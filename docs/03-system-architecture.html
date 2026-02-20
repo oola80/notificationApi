@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03 — System Architecture | Notification API</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="doc-container">
+  <nav class="doc-nav">
+    <a href="index.html">Home</a>
+    <a href="01-executive-summary.html">Executive Summary</a>
+    <a href="02-detailed-microservices.html">Microservices Detail</a>
+    <a href="03-system-architecture.html" class="active">System Architecture</a>
+    <a href="04-authentication-identity.html">Auth &amp; Identity</a>
+    <a href="05-testing-strategy.html">Testing Strategy</a>
+    <a href="06-changelog.html">Changelog</a>
+  </nav>
+
+  <div class="doc-header">
+    <h1>03 — System Architecture</h1>
+    <p class="subtitle">Notification API — Architecture &amp; Diagrams</p>
+    <div class="doc-meta">
+      <span><strong>Version:</strong> 1.0</span>
+      <span><strong>Date:</strong> 2026-02-19</span>
+      <span><strong>Author:</strong> Architecture Team</span>
+      <span><strong>Status:</strong> <span class="badge badge-review">In Review</span></span>
+    </div>
+  </div>
+
+  <!-- Table of Contents -->
+  <div class="toc">
+    <h3>Table of Contents</h3>
+    <ol>
+      <li><a href="#architecture-overview">Architecture Overview</a></li>
+      <li><a href="#high-level-diagram">High-Level Architecture Diagram</a></li>
+      <li><a href="#layer-architecture">Layer Architecture</a></li>
+      <li><a href="#event-flow">Event Flow Architecture</a></li>
+      <li><a href="#rabbitmq-architecture">RabbitMQ Message Architecture</a></li>
+      <li><a href="#database-architecture">Database Architecture</a></li>
+      <li><a href="#notification-lifecycle">Notification Lifecycle Flowchart</a></li>
+      <li><a href="#security-architecture">Authentication &amp; Security Architecture</a></li>
+      <li><a href="#scalability-resilience">Scalability &amp; Resilience Patterns</a></li>
+      <li><a href="#deployment-architecture">Deployment Architecture</a></li>
+      <li><a href="#monitoring-observability">Monitoring &amp; Observability</a></li>
+      <li><a href="#integration-patterns">Integration Patterns</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. Architecture Overview -->
+  <h2 id="architecture-overview">1. Architecture Overview</h2>
+  <p>
+    The Notification API platform is built on an <strong>event-driven microservices architecture</strong> that decouples
+    notification logic from source systems and centralizes it into a purpose-built set of services. The architecture is
+    designed for resilience, horizontal scalability, and operational flexibility — enabling the business to evolve its
+    notification strategy without engineering effort.
+  </p>
+
+  <h3>1.1 Architectural Principles</h3>
+  <table>
+    <thead>
+      <tr><th>Principle</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Loose Coupling</strong></td>
+        <td>Services communicate through well-defined APIs and asynchronous messages. No service directly accesses another service's database or internal state.</td>
+      </tr>
+      <tr>
+        <td><strong>Single Responsibility</strong></td>
+        <td>Each microservice owns one bounded context: event ingestion, orchestration, template rendering, channel routing, administration, or auditing.</td>
+      </tr>
+      <tr>
+        <td><strong>Event-Driven</strong></td>
+        <td>Business events flow through RabbitMQ, decoupling producers from consumers and enabling asynchronous, resilient processing with guaranteed delivery.</td>
+      </tr>
+      <tr>
+        <td><strong>Database-per-Service</strong></td>
+        <td>Each service owns its own PostgreSQL database. Data isolation ensures independent deployability and eliminates cross-service schema coupling.</td>
+      </tr>
+      <tr>
+        <td><strong>API-First Design</strong></td>
+        <td>All service interfaces are designed API-first with clear contracts. The BFF/Gateway exposes a unified REST API for the frontend, abstracting internal service topology.</td>
+      </tr>
+      <tr>
+        <td><strong>Resilience by Default</strong></td>
+        <td>Circuit breakers, retry policies, dead-letter queues, and health checks are built into every service. The system degrades gracefully under failure.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>Key Architectural Decision:</strong> RabbitMQ was chosen over Kafka because the notification domain requires reliable per-message delivery, flexible routing via exchanges, and dead-letter queue support for retry workflows — all strengths of RabbitMQ's AMQP model. The system does not require Kafka's log-based stream processing or replay capabilities.
+  </div>
+
+  <!-- 2. High-Level Architecture Diagram -->
+  <h2 id="high-level-diagram">2. High-Level Architecture Diagram</h2>
+  <p>
+    The following diagram illustrates the complete system topology, showing how source systems, microservices, message
+    broker, databases, and external providers interconnect.
+  </p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 920 630" xmlns="http://www.w3.org/2000/svg" style="max-width:920px;width:100%;height:auto;font-family:'Segoe UI',Arial,sans-serif;">
+      <rect x="0" y="0" width="920" height="630" rx="10" fill="#FFFFFF" stroke="#DFE1E6" stroke-width="1"/>
+
+      <!-- Title -->
+      <text x="460" y="28" text-anchor="middle" font-size="14" font-weight="700" fill="#172B4D">Notification API — High-Level Architecture</text>
+
+      <!-- Source Systems -->
+      <rect x="15" y="50" width="130" height="260" rx="8" fill="#EAE6FF" stroke="#5243AA" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <text x="80" y="70" text-anchor="middle" font-size="11" font-weight="700" fill="#5243AA">Source Systems</text>
+      <rect x="25" y="82" width="110" height="30" rx="6" fill="#fff" stroke="#5243AA" stroke-width="1"/><text x="80" y="102" text-anchor="middle" font-size="10" fill="#5243AA">OMS</text>
+      <rect x="25" y="120" width="110" height="30" rx="6" fill="#fff" stroke="#5243AA" stroke-width="1"/><text x="80" y="140" text-anchor="middle" font-size="10" fill="#5243AA">Magento 2</text>
+      <rect x="25" y="158" width="110" height="30" rx="6" fill="#fff" stroke="#5243AA" stroke-width="1"/><text x="80" y="178" text-anchor="middle" font-size="10" fill="#5243AA">Mirakl</text>
+      <rect x="25" y="196" width="110" height="30" rx="6" fill="#fff" stroke="#5243AA" stroke-width="1"/><text x="80" y="216" text-anchor="middle" font-size="10" fill="#5243AA">Chat Commerce</text>
+      <rect x="25" y="234" width="110" height="30" rx="6" fill="#fff" stroke="#5243AA" stroke-width="1"/><text x="80" y="254" text-anchor="middle" font-size="10" fill="#5243AA">Manual (Admin UI)</text>
+      <rect x="25" y="272" width="110" height="30" rx="6" fill="#fff" stroke="#5243AA" stroke-width="1"/><text x="80" y="292" text-anchor="middle" font-size="10" fill="#5243AA">Closed Systems</text>
+
+      <!-- Arrow Sources to Ingestion -->
+      <defs>
+        <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#6B778C"/></marker>
+        <marker id="ahBlue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0052CC"/></marker>
+        <marker id="ahGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#00875A"/></marker>
+      </defs>
+      <line x1="145" y1="175" x2="175" y2="175" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/>
+
+      <!-- Event Ingestion Service -->
+      <rect x="180" y="120" width="130" height="110" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="245" y="148" text-anchor="middle" font-size="11" font-weight="700" fill="#0052CC">Event Ingestion</text>
+      <text x="245" y="165" text-anchor="middle" font-size="9" fill="#42526E">Normalize &amp; Validate</text>
+      <text x="245" y="180" text-anchor="middle" font-size="9" fill="#42526E">REST + RabbitMQ</text>
+      <rect x="195" y="195" width="100" height="22" rx="4" fill="#E6FCFF" stroke="#008DA6" stroke-width="1"/><text x="245" y="210" text-anchor="middle" font-size="8" fill="#008DA6">event_ingestion_db</text>
+
+      <!-- Email Ingest Service -->
+      <rect x="180" y="250" width="130" height="70" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="245" y="275" text-anchor="middle" font-size="11" font-weight="700" fill="#0052CC">Email Ingest</text>
+      <text x="245" y="292" text-anchor="middle" font-size="9" fill="#42526E">SMTP :2525 / REST :3007</text>
+      <rect x="195" y="305" width="100" height="22" rx="4" fill="#E6FCFF" stroke="#008DA6" stroke-width="1"/><text x="245" y="320" text-anchor="middle" font-size="8" fill="#008DA6">email_ingest_db</text>
+
+      <!-- Arrow Closed Systems to Email Ingest -->
+      <line x1="135" y1="287" x2="175" y2="287" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/>
+
+      <!-- Bulk Upload Service -->
+      <rect x="180" y="340" width="130" height="55" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="245" y="363" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Bulk Upload</text>
+      <text x="245" y="378" text-anchor="middle" font-size="9" fill="#42526E">XLSX Parse — Port 3008</text>
+      <rect x="195" y="398" width="100" height="22" rx="4" fill="#E6FCFF" stroke="#008DA6" stroke-width="1"/><text x="245" y="413" text-anchor="middle" font-size="8" fill="#008DA6">bulk_upload_db</text>
+
+      <!-- Arrow Bulk Upload to Event Ingestion (HTTP) -->
+      <line x1="245" y1="340" x2="245" y2="230" stroke="#6B778C" stroke-width="1.5" marker-end="url(#ah)"/>
+      <text x="260" y="285" font-size="7" fill="#6B778C">HTTP POST</text>
+
+      <!-- Arrow Email Ingest to RabbitMQ -->
+      <line x1="310" y1="280" x2="370" y2="210" stroke="#6B778C" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah)"/>
+
+      <!-- Arrow Ingestion to RabbitMQ -->
+      <line x1="310" y1="175" x2="340" y2="175" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/>
+
+      <!-- RabbitMQ -->
+      <rect x="345" y="130" width="120" height="90" rx="8" fill="#EAE6FF" stroke="#5243AA" stroke-width="2"/>
+      <text x="405" y="160" text-anchor="middle" font-size="12" font-weight="700" fill="#5243AA">RabbitMQ</text>
+      <text x="405" y="178" text-anchor="middle" font-size="9" fill="#5243AA">Exchanges &amp; Queues</text>
+      <text x="405" y="193" text-anchor="middle" font-size="9" fill="#5243AA">Message Broker</text>
+
+      <!-- Arrow RabbitMQ to Engine -->
+      <line x1="465" y1="175" x2="495" y2="175" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/>
+
+      <!-- Notification Engine -->
+      <rect x="500" y="105" width="140" height="140" rx="8" fill="#E3FCEF" stroke="#00875A" stroke-width="1.5"/>
+      <text x="570" y="130" text-anchor="middle" font-size="11" font-weight="700" fill="#00875A">Notification</text>
+      <text x="570" y="145" text-anchor="middle" font-size="11" font-weight="700" fill="#00875A">Engine</text>
+      <text x="570" y="165" text-anchor="middle" font-size="9" fill="#42526E">Rules &amp; Orchestration</text>
+      <text x="570" y="180" text-anchor="middle" font-size="9" fill="#42526E">Recipient Resolution</text>
+      <rect x="515" y="195" width="110" height="22" rx="4" fill="#E6FCFF" stroke="#008DA6" stroke-width="1"/><text x="570" y="210" text-anchor="middle" font-size="8" fill="#008DA6">notification_engine_db</text>
+
+      <!-- Template Service (above Engine) -->
+      <rect x="500" y="45" width="140" height="48" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="570" y="66" text-anchor="middle" font-size="10" font-weight="600" fill="#0052CC">Template Service</text>
+      <text x="570" y="82" text-anchor="middle" font-size="8" fill="#42526E">Render &amp; Manage</text>
+      <line x1="570" y1="93" x2="570" y2="105" stroke="#0052CC" stroke-width="1.5" marker-end="url(#ahBlue)"/>
+
+      <!-- Arrow Engine to Channel Router -->
+      <line x1="640" y1="175" x2="670" y2="175" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/>
+
+      <!-- Channel Router -->
+      <rect x="675" y="115" width="130" height="120" rx="8" fill="#FFFAE6" stroke="#FF991F" stroke-width="1.5"/>
+      <text x="740" y="142" text-anchor="middle" font-size="11" font-weight="700" fill="#FF991F">Channel Router</text>
+      <text x="740" y="160" text-anchor="middle" font-size="9" fill="#42526E">Route &amp; Deliver</text>
+      <text x="740" y="175" text-anchor="middle" font-size="9" fill="#42526E">Retry &amp; Circuit Breaker</text>
+      <rect x="690" y="195" width="100" height="22" rx="4" fill="#E6FCFF" stroke="#008DA6" stroke-width="1"/><text x="740" y="210" text-anchor="middle" font-size="8" fill="#008DA6">channel_router_db</text>
+
+      <!-- Arrow Channel Router to Providers -->
+      <line x1="805" y1="155" x2="835" y2="120" stroke="#00875A" stroke-width="1.5" marker-end="url(#ahGreen)"/>
+      <line x1="805" y1="165" x2="835" y2="155" stroke="#00875A" stroke-width="1.5" marker-end="url(#ahGreen)"/>
+      <line x1="805" y1="175" x2="835" y2="190" stroke="#00875A" stroke-width="1.5" marker-end="url(#ahGreen)"/>
+      <line x1="805" y1="185" x2="835" y2="225" stroke="#00875A" stroke-width="1.5" marker-end="url(#ahGreen)"/>
+
+      <!-- External Providers -->
+      <rect x="840" y="100" width="70" height="28" rx="6" fill="#E3FCEF" stroke="#00875A" stroke-width="1"/><text x="875" y="118" text-anchor="middle" font-size="9" fill="#00875A">SendGrid</text>
+      <rect x="840" y="138" width="70" height="28" rx="6" fill="#E3FCEF" stroke="#00875A" stroke-width="1"/><text x="875" y="156" text-anchor="middle" font-size="9" fill="#00875A">Twilio SMS</text>
+      <rect x="840" y="176" width="70" height="28" rx="6" fill="#E3FCEF" stroke="#00875A" stroke-width="1"/><text x="875" y="194" text-anchor="middle" font-size="9" fill="#00875A">WhatsApp</text>
+      <rect x="840" y="214" width="70" height="28" rx="6" fill="#E3FCEF" stroke="#00875A" stroke-width="1"/><text x="875" y="232" text-anchor="middle" font-size="9" fill="#00875A">FCM Push</text>
+
+      <!-- Admin UI & Gateway (bottom) -->
+      <rect x="15" y="440" width="180" height="60" rx="8" fill="#F4F5F7" stroke="#6B778C" stroke-width="1.5"/>
+      <text x="105" y="465" text-anchor="middle" font-size="11" font-weight="700" fill="#172B4D">Admin UI (Next.js)</text>
+      <text x="105" y="482" text-anchor="middle" font-size="9" fill="#6B778C">Port 3010</text>
+
+      <line x1="195" y1="470" x2="225" y2="470" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/>
+
+      <rect x="230" y="440" width="180" height="60" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="320" y="465" text-anchor="middle" font-size="11" font-weight="700" fill="#0052CC">Gateway (BFF)</text>
+      <text x="320" y="482" text-anchor="middle" font-size="9" fill="#42526E">Auth, Routing — Port 3000</text>
+
+      <line x1="410" y1="470" x2="440" y2="470" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/>
+
+      <rect x="445" y="440" width="160" height="60" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="525" y="465" text-anchor="middle" font-size="11" font-weight="700" fill="#0052CC">Admin Service</text>
+      <text x="525" y="482" text-anchor="middle" font-size="9" fill="#42526E">Rules, Config — Port 3005</text>
+
+      <!-- Audit Service -->
+      <rect x="660" y="440" width="160" height="60" rx="8" fill="#FFEBE6" stroke="#FF5630" stroke-width="1.5"/>
+      <text x="740" y="465" text-anchor="middle" font-size="11" font-weight="700" fill="#FF5630">Audit Service</text>
+      <text x="740" y="482" text-anchor="middle" font-size="9" fill="#42526E">Tracking — Port 3006</text>
+
+      <!-- Dashed line from RabbitMQ to Audit -->
+      <line x1="405" y1="220" x2="405" y2="310" stroke="#FF5630" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="405" y1="310" x2="740" y2="310" stroke="#FF5630" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="740" y1="310" x2="740" y2="440" stroke="#FF5630" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah)"/>
+      <text x="570" y="304" text-anchor="middle" font-size="8" fill="#FF5630">Status Events</text>
+
+      <!-- Legend -->
+      <rect x="15" y="530" width="890" height="85" rx="8" fill="#F4F5F7" stroke="#DFE1E6" stroke-width="1"/>
+      <text x="30" y="550" font-size="10" font-weight="700" fill="#172B4D">Legend:</text>
+      <rect x="30" y="560" width="14" height="14" rx="3" fill="#DEEBFF" stroke="#0052CC" stroke-width="1"/><text x="50" y="572" font-size="9" fill="#42526E">Core Services (NestJS)</text>
+      <rect x="180" y="560" width="14" height="14" rx="3" fill="#E3FCEF" stroke="#00875A" stroke-width="1"/><text x="200" y="572" font-size="9" fill="#42526E">External Providers</text>
+      <rect x="330" y="560" width="14" height="14" rx="3" fill="#EAE6FF" stroke="#5243AA" stroke-width="1"/><text x="350" y="572" font-size="9" fill="#42526E">Message Broker / Sources</text>
+      <rect x="520" y="560" width="14" height="14" rx="3" fill="#E6FCFF" stroke="#008DA6" stroke-width="1"/><text x="540" y="572" font-size="9" fill="#42526E">Databases (PostgreSQL)</text>
+      <rect x="700" y="560" width="14" height="14" rx="3" fill="#FFFAE6" stroke="#FF991F" stroke-width="1"/><text x="720" y="572" font-size="9" fill="#42526E">Routing / Delivery</text>
+      <line x1="30" y1="590" x2="60" y2="590" stroke="#6B778C" stroke-width="2" marker-end="url(#ah)"/><text x="70" y="594" font-size="9" fill="#42526E">Synchronous (REST)</text>
+      <line x1="200" y1="590" x2="230" y2="590" stroke="#6B778C" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ah)"/><text x="240" y="594" font-size="9" fill="#42526E">Asynchronous (RabbitMQ)</text>
+    </svg>
+    <p class="diagram-caption">Figure 2.1 — High-Level System Architecture showing all microservices, external integrations, and communication patterns.</p>
+  </div>
+
+  <!-- 3. Layer Architecture -->
+  <h2 id="layer-architecture">3. Layer Architecture</h2>
+  <p>
+    The system is organized into five distinct layers, each with a specific responsibility. This layered approach
+    enforces separation of concerns and allows each layer to scale, evolve, and be maintained independently.
+  </p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 900 410" xmlns="http://www.w3.org/2000/svg" style="max-width:900px;width:100%;height:auto;font-family:'Segoe UI',Arial,sans-serif;">
+      <rect x="0" y="0" width="900" height="410" rx="10" fill="#FFFFFF" stroke="#DFE1E6" stroke-width="1"/>
+      <text x="450" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#172B4D">Layered Architecture</text>
+
+      <!-- Edge Layer -->
+      <rect x="20" y="40" width="860" height="55" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="50" y="62" font-size="11" font-weight="700" fill="#0052CC">Edge Layer</text>
+      <rect x="200" y="48" width="160" height="35" rx="6" fill="#fff" stroke="#0052CC" stroke-width="1"/><text x="280" y="70" text-anchor="middle" font-size="9" fill="#0052CC">Admin UI (Next.js :3010)</text>
+      <rect x="380" y="48" width="190" height="35" rx="6" fill="#fff" stroke="#0052CC" stroke-width="1"/><text x="475" y="70" text-anchor="middle" font-size="9" fill="#0052CC">Notification Gateway (BFF :3000)</text>
+      <rect x="590" y="48" width="160" height="35" rx="6" fill="#fff" stroke="#0052CC" stroke-width="1"/><text x="670" y="70" text-anchor="middle" font-size="9" fill="#0052CC">External Webhooks</text>
+
+      <!-- Compute Layer -->
+      <rect x="20" y="110" width="860" height="98" rx="8" fill="#E3FCEF" stroke="#00875A" stroke-width="1.5"/>
+      <text x="50" y="132" font-size="11" font-weight="700" fill="#00875A">Compute Layer</text>
+      <rect x="50" y="140" width="120" height="35" rx="6" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="110" y="162" text-anchor="middle" font-size="8" fill="#00875A">Event Ingestion :3001</text>
+      <rect x="185" y="140" width="130" height="35" rx="6" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="250" y="162" text-anchor="middle" font-size="8" fill="#00875A">Notification Engine :3002</text>
+      <rect x="330" y="140" width="120" height="35" rx="6" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="390" y="162" text-anchor="middle" font-size="8" fill="#00875A">Template Service :3003</text>
+      <rect x="465" y="140" width="120" height="35" rx="6" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="525" y="162" text-anchor="middle" font-size="8" fill="#00875A">Channel Router :3004</text>
+      <rect x="600" y="140" width="120" height="35" rx="6" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="660" y="162" text-anchor="middle" font-size="8" fill="#00875A">Admin Service :3005</text>
+      <rect x="735" y="140" width="120" height="35" rx="6" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="795" y="162" text-anchor="middle" font-size="8" fill="#00875A">Audit Service :3006</text>
+      <rect x="50" y="178" width="130" height="22" rx="4" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="115" y="193" text-anchor="middle" font-size="8" fill="#00875A">Email Ingest :3007/2525</text>
+      <rect x="195" y="178" width="120" height="22" rx="4" fill="#fff" stroke="#00875A" stroke-width="1"/><text x="255" y="193" text-anchor="middle" font-size="8" fill="#00875A">Bulk Upload :3008</text>
+
+      <!-- Message Layer -->
+      <rect x="20" y="223" width="860" height="55" rx="8" fill="#EAE6FF" stroke="#5243AA" stroke-width="1.5"/>
+      <text x="50" y="245" font-size="11" font-weight="700" fill="#5243AA">Message Layer</text>
+      <rect x="200" y="233" width="580" height="35" rx="6" fill="#fff" stroke="#5243AA" stroke-width="1"/><text x="490" y="255" text-anchor="middle" font-size="10" fill="#5243AA">RabbitMQ — Exchanges: events.incoming, events.normalized, notifications.render, notifications.deliver, notifications.status, notifications.dlq</text>
+
+      <!-- Data Layer -->
+      <rect x="20" y="293" width="860" height="55" rx="8" fill="#E6FCFF" stroke="#008DA6" stroke-width="1.5"/>
+      <text x="50" y="315" font-size="11" font-weight="700" fill="#008DA6">Data Layer</text>
+      <rect x="130" y="301" width="95" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="177" y="323" text-anchor="middle" font-size="7" fill="#008DA6">event_ingestion_db</text>
+      <rect x="233" y="301" width="105" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="285" y="323" text-anchor="middle" font-size="7" fill="#008DA6">notification_engine_db</text>
+      <rect x="346" y="301" width="75" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="383" y="323" text-anchor="middle" font-size="7" fill="#008DA6">template_db</text>
+      <rect x="429" y="301" width="95" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="476" y="323" text-anchor="middle" font-size="7" fill="#008DA6">channel_router_db</text>
+      <rect x="532" y="301" width="70" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="567" y="323" text-anchor="middle" font-size="7" fill="#008DA6">admin_db</text>
+      <rect x="610" y="301" width="70" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="645" y="323" text-anchor="middle" font-size="7" fill="#008DA6">audit_db</text>
+      <rect x="688" y="301" width="95" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="735" y="323" text-anchor="middle" font-size="7" fill="#008DA6">email_ingest_db</text>
+      <rect x="791" y="301" width="80" height="35" rx="6" fill="#fff" stroke="#008DA6" stroke-width="1"/><text x="831" y="323" text-anchor="middle" font-size="7" fill="#008DA6">bulk_upload_db</text>
+
+      <!-- External Layer -->
+      <rect x="20" y="363" width="860" height="35" rx="8" fill="#FFEBE6" stroke="#FF5630" stroke-width="1.5"/>
+      <text x="50" y="386" font-size="11" font-weight="700" fill="#FF5630">External Integration Layer</text>
+      <text x="270" y="386" font-size="9" fill="#42526E">SendGrid (Email)</text>
+      <text x="420" y="386" font-size="9" fill="#42526E">Twilio (SMS/WhatsApp)</text>
+      <text x="600" y="386" font-size="9" fill="#42526E">Firebase (Push)</text>
+      <text x="750" y="386" font-size="9" fill="#42526E">OMS / Magento / Mirakl</text>
+    </svg>
+    <p class="diagram-caption">Figure 3.1 — Layered architecture showing Edge, Compute, Message, Data, and External Integration layers.</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Responsibility</th><th>Components</th><th>Scalability</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-blue">Edge</span></td>
+        <td>Client-facing API surface. Authentication, authorization, rate limiting, request validation, and routing.</td>
+        <td>notification-admin-ui, notification-gateway</td>
+        <td>Horizontal — stateless, load-balanced</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">Compute</span></td>
+        <td>Core business logic. Event normalization, rule evaluation, template rendering, channel routing, administration, and audit recording.</td>
+        <td>event-ingestion, notification-engine, template-service, channel-router, admin-service, audit-service, email-ingest-service, bulk-upload-service</td>
+        <td>Horizontal — independent per service</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-purple">Message</span></td>
+        <td>Asynchronous inter-service communication. Event fan-out, delivery queue management, dead-letter handling.</td>
+        <td>RabbitMQ (6 exchanges, multiple queues)</td>
+        <td>Clustered — mirrored queues</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-teal">Data</span></td>
+        <td>Persistent storage. Each service owns its database with full schema control.</td>
+        <td>8 PostgreSQL databases</td>
+        <td>Vertical + read replicas</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-red">External</span></td>
+        <td>Third-party provider integrations and source system connections.</td>
+        <td>SendGrid, Twilio, FCM, OMS, Magento, Mirakl</td>
+        <td>Provider-managed</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 4. Event Flow Architecture -->
+  <h2 id="event-flow">4. Event Flow Architecture</h2>
+  <p>
+    The notification lifecycle follows a sequential event-driven flow from source system event to customer delivery.
+    Each step is asynchronous and decoupled, enabling independent scaling and fault isolation.
+  </p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" style="max-width:900px;width:100%;height:auto;font-family:'Segoe UI',Arial,sans-serif;">
+      <defs>
+        <marker id="af" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0052CC"/></marker>
+      </defs>
+      <rect x="0" y="0" width="900" height="480" rx="10" fill="#FFFFFF" stroke="#DFE1E6" stroke-width="1"/>
+      <text x="450" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#172B4D">Event Flow — Source to Customer</text>
+
+      <!-- Step 1 -->
+      <circle cx="60" cy="70" r="18" fill="#0052CC"/><text x="60" y="75" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">1</text>
+      <rect x="90" y="50" width="200" height="40" rx="8" fill="#EAE6FF" stroke="#5243AA" stroke-width="1.5"/>
+      <text x="190" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#5243AA">Source System Emits Event</text>
+      <text x="190" y="82" text-anchor="middle" font-size="8" fill="#6B778C">e.g. order.shipped from OMS</text>
+
+      <!-- Step 2 -->
+      <line x1="290" y1="70" x2="330" y2="70" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="350" cy="70" r="18" fill="#0052CC"/><text x="350" y="75" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">2</text>
+      <rect x="380" y="50" width="200" height="40" rx="8" fill="#EAE6FF" stroke="#5243AA" stroke-width="1.5"/>
+      <text x="480" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#5243AA">RabbitMQ / Webhook Received</text>
+      <text x="480" y="82" text-anchor="middle" font-size="8" fill="#6B778C">events.incoming exchange</text>
+
+      <!-- Step 3 -->
+      <line x1="580" y1="70" x2="620" y2="70" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="640" cy="70" r="18" fill="#0052CC"/><text x="640" y="75" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">3</text>
+      <rect x="670" y="50" width="200" height="40" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="770" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#0052CC">Event Ingestion Normalizes</text>
+      <text x="770" y="82" text-anchor="middle" font-size="8" fill="#6B778C">Canonical schema, validation</text>
+
+      <!-- Step 4 -->
+      <line x1="770" y1="90" x2="770" y2="125" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="640" cy="145" r="18" fill="#0052CC"/><text x="640" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">4</text>
+      <rect x="670" y="125" width="200" height="40" rx="8" fill="#EAE6FF" stroke="#5243AA" stroke-width="1.5"/>
+      <text x="770" y="143" text-anchor="middle" font-size="10" font-weight="600" fill="#5243AA">Publish to Normalized Exchange</text>
+      <text x="770" y="157" text-anchor="middle" font-size="8" fill="#6B778C">events.normalized topic</text>
+
+      <!-- Step 5 -->
+      <line x1="670" y1="145" x2="590" y2="145" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="350" cy="145" r="18" fill="#0052CC"/><text x="350" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">5</text>
+      <rect x="380" y="125" width="200" height="40" rx="8" fill="#E3FCEF" stroke="#00875A" stroke-width="1.5"/>
+      <text x="480" y="143" text-anchor="middle" font-size="10" font-weight="600" fill="#00875A">Engine Matches Rules</text>
+      <text x="480" y="157" text-anchor="middle" font-size="8" fill="#6B778C">Event type → notification rules</text>
+
+      <!-- Step 6 -->
+      <circle cx="60" cy="145" r="18" fill="#0052CC"/><text x="60" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">6</text>
+      <rect x="90" y="125" width="200" height="40" rx="8" fill="#E3FCEF" stroke="#00875A" stroke-width="1.5"/>
+      <text x="190" y="143" text-anchor="middle" font-size="10" font-weight="600" fill="#00875A">Resolve Recipients</text>
+      <text x="190" y="157" text-anchor="middle" font-size="8" fill="#6B778C">Customer, groups, preferences</text>
+      <line x1="380" y1="145" x2="290" y2="145" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+
+      <!-- Step 7 -->
+      <line x1="190" y1="165" x2="190" y2="200" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="60" cy="220" r="18" fill="#0052CC"/><text x="60" y="225" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">7</text>
+      <rect x="90" y="200" width="200" height="40" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="190" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#0052CC">Template Service Renders</text>
+      <text x="190" y="232" text-anchor="middle" font-size="8" fill="#6B778C">Handlebars, per-channel variant</text>
+
+      <!-- Step 8 -->
+      <line x1="290" y1="220" x2="330" y2="220" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="350" cy="220" r="18" fill="#0052CC"/><text x="350" y="225" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">8</text>
+      <rect x="380" y="200" width="200" height="40" rx="8" fill="#FFFAE6" stroke="#FF991F" stroke-width="1.5"/>
+      <text x="480" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#FF991F">Channel Router Dispatches</text>
+      <text x="480" y="232" text-anchor="middle" font-size="8" fill="#6B778C">Route to provider per channel</text>
+
+      <!-- Step 9 -->
+      <line x1="580" y1="220" x2="620" y2="220" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="640" cy="220" r="18" fill="#0052CC"/><text x="640" y="225" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">9</text>
+      <rect x="670" y="200" width="200" height="40" rx="8" fill="#E3FCEF" stroke="#00875A" stroke-width="1.5"/>
+      <text x="770" y="218" text-anchor="middle" font-size="10" font-weight="600" fill="#00875A">Provider Delivers to Customer</text>
+      <text x="770" y="232" text-anchor="middle" font-size="8" fill="#6B778C">SendGrid, Twilio, FCM</text>
+
+      <!-- Step 10 -->
+      <line x1="770" y1="240" x2="770" y2="275" stroke="#0052CC" stroke-width="1.5" marker-end="url(#af)"/>
+      <circle cx="640" cy="295" r="18" fill="#0052CC"/><text x="640" y="300" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">10</text>
+      <rect x="670" y="275" width="200" height="40" rx="8" fill="#FFEBE6" stroke="#FF5630" stroke-width="1.5"/>
+      <text x="770" y="293" text-anchor="middle" font-size="10" font-weight="600" fill="#FF5630">Audit Service Records</text>
+      <text x="770" y="307" text-anchor="middle" font-size="8" fill="#6B778C">Status, receipt, analytics</text>
+
+      <!-- Summary box -->
+      <rect x="60" y="340" width="780" height="120" rx="8" fill="#F4F5F7" stroke="#DFE1E6" stroke-width="1"/>
+      <text x="80" y="365" font-size="11" font-weight="700" fill="#172B4D">Step Summary:</text>
+      <text x="80" y="385" font-size="9" fill="#42526E">1. Source system publishes business event  |  2. Event arrives via RabbitMQ or webhook  |  3. Ingestion service normalizes to canonical schema</text>
+      <text x="80" y="400" font-size="9" fill="#42526E">4. Normalized event published to internal exchange  |  5. Engine evaluates notification rules  |  6. Recipients resolved from rules and preferences</text>
+      <text x="80" y="415" font-size="9" fill="#42526E">7. Template service renders per-channel message variants  |  8. Channel router dispatches to delivery provider  |  9. Provider delivers to customer</text>
+      <text x="80" y="430" font-size="9" fill="#42526E">10. Audit service records delivery status, receipt, and analytics data for compliance and monitoring</text>
+      <text x="80" y="450" font-size="9" font-weight="600" fill="#0052CC">All steps are asynchronous via RabbitMQ except Template rendering (synchronous REST) and Provider delivery (synchronous HTTP).</text>
+    </svg>
+    <p class="diagram-caption">Figure 4.1 — End-to-end event flow from source system event emission through customer delivery and audit recording.</p>
+  </div>
+
+  <!-- 5. RabbitMQ Message Architecture -->
+  <h2 id="rabbitmq-architecture">5. RabbitMQ Message Architecture</h2>
+  <p>
+    RabbitMQ is the backbone of the asynchronous communication layer. The exchange and queue topology is designed
+    for flexible routing, reliable delivery, and graceful failure handling via dead-letter queues.
+  </p>
+
+  <h3>5.1 Exchange Topology</h3>
+  <table>
+    <thead>
+      <tr><th>Exchange</th><th>Type</th><th>Purpose</th><th>Routing Key Pattern</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>events.incoming</code></td><td>Topic</td><td>Raw events from source systems</td><td><code>source.{system}.{eventType}</code></td></tr>
+      <tr><td><code>events.normalized</code></td><td>Topic</td><td>Normalized canonical events</td><td><code>event.{eventType}</code></td></tr>
+      <tr><td><code>notifications.render</code></td><td>Topic</td><td>Template render requests</td><td><code>render.{channel}</code></td></tr>
+      <tr><td><code>notifications.deliver</code></td><td>Topic</td><td>Delivery requests per channel</td><td><code>deliver.{channel}</code></td></tr>
+      <tr><td><code>notifications.status</code></td><td>Topic</td><td>Delivery status updates</td><td><code>status.{notificationId}</code></td></tr>
+      <tr><td><code>notifications.dlq</code></td><td>Fanout</td><td>Dead-letter queue for failed messages</td><td>N/A (fanout)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 Queue Configuration</h3>
+  <table>
+    <thead>
+      <tr><th>Queue</th><th>Bound Exchange</th><th>Routing Key</th><th>Consumer Service</th><th>DLQ</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>q.events.oms</code></td><td>events.incoming</td><td><code>source.oms.#</code></td><td>event-ingestion-service</td><td>Yes</td></tr>
+      <tr><td><code>q.events.magento</code></td><td>events.incoming</td><td><code>source.magento.#</code></td><td>event-ingestion-service</td><td>Yes</td></tr>
+      <tr><td><code>q.events.mirakl</code></td><td>events.incoming</td><td><code>source.mirakl.#</code></td><td>event-ingestion-service</td><td>Yes</td></tr>
+      <tr><td><code>q.events.chat</code></td><td>events.incoming</td><td><code>source.chat.#</code></td><td>event-ingestion-service</td><td>Yes</td></tr>
+      <tr><td><code>q.events.email-ingest</code></td><td>events.incoming</td><td><code>source.email-ingest.#</code></td><td>event-ingestion-service</td><td>Yes</td></tr>
+      <tr><td><code>q.events.normalized</code></td><td>events.normalized</td><td><code>event.#</code></td><td>notification-engine-service</td><td>Yes</td></tr>
+      <tr><td><code>q.deliver.email</code></td><td>notifications.deliver</td><td><code>deliver.email</code></td><td>channel-router-service</td><td>Yes</td></tr>
+      <tr><td><code>q.deliver.sms</code></td><td>notifications.deliver</td><td><code>deliver.sms</code></td><td>channel-router-service</td><td>Yes</td></tr>
+      <tr><td><code>q.deliver.whatsapp</code></td><td>notifications.deliver</td><td><code>deliver.whatsapp</code></td><td>channel-router-service</td><td>Yes</td></tr>
+      <tr><td><code>q.deliver.push</code></td><td>notifications.deliver</td><td><code>deliver.push</code></td><td>channel-router-service</td><td>Yes</td></tr>
+      <tr><td><code>q.status.updates</code></td><td>notifications.status</td><td><code>status.#</code></td><td>audit-service</td><td>Yes</td></tr>
+      <tr><td><code>q.dlq</code></td><td>notifications.dlq</td><td>N/A</td><td>Manual review / reprocessing</td><td>No</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note-box">
+    <strong>Dead-Letter Queue Strategy:</strong> All queues are configured with a dead-letter exchange (<code>notifications.dlq</code>).
+    Messages are dead-lettered after 3 failed processing attempts. The DLQ is monitored and messages can be manually reprocessed
+    through the Admin UI or automatically retried with exponential backoff via a scheduled reprocessing job.
+  </div>
+
+  <!-- 6. Database Architecture -->
+  <h2 id="database-architecture">6. Database Architecture</h2>
+  <p>
+    The platform follows the <strong>database-per-service</strong> pattern. Each microservice owns and manages its own
+    PostgreSQL database, ensuring data isolation, independent schema evolution, and no cross-service data coupling.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Database</th><th>Owner Service</th><th>Key Tables</th><th>Est. Size (Year 1)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>event_ingestion_db</code></td><td>event-ingestion-service</td><td>events, event_sources, event_schemas</td><td>~50 GB</td></tr>
+      <tr><td><code>notification_engine_db</code></td><td>notification-engine-service</td><td>notification_rules, notifications, notification_recipients, notification_status_log, recipient_groups, recipient_preferences</td><td>~80 GB</td></tr>
+      <tr><td><code>template_db</code></td><td>template-service</td><td>templates, template_versions, template_variables, template_channels</td><td>~1 GB</td></tr>
+      <tr><td><code>channel_router_db</code></td><td>channel-router-service</td><td>channels, channel_configs, delivery_attempts, provider_configs</td><td>~30 GB</td></tr>
+      <tr><td><code>admin_db</code></td><td>admin-service</td><td>admin_users, admin_roles, admin_permissions, system_configs</td><td>~500 MB</td></tr>
+      <tr><td><code>audit_db</code></td><td>audit-service</td><td>audit_events, delivery_receipts, notification_analytics</td><td>~100 GB</td></tr>
+      <tr><td><code>email_ingest_db</code></td><td>email-ingest-service</td><td>email_parsing_rules, processed_emails, email_sources</td><td>~20 GB</td></tr>
+      <tr><td><code>bulk_upload_db</code></td><td>bulk-upload-service</td><td>uploads, upload_rows</td><td>~5 GB</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.1 Core Entity Relationships (notification_engine_db)</h3>
+  <div class="diagram-container">
+    <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" style="max-width:880px;width:100%;height:auto;font-family:'Segoe UI',Arial,sans-serif;">
+      <rect x="0" y="0" width="880" height="340" rx="10" fill="#FFFFFF" stroke="#DFE1E6" stroke-width="1"/>
+      <text x="440" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#172B4D">notification_engine_db — Entity Relationships</text>
+
+      <!-- notification_rules -->
+      <rect x="20" y="45" width="200" height="120" rx="6" fill="#E6FCFF" stroke="#008DA6" stroke-width="1.5"/>
+      <rect x="20" y="45" width="200" height="25" rx="6" fill="#008DA6"/><text x="120" y="63" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">notification_rules</text>
+      <text x="30" y="85" font-size="9" fill="#172B4D">PK  rule_id UUID</text>
+      <text x="30" y="100" font-size="9" fill="#172B4D">    name VARCHAR(255)</text>
+      <text x="30" y="115" font-size="9" fill="#172B4D">    event_type VARCHAR(100)</text>
+      <text x="30" y="130" font-size="9" fill="#172B4D">    conditions JSONB</text>
+      <text x="30" y="145" font-size="9" fill="#172B4D">    actions JSONB</text>
+      <text x="30" y="160" font-size="9" fill="#172B4D">    is_active BOOLEAN</text>
+
+      <!-- notifications -->
+      <rect x="340" y="45" width="200" height="140" rx="6" fill="#E6FCFF" stroke="#008DA6" stroke-width="1.5"/>
+      <rect x="340" y="45" width="200" height="25" rx="6" fill="#008DA6"/><text x="440" y="63" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">notifications</text>
+      <text x="350" y="85" font-size="9" fill="#172B4D">PK  notification_id UUID</text>
+      <text x="350" y="100" font-size="9" fill="#172B4D">FK  rule_id UUID</text>
+      <text x="350" y="115" font-size="9" fill="#172B4D">FK  event_id UUID</text>
+      <text x="350" y="130" font-size="9" fill="#172B4D">    status VARCHAR(20)</text>
+      <text x="350" y="145" font-size="9" fill="#172B4D">    channel VARCHAR(20)</text>
+      <text x="350" y="160" font-size="9" fill="#172B4D">    template_id UUID</text>
+      <text x="350" y="175" font-size="9" fill="#172B4D">    created_at TIMESTAMP</text>
+
+      <!-- notification_recipients -->
+      <rect x="660" y="45" width="200" height="120" rx="6" fill="#E6FCFF" stroke="#008DA6" stroke-width="1.5"/>
+      <rect x="660" y="45" width="200" height="25" rx="6" fill="#008DA6"/><text x="760" y="63" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">notification_recipients</text>
+      <text x="670" y="85" font-size="9" fill="#172B4D">PK  recipient_id UUID</text>
+      <text x="670" y="100" font-size="9" fill="#172B4D">FK  notification_id UUID</text>
+      <text x="670" y="115" font-size="9" fill="#172B4D">    customer_id VARCHAR</text>
+      <text x="670" y="130" font-size="9" fill="#172B4D">    contact_value VARCHAR</text>
+      <text x="670" y="145" font-size="9" fill="#172B4D">    delivery_status VARCHAR</text>
+      <text x="670" y="160" font-size="9" fill="#172B4D">    delivered_at TIMESTAMP</text>
+
+      <!-- notification_status_log -->
+      <rect x="340" y="220" width="200" height="100" rx="6" fill="#E6FCFF" stroke="#008DA6" stroke-width="1.5"/>
+      <rect x="340" y="220" width="200" height="25" rx="6" fill="#008DA6"/><text x="440" y="238" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">notification_status_log</text>
+      <text x="350" y="260" font-size="9" fill="#172B4D">PK  log_id UUID</text>
+      <text x="350" y="275" font-size="9" fill="#172B4D">FK  notification_id UUID</text>
+      <text x="350" y="290" font-size="9" fill="#172B4D">    status VARCHAR(20)</text>
+      <text x="350" y="305" font-size="9" fill="#172B4D">    timestamp TIMESTAMP</text>
+
+      <!-- recipient_groups -->
+      <rect x="660" y="220" width="200" height="100" rx="6" fill="#E6FCFF" stroke="#008DA6" stroke-width="1.5"/>
+      <rect x="660" y="220" width="200" height="25" rx="6" fill="#008DA6"/><text x="760" y="238" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">recipient_groups</text>
+      <text x="670" y="260" font-size="9" fill="#172B4D">PK  group_id UUID</text>
+      <text x="670" y="275" font-size="9" fill="#172B4D">    name VARCHAR(255)</text>
+      <text x="670" y="290" font-size="9" fill="#172B4D">    criteria JSONB</text>
+      <text x="670" y="305" font-size="9" fill="#172B4D">    is_active BOOLEAN</text>
+
+      <!-- Relationship lines -->
+      <line x1="220" y1="105" x2="340" y2="105" stroke="#008DA6" stroke-width="1.5"/>
+      <circle cx="220" cy="105" r="4" fill="#008DA6"/><text x="270" y="100" text-anchor="middle" font-size="8" fill="#008DA6">1:N</text>
+      <line x1="540" y1="105" x2="660" y2="105" stroke="#008DA6" stroke-width="1.5"/>
+      <circle cx="540" cy="105" r="4" fill="#008DA6"/><text x="600" y="100" text-anchor="middle" font-size="8" fill="#008DA6">1:N</text>
+      <line x1="440" y1="185" x2="440" y2="220" stroke="#008DA6" stroke-width="1.5"/>
+      <circle cx="440" cy="185" r="4" fill="#008DA6"/><text x="460" y="205" font-size="8" fill="#008DA6">1:N</text>
+    </svg>
+    <p class="diagram-caption">Figure 6.1 — Core entity relationships in the notification_engine_db showing rules, notifications, recipients, and status tracking.</p>
+  </div>
+
+  <div class="info-box">
+    <strong>Data Isolation:</strong> Services never query another service's database directly. If the Admin Service needs notification
+    delivery data, it queries the Audit Service via REST API. This ensures each service can independently evolve its schema,
+    apply migrations, and optimize queries without affecting others.
+  </div>
+
+  <!-- 7. Notification Lifecycle -->
+  <h2 id="notification-lifecycle">7. Notification Lifecycle Flowchart</h2>
+  <p>
+    Each notification passes through a well-defined set of states from creation to final delivery (or failure).
+    The state machine ensures clear tracking and enables retry logic at each transition point.
+  </p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" style="max-width:880px;width:100%;height:auto;font-family:'Segoe UI',Arial,sans-serif;">
+      <defs><marker id="al" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#42526E"/></marker></defs>
+      <rect x="0" y="0" width="880" height="230" rx="10" fill="#FFFFFF" stroke="#DFE1E6" stroke-width="1"/>
+      <text x="440" y="25" text-anchor="middle" font-size="13" font-weight="700" fill="#172B4D">Notification State Machine</text>
+
+      <!-- PENDING -->
+      <rect x="20" y="60" width="100" height="45" rx="8" fill="#F4F5F7" stroke="#6B778C" stroke-width="1.5"/>
+      <text x="70" y="88" text-anchor="middle" font-size="10" font-weight="700" fill="#6B778C">PENDING</text>
+      <line x1="120" y1="82" x2="155" y2="82" stroke="#42526E" stroke-width="1.5" marker-end="url(#al)"/>
+
+      <!-- PROCESSING -->
+      <rect x="160" y="60" width="110" height="45" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="215" y="88" text-anchor="middle" font-size="10" font-weight="700" fill="#0052CC">PROCESSING</text>
+      <line x1="270" y1="82" x2="305" y2="82" stroke="#42526E" stroke-width="1.5" marker-end="url(#al)"/>
+
+      <!-- SUPPRESSED (branching down from PROCESSING) -->
+      <line x1="215" y1="105" x2="215" y2="150" stroke="#6B778C" stroke-width="1.5" marker-end="url(#al)"/>
+      <text x="240" y="133" font-size="7" fill="#6B778C">Suppression check</text>
+      <rect x="160" y="155" width="110" height="45" rx="8" fill="#F4F5F7" stroke="#6B778C" stroke-width="1.5"/>
+      <text x="215" y="183" text-anchor="middle" font-size="10" font-weight="700" fill="#6B778C">SUPPRESSED</text>
+
+      <!-- RENDERING -->
+      <rect x="310" y="60" width="110" height="45" rx="8" fill="#DEEBFF" stroke="#0052CC" stroke-width="1.5"/>
+      <text x="365" y="88" text-anchor="middle" font-size="10" font-weight="700" fill="#0052CC">RENDERING</text>
+      <line x1="420" y1="82" x2="455" y2="82" stroke="#42526E" stroke-width="1.5" marker-end="url(#al)"/>
+
+      <!-- DELIVERING -->
+      <rect x="460" y="60" width="110" height="45" rx="8" fill="#FFFAE6" stroke="#FF991F" stroke-width="1.5"/>
+      <text x="515" y="88" text-anchor="middle" font-size="10" font-weight="700" fill="#FF991F">DELIVERING</text>
+      <line x1="570" y1="82" x2="605" y2="82" stroke="#42526E" stroke-width="1.5" marker-end="url(#al)"/>
+
+      <!-- SENT -->
+      <rect x="610" y="60" width="100" height="45" rx="8" fill="#E3FCEF" stroke="#00875A" stroke-width="1.5"/>
+      <text x="660" y="88" text-anchor="middle" font-size="10" font-weight="700" fill="#00875A">SENT</text>
+
+      <!-- DELIVERED -->
+      <line x1="710" y1="72" x2="760" y2="62" stroke="#00875A" stroke-width="1.5" marker-end="url(#al)"/>
+      <rect x="765" y="40" width="100" height="45" rx="8" fill="#00875A" stroke="#00875A" stroke-width="1.5"/>
+      <text x="815" y="68" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">DELIVERED</text>
+
+      <!-- FAILED -->
+      <line x1="710" y1="92" x2="760" y2="112" stroke="#FF5630" stroke-width="1.5" marker-end="url(#al)"/>
+      <rect x="765" y="95" width="100" height="45" rx="8" fill="#FF5630" stroke="#FF5630" stroke-width="1.5"/>
+      <text x="815" y="123" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">FAILED</text>
+
+      <!-- Retry arrow from FAILED back to DELIVERING -->
+      <path d="M 765 130 Q 620 170 515 105" fill="none" stroke="#FF991F" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#al)"/>
+      <text x="640" y="155" text-anchor="middle" font-size="8" fill="#FF991F">Retry (max 3)</text>
+
+      <!-- Labels -->
+      <text x="140" y="55" text-anchor="middle" font-size="7" fill="#6B778C">Event received</text>
+      <text x="290" y="55" text-anchor="middle" font-size="7" fill="#6B778C">Rules matched</text>
+      <text x="440" y="55" text-anchor="middle" font-size="7" fill="#6B778C">Template rendered</text>
+      <text x="590" y="55" text-anchor="middle" font-size="7" fill="#6B778C">Dispatched</text>
+    </svg>
+    <p class="diagram-caption">Figure 7.1 — Notification state machine showing lifecycle from PENDING through DELIVERED or FAILED, with retry loop.</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>State</th><th>Description</th><th>Trigger</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="badge badge-draft">PENDING</span></td><td>Notification created by the engine after rule matching. Awaiting processing.</td><td>Normalized event consumed, rule matched</td></tr>
+      <tr><td><span class="badge badge-blue">PROCESSING</span></td><td>Engine is resolving recipients and preparing the notification.</td><td>Processing begins</td></tr>
+      <tr><td><span class="badge badge-draft">SUPPRESSED</span></td><td>Notification suppressed by rule-level dedup, max count, or cooldown policy. Terminal state — not delivered.</td><td>Suppression check triggered during processing</td></tr>
+      <tr><td><span class="badge badge-blue">RENDERING</span></td><td>Template Service is rendering the message for each target channel.</td><td>Recipients resolved, template requested</td></tr>
+      <tr><td><span class="badge badge-orange">DELIVERING</span></td><td>Channel Router has received the rendered message and is dispatching to provider.</td><td>Template rendered, delivery queued</td></tr>
+      <tr><td><span class="badge badge-green">SENT</span></td><td>Provider has accepted the message. Awaiting delivery confirmation.</td><td>Provider returns 2xx response</td></tr>
+      <tr><td><span class="badge badge-approved">DELIVERED</span></td><td>Provider confirmed delivery to recipient. Terminal success state.</td><td>Delivery receipt / webhook callback</td></tr>
+      <tr><td><span class="badge badge-red">FAILED</span></td><td>Delivery failed after all retry attempts exhausted. Terminal failure state.</td><td>Max retries exceeded or permanent error</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 8. Security Architecture -->
+  <h2 id="security-architecture">8. Authentication &amp; Security Architecture</h2>
+  <p>
+    Security is implemented at multiple layers: API gateway authentication, role-based access control, service-to-service
+    trust, data encryption, and PII protection.
+  </p>
+
+  <h3>8.1 Authentication Layers</h3>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Mechanism</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Admin UI → Gateway (Local Auth)</strong></td><td>JWT (Bearer Token)</td><td>Users authenticate via email/password login. The platform issues JWT tokens (RS256) with role and permission claims, validated on every request by the gateway.</td></tr>
+      <tr><td><strong>Admin UI → Gateway (SAML 2.0 SSO)</strong></td><td>SAML 2.0 + JWT</td><td>Enterprise users authenticate via SP-initiated SAML SSO with Azure AD. After assertion validation, the platform issues its own JWT tokens (identical to local auth). See <a href="04-authentication-identity.html">04 — Auth &amp; Identity</a>.</td></tr>
+      <tr><td><strong>External Webhooks → Ingestion</strong></td><td>API Key + HMAC Signature</td><td>Source systems authenticate via API keys. Webhook payloads are signed with HMAC-SHA256 to ensure integrity.</td></tr>
+      <tr><td><strong>Service-to-Service</strong></td><td>Internal Network Trust</td><td>Internal services communicate within a Docker network. For production, mTLS can be added for zero-trust service mesh.</td></tr>
+      <tr><td><strong>Gateway → Services</strong></td><td>Internal API Key</td><td>Gateway includes an internal API key header when forwarding requests to backend services for verification.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 Role-Based Access Control (RBAC)</h3>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>Permissions</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="badge badge-red">Super Admin</span></td><td>Full access: user management, system configuration, all CRUD operations, audit logs</td></tr>
+      <tr><td><span class="badge badge-blue">Admin</span></td><td>Manage rules, templates, channels, and recipient groups. View audit logs. Cannot manage users or system config.</td></tr>
+      <tr><td><span class="badge badge-green">Operator</span></td><td>View and edit templates and rules. View notification logs. Cannot modify channel configs or manage users.</td></tr>
+      <tr><td><span class="badge badge-draft">Viewer</span></td><td>Read-only access to dashboards, notification logs, and delivery analytics.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.3 Data Protection</h3>
+  <table>
+    <thead>
+      <tr><th>Control</th><th>Scope</th><th>Implementation</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Encryption in Transit</strong></td><td>All network communication</td><td>TLS 1.2+ for external connections. Internal Docker network encryption optional.</td></tr>
+      <tr><td><strong>Encryption at Rest</strong></td><td>PostgreSQL databases</td><td>Database-level encryption via PostgreSQL TDE or volume-level encryption.</td></tr>
+      <tr><td><strong>PII Masking</strong></td><td>Audit logs, error logs</td><td>Email addresses, phone numbers, and customer names are masked in log output.</td></tr>
+      <tr><td><strong>Data Retention</strong></td><td>All databases</td><td>Configurable retention policies per table. Event data: 90 days. Audit data: 1 year. Templates: indefinite.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 9. Scalability & Resilience -->
+  <h2 id="scalability-resilience">9. Scalability &amp; Resilience Patterns</h2>
+
+  <table>
+    <thead>
+      <tr><th>Pattern</th><th>Where Applied</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Horizontal Scaling</strong></td><td>All stateless services</td><td>Services can be scaled out by running additional container instances behind a load balancer. No shared state between instances.</td></tr>
+      <tr><td><strong>Competing Consumers</strong></td><td>RabbitMQ queues</td><td>Multiple instances of a service consume from the same queue. RabbitMQ distributes messages in round-robin, enabling parallel processing.</td></tr>
+      <tr><td><strong>Circuit Breaker</strong></td><td>Channel Router → Providers</td><td>If a provider (SendGrid, Twilio) fails repeatedly, the circuit opens to prevent cascading failures. Requests are routed to fallback channels or queued for retry.</td></tr>
+      <tr><td><strong>Exponential Backoff</strong></td><td>Channel Router retries</td><td>Failed deliveries are retried with increasing delays: 1s, 5s, 30s, 2m, 10m. Prevents provider overload during outages.</td></tr>
+      <tr><td><strong>Dead-Letter Queue</strong></td><td>All RabbitMQ queues</td><td>Messages that cannot be processed after max attempts are routed to the DLQ for manual inspection and reprocessing.</td></tr>
+      <tr><td><strong>Health Checks</strong></td><td>All services</td><td>Each service exposes <code>/health</code> and <code>/ready</code> endpoints for liveness and readiness probes.</td></tr>
+      <tr><td><strong>Rate Limiting</strong></td><td>Gateway (inbound)</td><td>Configurable rate limits per API key / user to prevent abuse and protect backend services from traffic spikes.</td></tr>
+      <tr><td><strong>Idempotency</strong></td><td>Event Ingestion</td><td>Duplicate events are detected via <code>eventId</code> deduplication, ensuring each event is processed exactly once.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="success-box">
+    <strong>Scalability Benefits:</strong> During peak events like flash sales, only the Channel Router and Notification Engine
+    need to scale out. The Template Service, Admin Service, and Audit Service can remain at baseline capacity — optimizing
+    infrastructure costs while handling traffic spikes reliably.
+  </div>
+
+  <!-- 10. Deployment Architecture -->
+  <h2 id="deployment-architecture">10. Deployment Architecture</h2>
+  <p>
+    All services are containerized with Docker and orchestrated locally via Docker Compose.
+    Each service has its own Dockerfile and is independently deployable.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Container</th><th>Image</th><th>Port</th><th>Depends On</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>notification-admin-ui</td><td>notification-admin-ui:latest</td><td>3010</td><td>notification-gateway</td></tr>
+      <tr><td>notification-gateway</td><td>notification-gateway:latest</td><td>3000</td><td>rabbitmq, all backend services</td></tr>
+      <tr><td>event-ingestion-service</td><td>event-ingestion:latest</td><td>3001</td><td>rabbitmq, postgresql</td></tr>
+      <tr><td>notification-engine-service</td><td>notification-engine:latest</td><td>3002</td><td>rabbitmq, postgresql, template-service</td></tr>
+      <tr><td>template-service</td><td>template-service:latest</td><td>3003</td><td>postgresql</td></tr>
+      <tr><td>channel-router-service</td><td>channel-router:latest</td><td>3004</td><td>rabbitmq, postgresql</td></tr>
+      <tr><td>admin-service</td><td>admin-service:latest</td><td>3005</td><td>postgresql</td></tr>
+      <tr><td>audit-service</td><td>audit-service:latest</td><td>3006</td><td>rabbitmq, postgresql</td></tr>
+      <tr><td>email-ingest-service</td><td>email-ingest:latest</td><td>3007 / 2525</td><td>rabbitmq, postgresql</td></tr>
+      <tr><td>bulk-upload-service</td><td>bulk-upload:latest</td><td>3008</td><td>postgresql, event-ingestion-service</td></tr>
+      <tr><td>rabbitmq</td><td>rabbitmq:3-management</td><td>5672 / 15672</td><td>—</td></tr>
+      <tr><td>postgresql</td><td>postgres:16-alpine</td><td>5432</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note-box">
+    <strong>Local Development:</strong> A single <code>docker-compose.yml</code> file orchestrates all 11 containers with
+    proper dependency ordering, shared networking, and volume mounts for persistent database storage. The RabbitMQ management
+    UI is available at <code>http://localhost:15672</code> for queue monitoring during development.
+  </div>
+
+  <!-- 11. Monitoring & Observability -->
+  <h2 id="monitoring-observability">11. Monitoring &amp; Observability</h2>
+
+  <table>
+    <thead>
+      <tr><th>Aspect</th><th>Strategy</th><th>Tools</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Structured Logging</strong></td><td>All services emit JSON-formatted logs with correlation IDs, service name, timestamp, and log level.</td><td>NestJS Logger, Winston</td></tr>
+      <tr><td><strong>Health Checks</strong></td><td>Each service exposes <code>/health</code> (liveness) and <code>/ready</code> (readiness) endpoints checking database and RabbitMQ connectivity.</td><td>NestJS Terminus</td></tr>
+      <tr><td><strong>Delivery Metrics</strong></td><td>Track notification throughput, delivery success/failure rates, average delivery latency, and channel utilization.</td><td>Audit Service dashboards</td></tr>
+      <tr><td><strong>Queue Monitoring</strong></td><td>Monitor queue depth, message rates, consumer counts, and DLQ size via RabbitMQ management plugin.</td><td>RabbitMQ Management UI</td></tr>
+      <tr><td><strong>Error Alerting</strong></td><td>Alert on DLQ message accumulation, circuit breaker state changes, service health failures, and delivery failure rate thresholds.</td><td>Custom alerts via Admin Service</td></tr>
+      <tr><td><strong>Correlation Tracing</strong></td><td>Every event carries a <code>correlationId</code> from ingestion through delivery, enabling end-to-end trace of a notification across all services.</td><td>Custom middleware</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 12. Integration Patterns -->
+  <h2 id="integration-patterns">12. Integration Patterns</h2>
+  <p>
+    Each source system integrates with the Notification API through the most appropriate pattern based on its
+    capabilities and infrastructure.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Source System</th><th>Integration Method</th><th>Event Types</th><th>Data Format</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>OMS</strong> (In-house)</td>
+        <td>Direct RabbitMQ publishing to <code>events.incoming</code> exchange</td>
+        <td>order.created, order.confirmed, order.shipped, order.delivered, order.cancelled</td>
+        <td>JSON (custom schema, normalized by ingestion)</td>
+      </tr>
+      <tr>
+        <td><strong>Magento 2</strong></td>
+        <td>Webhook via REST API to <code>POST /webhooks/events</code></td>
+        <td>order.placed, payment.received, payment.failed, shipment.created, refund.processed</td>
+        <td>JSON (Magento webhook payload, normalized by ingestion)</td>
+      </tr>
+      <tr>
+        <td><strong>Mirakl Marketplace</strong></td>
+        <td>Webhook via REST API to <code>POST /webhooks/events</code></td>
+        <td>marketplace.order.accepted, marketplace.order.shipped, marketplace.refund</td>
+        <td>JSON (Mirakl webhook payload, normalized by ingestion)</td>
+      </tr>
+      <tr>
+        <td><strong>Chat Commerce</strong></td>
+        <td>RabbitMQ publishing to <code>events.incoming</code> exchange</td>
+        <td>chat.order.created, chat.support.escalated, chat.promotion.sent</td>
+        <td>JSON (custom schema, normalized by ingestion)</td>
+      </tr>
+      <tr>
+        <td><strong>Manual (Admin UI)</strong></td>
+        <td>REST API via Gateway: <code>POST /api/v1/notifications/send</code></td>
+        <td>manual.notification (custom event type and payload)</td>
+        <td>JSON (admin-defined payload)</td>
+      </tr>
+      <tr>
+        <td><strong>Closed/Legacy Systems</strong></td>
+        <td>SMTP email to Email Ingest Service (<code>:2525</code>)</td>
+        <td>Configurable via parsing rules (e.g., order.confirmed, inventory.updated)</td>
+        <td>Email (HTML/text body, parsed via regex extraction rules)</td>
+      </tr>
+      <tr>
+        <td><strong>Bulk Upload (Admin UI)</strong></td>
+        <td>XLSX file upload via Admin UI &rarr; Gateway &rarr; Bulk Upload Service &rarr; HTTP POST to Event Ingestion (<code>POST /webhooks/events</code>)</td>
+        <td>Any event type (defined per row via <code>eventType</code> column)</td>
+        <td>XLSX (column headers map to payload fields, parsed by <code>exceljs</code>)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>Adapter Pattern:</strong> The Event Ingestion Service uses pluggable adapters for each source system. Each adapter
+    knows how to parse the source-specific event format and map it to the canonical event schema. Adding a new source system
+    requires only implementing a new adapter — no changes to downstream services.
+  </div>
+
+  <div class="warning-box">
+    <strong>Webhook Security:</strong> All webhook endpoints require API key authentication and HMAC-SHA256 payload signing.
+    Source systems must register their API key and signing secret through the Admin Service before sending events. Unsigned
+    or improperly authenticated webhook requests are rejected with a <code>401 Unauthorized</code> response.
+  </div>
+
+  <!-- Footer -->
+  <div class="doc-footer">
+    <p>Notification API Documentation v1.0 &bull; Architecture Team &bull; 2026</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,2588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02 — Detailed Microservices | Notification API</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="doc-container">
+  <nav class="doc-nav">
+    <a href="index.html">Home</a>
+    <a href="01-executive-summary.html">Executive Summary</a>
+    <a href="02-detailed-microservices.html" class="active">Microservices Detail</a>
+    <a href="03-system-architecture.html">System Architecture</a>
+    <a href="04-authentication-identity.html">Auth &amp; Identity</a>
+    <a href="05-testing-strategy.html">Testing Strategy</a>
+    <a href="06-changelog.html">Changelog</a>
+  </nav>
+
+  <div class="doc-header">
+    <h1>02 — Detailed Microservices</h1>
+    <p class="subtitle">Notification API — Service Specifications</p>
+    <div class="doc-meta">
+      <span><strong>Version:</strong> 1.0</span>
+      <span><strong>Date:</strong> 2026-02-19</span>
+      <span><strong>Author:</strong> Architecture Team</span>
+      <span><strong>Status:</strong> <span class="badge badge-review">In Review</span></span>
+    </div>
+  </div>
+
+  <!-- Table of Contents -->
+  <div class="toc">
+    <h3 class="mt-0">Table of Contents</h3>
+    <ol>
+      <li><a href="#microservices-overview">Microservices Overview</a></li>
+      <li><a href="#notification-gateway">Notification Gateway (BFF)</a></li>
+      <li><a href="#event-ingestion-service">Event Ingestion Service</a></li>
+      <li><a href="#notification-engine-service">Notification Engine Service</a></li>
+      <li><a href="#template-service">Template Service</a></li>
+      <li><a href="#channel-router-service">Channel Router Service</a></li>
+      <li><a href="#admin-service">Admin Service</a></li>
+      <li><a href="#audit-service">Audit Service</a></li>
+      <li><a href="#email-ingest-service">Email Ingest Service</a></li>
+      <li><a href="#bulk-upload-service">Bulk Upload Service</a></li>
+      <li><a href="#notification-admin-ui">Notification Admin UI (Frontend)</a></li>
+      <li><a href="#database-schema-overview">Database Schema Overview</a></li>
+      <li><a href="#inter-service-communication">Inter-Service Communication</a></li>
+      <li><a href="#security-considerations">Security Considerations</a></li>
+    </ol>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 1. Microservices Overview                                          -->
+  <!-- ================================================================== -->
+  <h2 id="microservices-overview">1. Microservices Overview</h2>
+  <p>
+    The Notification API platform is composed of nine backend services, one frontend application, and a shared messaging backbone built on RabbitMQ. Each microservice is independently deployable, owns its own PostgreSQL database (where applicable), and communicates through well-defined synchronous (HTTP/REST) or asynchronous (AMQP) interfaces. This architecture enables the team to develop, test, scale, and deploy each service independently while maintaining clear ownership boundaries.
+  </p>
+  <p>
+    The following table provides a high-level summary of every service in the ecosystem. Detailed specifications for each service follow in subsequent sections.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Service Name</th>
+        <th>Port</th>
+        <th>Database</th>
+        <th>Key Responsibility</th>
+        <th>Dependencies</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Notification Gateway</strong></td>
+        <td><code>3000</code></td>
+        <td>None (stateless)</td>
+        <td>BFF / API Gateway — auth, validation, routing</td>
+        <td>All internal services</td>
+      </tr>
+      <tr>
+        <td><strong>Event Ingestion</strong></td>
+        <td><code>3001</code></td>
+        <td><code>event_ingestion_db</code></td>
+        <td>Receive &amp; normalize events from source systems</td>
+        <td>RabbitMQ</td>
+      </tr>
+      <tr>
+        <td><strong>Notification Engine</strong></td>
+        <td><code>3002</code></td>
+        <td><code>notification_engine_db</code></td>
+        <td>Rule matching, orchestration, lifecycle management</td>
+        <td>Event Ingestion, Template Service, Channel Router, RabbitMQ</td>
+      </tr>
+      <tr>
+        <td><strong>Template Service</strong></td>
+        <td><code>3003</code></td>
+        <td><code>template_db</code></td>
+        <td>Template CRUD, rendering with Handlebars</td>
+        <td>PostgreSQL</td>
+      </tr>
+      <tr>
+        <td><strong>Channel Router</strong></td>
+        <td><code>3004</code></td>
+        <td><code>channel_router_db</code></td>
+        <td>Route to delivery providers (SendGrid, Twilio, Firebase)</td>
+        <td>External providers, RabbitMQ</td>
+      </tr>
+      <tr>
+        <td><strong>Admin Service</strong></td>
+        <td><code>3005</code></td>
+        <td><code>admin_db</code></td>
+        <td>Backoffice administration, user &amp; rule management</td>
+        <td>Notification Engine, Template Service, Channel Router</td>
+      </tr>
+      <tr>
+        <td><strong>Audit Service</strong></td>
+        <td><code>3006</code></td>
+        <td><code>audit_db</code></td>
+        <td>Event sourcing, delivery tracking, compliance logging</td>
+        <td>RabbitMQ (all status exchanges)</td>
+      </tr>
+      <tr>
+        <td><strong>Email Ingest</strong></td>
+        <td><code>3007</code> / <code>2525</code></td>
+        <td><code>email_ingest_db</code></td>
+        <td>SMTP ingest — receive emails, parse against rules, generate events</td>
+        <td>RabbitMQ, PostgreSQL</td>
+      </tr>
+      <tr>
+        <td><strong>Bulk Upload</strong></td>
+        <td><code>3008</code></td>
+        <td><code>bulk_upload_db</code></td>
+        <td>XLSX file upload, row parsing, event submission to Event Ingestion</td>
+        <td>Event Ingestion Service (HTTP), PostgreSQL</td>
+      </tr>
+      <tr>
+        <td><strong>Notification Admin UI</strong></td>
+        <td><code>3010</code></td>
+        <td>None</td>
+        <td>Next.js backoffice for the operative team</td>
+        <td>Notification Gateway (BFF)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ================================================================== -->
+  <!-- 2. Notification Gateway (BFF)                                      -->
+  <!-- ================================================================== -->
+  <h2 id="notification-gateway">2. Notification Gateway (BFF)</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Notification Gateway acts as the Backend-for-Frontend (BFF) and API Gateway for the entire platform. It is the single entry point for the Next.js admin frontend and any external API consumers. All inbound HTTP traffic is routed through this service, which handles cross-cutting concerns such as authentication, authorization, request validation, rate limiting, and API versioning before proxying requests to the appropriate internal microservice.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3000</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>None (stateless proxy)</td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>All internal microservices</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>Authentication &amp; Authorization:</strong> Validates JWT tokens issued by the platform's own auth system (local login or SAML SSO). Enforces role-based access control (RBAC) for admin endpoints and API-key authentication for external integrations. See <a href="04-authentication-identity.html">04 — Authentication &amp; Identity</a> for full details.</li>
+    <li><strong>Request Validation:</strong> Leverages NestJS class-validator and class-transformer to validate and sanitize all incoming payloads before they reach downstream services.</li>
+    <li><strong>Rate Limiting:</strong> Applies configurable per-client and per-endpoint rate limits using a sliding window algorithm backed by an in-memory store (with Redis upgrade path).</li>
+    <li><strong>API Versioning:</strong> Supports URL-based versioning (<code>/api/v1/</code>) with clear deprecation headers for older versions.</li>
+    <li><strong>Request Routing:</strong> Proxies validated requests to the correct internal service using NestJS <code>HttpService</code> (Axios-based).</li>
+    <li><strong>Response Transformation:</strong> Normalizes response envelopes to a consistent structure (<code>{ data, meta, errors }</code>) regardless of which internal service handles the request.</li>
+    <li><strong>CORS Configuration:</strong> Allows the Next.js frontend origin while blocking unauthorized cross-origin requests.</li>
+  </ul>
+
+  <h3>Key API Endpoints</h3>
+
+  <!-- Notifications -->
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/notifications/send</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Manually send a notification. Accepts a payload with recipient details, template ID, channel preferences, and variable data. The request is forwarded to the Notification Engine for processing.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/notifications</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List notifications with filters. Supports query parameters: <code>status</code>, <code>channel</code>, <code>dateFrom</code>, <code>dateTo</code>, <code>recipientEmail</code>, <code>page</code>, <code>limit</code>. Returns paginated results with metadata.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/notifications/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retrieve full details for a specific notification, including its lifecycle status log, delivery attempts, and rendered content for each channel.</p>
+    </div>
+  </div>
+
+  <!-- Templates -->
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/templates</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all notification templates. Supports query parameters: <code>channel</code>, <code>search</code>, <code>isActive</code>, <code>page</code>, <code>limit</code>. Returns template summaries without full body content.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/templates</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Create a new notification template. Requires <code>name</code>, <code>description</code>, and at least one channel variant. Template variables are auto-detected from Handlebars expressions in the body.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/api/v1/templates/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update an existing template. Creates a new version internally; previous versions are retained for audit purposes. Supports partial updates.</p>
+    </div>
+  </div>
+
+  <!-- Channels -->
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/channels</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all available notification channels (Email, SMS, WhatsApp, Push) with their current configuration status, provider details, and health indicators.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/api/v1/channels/:id/config</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update the configuration for a specific channel. Includes provider credentials, sender identity settings, and channel-specific options (e.g., email reply-to address, SMS sender ID).</p>
+    </div>
+  </div>
+
+  <!-- Rules -->
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List notification rules with pagination and filters. Supports filtering by <code>eventType</code>, <code>isActive</code>, and <code>channel</code>.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Create a new notification rule. Defines the mapping between an event type and the notification actions to execute (template, channels, recipients).</p>
+    </div>
+  </div>
+
+  <!-- Email Parsing Rules -->
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/email-ingest/parsing-rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all email parsing rules. Supports query parameters: <code>isActive</code>, <code>eventType</code>, <code>page</code>, <code>limit</code>. Proxied to the Email Ingest Service.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/email-ingest/parsing-rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Create a new email parsing rule. Defines sender filters, subject/body regex patterns, and event type mapping. Proxied to the Email Ingest Service.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/email-ingest/processed-emails</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List processed emails with filters. Supports query parameters: <code>status</code>, <code>sender</code>, <code>dateFrom</code>, <code>dateTo</code>, <code>page</code>, <code>limit</code>. Proxied to the Email Ingest Service.</p>
+    </div>
+  </div>
+
+  <!-- Bulk Upload -->
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/bulk-upload/uploads</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Upload an XLSX file for bulk event submission. Accepts <code>multipart/form-data</code> with the file. Returns <code>202 Accepted</code> with an <code>uploadId</code>. Proxied to the Bulk Upload Service. <span class="badge badge-blue">Admin</span> <span class="badge badge-green">Operator</span></p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/bulk-upload/uploads</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List uploads with filters. Supports query parameters: <code>status</code>, <code>uploadedBy</code>, <code>dateFrom</code>, <code>dateTo</code>, <code>page</code>, <code>limit</code>. Proxied to the Bulk Upload Service. <span class="badge badge-blue">Admin</span> <span class="badge badge-green">Operator</span></p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/bulk-upload/uploads/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Get upload status and progress (total, processed, succeeded, failed row counts). Proxied to the Bulk Upload Service. <span class="badge badge-blue">Admin</span> <span class="badge badge-green">Operator</span></p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/bulk-upload/uploads/:id/errors</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Get failed row details for an upload. Returns row number, error message, and raw data for each failed row. Proxied to the Bulk Upload Service. <span class="badge badge-blue">Admin</span> <span class="badge badge-green">Operator</span></p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/bulk-upload/uploads/:id/retry</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retry failed rows for an upload. Resubmits only the rows with <code>failed</code> status. Proxied to the Bulk Upload Service. <span class="badge badge-red">Admin</span> only.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-delete">
+      <span class="method-badge delete">DELETE</span>
+      <span>/api/v1/bulk-upload/uploads/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Cancel an in-progress upload or delete an upload record. Proxied to the Bulk Upload Service. <span class="badge badge-red">Admin</span> only.</p>
+    </div>
+  </div>
+
+  <!-- Audit & Dashboard -->
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/audit/logs</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retrieve audit logs with comprehensive filtering. Supports query parameters: <code>action</code>, <code>userId</code>, <code>resourceType</code>, <code>dateFrom</code>, <code>dateTo</code>, <code>page</code>, <code>limit</code>.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/dashboard/stats</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Dashboard statistics endpoint. Returns aggregated metrics including total notifications sent (by channel, by status), delivery success rates, average delivery latency, and trend data for configurable time windows.</p>
+    </div>
+  </div>
+
+  <!-- Authentication -->
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/login</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Local authentication endpoint. Validates email/password credentials and issues JWT access token + refresh token cookie. Rate limited: 5 failed attempts per account per 15 minutes.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/saml/acs</span>
+    </div>
+    <div class="endpoint-body">
+      <p>SAML Assertion Consumer Service. Receives SAML Response from the IdP (Azure AD), validates the assertion, links or creates the user, and issues JWT tokens. See <a href="04-authentication-identity.html">04 — Authentication &amp; Identity</a>.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/auth/saml/metadata</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Returns the SAML Service Provider metadata XML document for configuring trust in the Identity Provider.</p>
+    </div>
+  </div>
+
+  <div class="note-box">
+    <strong>Authentication Strategy</strong>
+    The gateway uses a two-tier authentication model. Admin users authenticate via local credentials (email/password) or SAML 2.0 SSO with Azure AD — both methods issue platform-managed JWT tokens (short-lived access tokens with refresh token rotation). External system integrations (OMS, Magento, etc.) authenticate using API keys passed in the <code>X-API-Key</code> header. API keys are scoped to specific endpoints and rate-limited independently. All tokens and keys are validated on every request before proxying to internal services. Internal service-to-service calls bypass the gateway and use mutual TLS or shared secrets. See <a href="04-authentication-identity.html">04 — Authentication &amp; Identity</a> for the complete authentication design.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 3. Event Ingestion Service                                         -->
+  <!-- ================================================================== -->
+  <h2 id="event-ingestion-service">3. Event Ingestion Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Event Ingestion Service is the universal entry point for all business events that may trigger notifications. It receives events from five distinct source systems — OMS (in-house order management), Magento 2 (eCommerce platform), Mirakl Marketplace, Chat Commerce, and manual triggers — normalizes them into a canonical event schema, and publishes them to the internal RabbitMQ exchange for downstream processing.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS with RabbitMQ consumers (amqplib / @golevelup/nestjs-rabbitmq)</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3001</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>event_ingestion_db</code></td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>RabbitMQ, PostgreSQL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>RabbitMQ Consumers:</strong> Dedicated consumers for each source system (OMS, Magento 2, Mirakl, Chat Commerce) that listen on source-specific queues. Each consumer understands the schema of its source system and can map it to the canonical format.</li>
+    <li><strong>REST Webhook Endpoint:</strong> An HTTP endpoint (<code>POST /webhooks/events</code>) for external integrations that cannot publish directly to RabbitMQ. Accepts events with a source identifier and processes them through the same normalization pipeline.</li>
+    <li><strong>Event Schema Validation:</strong> Validates incoming events against registered JSON schemas per source and event type. Invalid events are rejected with detailed error messages and logged for investigation.</li>
+    <li><strong>Event Normalization:</strong> Transforms source-specific event payloads into the canonical event format. This includes field mapping, data type coercion, timestamp normalization (to ISO-8601 UTC), and enrichment with metadata (correlation IDs, source event IDs).</li>
+    <li><strong>Publishing Normalized Events:</strong> Publishes validated and normalized events to the <code>events.normalized</code> exchange with appropriate routing keys for downstream consumers.</li>
+    <li><strong>Event Persistence:</strong> Stores all raw and normalized events in the database for auditability and replay capabilities.</li>
+  </ul>
+
+  <h3>RabbitMQ Configuration</h3>
+
+  <h4>Exchanges</h4>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Exchange</th>
+        <th>Type</th>
+        <th>Purpose</th>
+        <th>Durable</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>events.incoming</code></td>
+        <td>Topic</td>
+        <td>Receives raw events from source systems</td>
+        <td>Yes</td>
+      </tr>
+      <tr>
+        <td><code>events.normalized</code></td>
+        <td>Topic</td>
+        <td>Publishes normalized canonical events</td>
+        <td>Yes</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>Queues</h4>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Queue</th>
+        <th>Bound To</th>
+        <th>Routing Key</th>
+        <th>Consumer Concurrency</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>events.oms</code></td>
+        <td><code>events.incoming</code></td>
+        <td><code>source.oms.#</code></td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td><code>events.magento</code></td>
+        <td><code>events.incoming</code></td>
+        <td><code>source.magento.#</code></td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td><code>events.mirakl</code></td>
+        <td><code>events.incoming</code></td>
+        <td><code>source.mirakl.#</code></td>
+        <td>2</td>
+      </tr>
+      <tr>
+        <td><code>events.chat</code></td>
+        <td><code>events.incoming</code></td>
+        <td><code>source.chat.#</code></td>
+        <td>2</td>
+      </tr>
+      <tr>
+        <td><code>events.webhook</code></td>
+        <td><code>events.incoming</code></td>
+        <td><code>source.webhook.#</code></td>
+        <td>2</td>
+      </tr>
+      <tr>
+        <td><code>q.events.email-ingest</code></td>
+        <td><code>events.incoming</code></td>
+        <td><code>source.email-ingest.#</code></td>
+        <td>2</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Canonical Event Schema</h3>
+  <pre><code>{
+  <span class="json-key">"eventId"</span>: <span class="json-string">"a]f47ac10b-58cc-4372-a567-0e02b2c3d479"</span>,
+  <span class="json-key">"source"</span>: <span class="json-string">"oms | magento | mirakl | chat | manual | email-ingest"</span>,
+  <span class="json-key">"eventType"</span>: <span class="json-string">"order.created | order.shipped | order.delivered | order.cancelled | payment.confirmed | return.requested | return.approved | chat.escalated"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2026-02-19T14:30:00.000Z"</span>,
+  <span class="json-key">"payload"</span>: {
+    <span class="json-key">"orderId"</span>: <span class="json-string">"ORD-2026-00451"</span>,
+    <span class="json-key">"customerEmail"</span>: <span class="json-string">"customer@example.com"</span>,
+    <span class="json-key">"customerName"</span>: <span class="json-string">"Jane Doe"</span>,
+    <span class="json-key">"customerPhone"</span>: <span class="json-string">"+1234567890"</span>,
+    <span class="json-key">"items"</span>: [
+      {
+        <span class="json-key">"sku"</span>: <span class="json-string">"PROD-001"</span>,
+        <span class="json-key">"name"</span>: <span class="json-string">"Wireless Headphones"</span>,
+        <span class="json-key">"quantity"</span>: <span class="json-number">1</span>,
+        <span class="json-key">"price"</span>: <span class="json-number">79.99</span>
+      }
+    ],
+    <span class="json-key">"totalAmount"</span>: <span class="json-number">79.99</span>,
+    <span class="json-key">"currency"</span>: <span class="json-string">"USD"</span>
+  },
+  <span class="json-key">"metadata"</span>: {
+    <span class="json-key">"correlationId"</span>: <span class="json-string">"corr-8f14e45f-ceea-467f-a8f5-5f1b39e5c7e2"</span>,
+    <span class="json-key">"sourceEventId"</span>: <span class="json-string">"OMS-EVT-78901"</span>,
+    <span class="json-key">"receivedAt"</span>: <span class="json-string">"2026-02-19T14:30:00.123Z"</span>,
+    <span class="json-key">"normalizedAt"</span>: <span class="json-string">"2026-02-19T14:30:00.456Z"</span>,
+    <span class="json-key">"schemaVersion"</span>: <span class="json-string">"1.0"</span>
+  }
+}</code></pre>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>events</code></td>
+        <td>Stores all ingested events (raw and normalized)</td>
+        <td><code>id</code>, <code>event_id</code>, <code>source</code>, <code>event_type</code>, <code>raw_payload</code>, <code>normalized_payload</code>, <code>status</code>, <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><code>event_sources</code></td>
+        <td>Registered source system configurations</td>
+        <td><code>id</code>, <code>name</code>, <code>type</code>, <code>connection_config</code>, <code>is_active</code>, <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><code>event_schemas</code></td>
+        <td>JSON schemas for validating events per source and type</td>
+        <td><code>id</code>, <code>source</code>, <code>event_type</code>, <code>schema_json</code>, <code>version</code>, <code>is_active</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Key Endpoints</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/webhooks/events</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Receive webhook events from external integrations. Expects a JSON body with <code>source</code>, <code>eventType</code>, and <code>payload</code> fields. Returns <code>202 Accepted</code> with an <code>eventId</code> for tracking. The event is validated, normalized, and published asynchronously.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/health</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Health check endpoint. Returns the service status, RabbitMQ connection health, database connectivity, and consumer queue depths.</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>Idempotency Handling</strong>
+    Every incoming event is assigned or carries a <code>sourceEventId</code> from the originating system. The Event Ingestion Service maintains a deduplication window (configurable, default 24 hours) using a unique constraint on <code>(source, source_event_id)</code> in the <code>events</code> table. If a duplicate event is received within the window, the service returns <code>200 OK</code> with the existing <code>eventId</code> and does not re-publish to RabbitMQ. This guarantees at-least-once delivery semantics without producing duplicate notifications downstream.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 4. Notification Engine Service                                     -->
+  <!-- ================================================================== -->
+  <h2 id="notification-engine-service">4. Notification Engine Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Notification Engine is the central orchestrator of the platform — the "brain" that determines what notifications to send, to whom, using which templates and channels. It consumes normalized events, evaluates them against a configurable rule engine, resolves recipient lists, coordinates template rendering, and dispatches notifications to the Channel Router for delivery.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3002</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>notification_engine_db</code></td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>Event Ingestion (via RabbitMQ), Template Service (HTTP), Channel Router (via RabbitMQ), PostgreSQL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>Event Consumption:</strong> Subscribes to the <code>events.normalized</code> exchange and processes each normalized event through the rule evaluation pipeline.</li>
+    <li><strong>Rule Matching:</strong> Evaluates each event against all active notification rules. A rule matches when the event type equals the rule's configured event type and all additional conditions (e.g., source channel, order priority, customer segment) are satisfied.</li>
+    <li><strong>Recipient Resolution:</strong> Determines the notification recipients based on the rule's <code>recipientType</code>. For <code>customer</code>, extracts contact details from the event payload. For <code>group</code>, resolves the recipient group membership. For <code>custom</code>, uses the explicitly defined recipient list.</li>
+    <li><strong>Template Rendering Coordination:</strong> Calls the Template Service (HTTP) to render the appropriate template for each channel, passing the event payload as variable data.</li>
+    <li><strong>Dispatch to Channel Router:</strong> Publishes rendered notifications to the <code>notifications.deliver</code> exchange with channel-specific routing keys for the Channel Router to pick up.</li>
+    <li><strong>Lifecycle Management:</strong> Tracks each notification through its lifecycle states: <span class="badge badge-blue">Pending</span> <span class="badge badge-orange">Processing</span> <span class="badge badge-green">Sent</span> <span class="badge badge-approved">Delivered</span> <span class="badge badge-red">Failed</span>. Status transitions are logged in the <code>notification_status_log</code> table.</li>
+    <li><strong>Recipient Preferences:</strong> Respects recipient opt-out preferences and channel preferences before dispatching notifications.</li>
+    <li><strong>Suppression &amp; Deduplication:</strong> Evaluates optional per-rule suppression policies (deduplication windows, max send counts, cooldown periods) after recipient resolution to prevent duplicate or excessive notifications.</li>
+  </ul>
+
+  <h3>Rule Engine</h3>
+  <p>
+    The rule engine uses a declarative, condition-based matching system. When a normalized event arrives, the engine queries all active rules whose <code>eventType</code> matches the event. For each matching rule, it evaluates the <code>conditions</code> object against the event payload using a simple expression evaluator. Conditions support equality checks, "in" list checks, and nested property access. When all conditions are satisfied, the rule's <code>actions</code> array is executed sequentially — each action specifies a template, a set of channels, and a recipient type.
+  </p>
+  <p>
+    Rules are prioritized by a <code>priority</code> field (lower number = higher priority). If multiple rules match a single event, all matching rules are executed unless a rule is marked as <code>exclusive</code>, in which case only the highest-priority exclusive rule runs and subsequent matches are skipped.
+  </p>
+
+  <h3>Suppression &amp; Deduplication</h3>
+  <p>
+    Each notification rule may include an optional <code>suppression</code> configuration (JSONB) that prevents duplicate or excessive notifications. Suppression is evaluated <strong>per-recipient</strong>, after recipient resolution and before template rendering. If a notification is suppressed, it is logged with a <code>SUPPRESSED</code> terminal status in the <code>notification_status_log</code> table but not persisted as a full <code>notifications</code> row, keeping send counts accurate.
+  </p>
+
+  <h4>Suppression Configuration Structure</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>dedupKey</code></td>
+        <td><code>string[]</code></td>
+        <td>Array of dot-notation paths resolved against the event context and recipient (e.g., <code>["eventType", "payload.orderId", "recipient.email"]</code>). Values are concatenated and SHA-256 hashed into a fixed-length lookup key.</td>
+      </tr>
+      <tr>
+        <td><code>modes.dedup</code></td>
+        <td><code>{ windowMinutes: number }</code></td>
+        <td>Suppress if any notification with the same dedup key hash was sent within the specified window.</td>
+      </tr>
+      <tr>
+        <td><code>modes.maxCount</code></td>
+        <td><code>{ limit: number, windowMinutes: number }</code></td>
+        <td>Suppress if <code>limit</code> or more notifications with the same dedup key hash were sent within the specified window.</td>
+      </tr>
+      <tr>
+        <td><code>modes.cooldown</code></td>
+        <td><code>{ intervalMinutes: number }</code></td>
+        <td>Suppress if the last notification with the same dedup key hash was sent less than <code>intervalMinutes</code> ago.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>Dedup Key Resolution</h4>
+  <p>
+    At evaluation time, each path in the <code>dedupKey</code> array is resolved against the combined event context (event type, source, payload) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the <code>dedup_key_hash</code> column. The original resolved values are also stored in <code>dedup_key_values</code> (JSONB) for human-readable display in the Admin UI.
+  </p>
+
+  <h4>Suppression Evaluation Logic</h4>
+  <p>
+    When a rule has a <code>suppression</code> configuration, the engine evaluates all configured modes in order: <strong>dedup &rarr; cooldown &rarr; maxCount</strong>. The first mode that triggers causes the notification to be suppressed — all modes must pass for the notification to proceed (logical AND). The suppression reason is recorded in the status log metadata.
+  </p>
+
+  <h4>Suppression Query</h4>
+  <pre><code>SELECT id, status, created_at
+FROM notifications
+WHERE rule_id = :ruleId
+  AND dedup_key_hash = :hash
+  AND status NOT IN ('FAILED')
+  AND created_at >= NOW() - INTERVAL ':windowMinutes minutes'
+ORDER BY created_at DESC;</code></pre>
+  <p>
+    This query leverages a partial index on <code>(rule_id, dedup_key_hash, created_at DESC) WHERE dedup_key_hash IS NOT NULL</code> for efficient lookups.
+  </p>
+
+  <h4>Failed Notification Exclusion</h4>
+  <p>
+    Notifications with <code>FAILED</code> status are excluded from suppression queries (<code>WHERE status NOT IN ('FAILED')</code>) so that failed delivery attempts do not block legitimate retries or re-sends.
+  </p>
+
+  <div class="info-box">
+    <strong>Optional Per-Rule Configuration</strong>
+    <p>Suppression is entirely optional. When the <code>suppression</code> field is <code>NULL</code> (the default), the rule operates without any deduplication or rate limiting — every matched event produces a notification. This ensures backward compatibility with existing rules.</p>
+  </div>
+
+  <h4>Example Suppression Configurations</h4>
+
+  <p><strong>Late Delivery — no repeat within 24h:</strong></p>
+  <pre><code><span class="json-key">"suppression"</span>: {
+  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"payload.orderId"</span>, <span class="json-string">"recipient.email"</span>],
+  <span class="json-key">"modes"</span>: { <span class="json-key">"dedup"</span>: { <span class="json-key">"windowMinutes"</span>: <span class="json-number">1440</span> } }
+}</code></pre>
+
+  <p><strong>Order Status — max 5 per order per week:</strong></p>
+  <pre><code><span class="json-key">"suppression"</span>: {
+  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"payload.orderId"</span>, <span class="json-string">"recipient.email"</span>],
+  <span class="json-key">"modes"</span>: { <span class="json-key">"maxCount"</span>: { <span class="json-key">"limit"</span>: <span class="json-number">5</span>, <span class="json-key">"windowMinutes"</span>: <span class="json-number">10080</span> } }
+}</code></pre>
+
+  <p><strong>Promo Reminder — cooldown 3 days per customer:</strong></p>
+  <pre><code><span class="json-key">"suppression"</span>: {
+  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"recipient.email"</span>],
+  <span class="json-key">"modes"</span>: { <span class="json-key">"cooldown"</span>: { <span class="json-key">"intervalMinutes"</span>: <span class="json-number">4320</span> } }
+}</code></pre>
+
+  <p><strong>Payment Failure — combined dedup + max 3/week + 4h cooldown:</strong></p>
+  <pre><code><span class="json-key">"suppression"</span>: {
+  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"payload.orderId"</span>, <span class="json-string">"payload.paymentAttemptId"</span>, <span class="json-string">"recipient.email"</span>],
+  <span class="json-key">"modes"</span>: {
+    <span class="json-key">"dedup"</span>: { <span class="json-key">"windowMinutes"</span>: <span class="json-number">10080</span> },
+    <span class="json-key">"maxCount"</span>: { <span class="json-key">"limit"</span>: <span class="json-number">3</span>, <span class="json-key">"windowMinutes"</span>: <span class="json-number">10080</span> },
+    <span class="json-key">"cooldown"</span>: { <span class="json-key">"intervalMinutes"</span>: <span class="json-number">240</span> }
+  }
+}</code></pre>
+
+  <h3>RabbitMQ Configuration</h3>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Direction</th>
+        <th>Exchange / Queue</th>
+        <th>Routing Key</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Consumes</td>
+        <td><code>events.normalized</code> / <code>engine.events</code></td>
+        <td><code>event.#</code></td>
+        <td>Receive normalized events for rule evaluation</td>
+      </tr>
+      <tr>
+        <td>Publishes</td>
+        <td><code>notifications.render</code></td>
+        <td><code>notification.render.{channel}</code></td>
+        <td>Request template rendering (if async rendering is enabled)</td>
+      </tr>
+      <tr>
+        <td>Publishes</td>
+        <td><code>notifications.deliver</code></td>
+        <td><code>notification.deliver.{channel}</code></td>
+        <td>Dispatch rendered notifications for delivery</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>notification_rules</code></td>
+        <td>Rule definitions with event type, conditions, and actions</td>
+        <td><code>id</code>, <code>name</code>, <code>event_type</code>, <code>conditions</code>, <code>actions</code>, <code>suppression</code>, <code>priority</code>, <code>is_exclusive</code>, <code>is_active</code>, <code>created_at</code>, <code>updated_at</code></td>
+      </tr>
+      <tr>
+        <td><code>notifications</code></td>
+        <td>Core notification records</td>
+        <td><code>id</code>, <code>event_id</code>, <code>rule_id</code>, <code>template_id</code>, <code>status</code>, <code>channels</code>, <code>dedup_key_hash</code>, <code>dedup_key_values</code>, <code>created_at</code>, <code>updated_at</code></td>
+      </tr>
+      <tr>
+        <td><code>notification_recipients</code></td>
+        <td>Resolved recipients for each notification</td>
+        <td><code>id</code>, <code>notification_id</code>, <code>recipient_type</code>, <code>email</code>, <code>phone</code>, <code>device_token</code>, <code>status</code></td>
+      </tr>
+      <tr>
+        <td><code>notification_status_log</code></td>
+        <td>Lifecycle status transitions</td>
+        <td><code>id</code>, <code>notification_id</code>, <code>from_status</code>, <code>to_status</code>, <code>channel</code>, <code>metadata</code>, <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><code>recipient_groups</code></td>
+        <td>Named groups of recipients for bulk notifications</td>
+        <td><code>id</code>, <code>name</code>, <code>description</code>, <code>member_count</code>, <code>is_active</code></td>
+      </tr>
+      <tr>
+        <td><code>recipient_preferences</code></td>
+        <td>Per-recipient channel opt-in/opt-out preferences</td>
+        <td><code>id</code>, <code>recipient_email</code>, <code>channel</code>, <code>is_opted_in</code>, <code>updated_at</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Rule Configuration Schema</h3>
+  <pre><code>{
+  <span class="json-key">"ruleId"</span>: <span class="json-string">"r-550e8400-e29b-41d4-a716-446655440000"</span>,
+  <span class="json-key">"name"</span>: <span class="json-string">"Order Shipped Notification"</span>,
+  <span class="json-key">"eventType"</span>: <span class="json-string">"order.shipped"</span>,
+  <span class="json-key">"conditions"</span>: {
+    <span class="json-key">"source"</span>: { <span class="json-key">"$in"</span>: [<span class="json-string">"oms"</span>, <span class="json-string">"magento"</span>] },
+    <span class="json-key">"payload.totalAmount"</span>: { <span class="json-key">"$gte"</span>: <span class="json-number">0</span> },
+    <span class="json-key">"payload.customerEmail"</span>: { <span class="json-key">"$exists"</span>: <span class="json-bool">true</span> }
+  },
+  <span class="json-key">"actions"</span>: [
+    {
+      <span class="json-key">"templateId"</span>: <span class="json-string">"tpl-order-shipped"</span>,
+      <span class="json-key">"channels"</span>: [<span class="json-string">"email"</span>, <span class="json-string">"sms"</span>, <span class="json-string">"push"</span>],
+      <span class="json-key">"recipientType"</span>: <span class="json-string">"customer"</span>,
+      <span class="json-key">"delayMinutes"</span>: <span class="json-number">0</span>
+    },
+    {
+      <span class="json-key">"templateId"</span>: <span class="json-string">"tpl-order-shipped-internal"</span>,
+      <span class="json-key">"channels"</span>: [<span class="json-string">"email"</span>],
+      <span class="json-key">"recipientType"</span>: <span class="json-string">"group"</span>,
+      <span class="json-key">"recipientGroupId"</span>: <span class="json-string">"grp-ops-team"</span>,
+      <span class="json-key">"delayMinutes"</span>: <span class="json-number">5</span>
+    }
+  ],
+  <span class="json-key">"suppression"</span>: {
+    <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"payload.orderId"</span>, <span class="json-string">"recipient.email"</span>],
+    <span class="json-key">"modes"</span>: {
+      <span class="json-key">"cooldown"</span>: { <span class="json-key">"intervalMinutes"</span>: <span class="json-number">1440</span> }
+    }
+  },
+  <span class="json-key">"priority"</span>: <span class="json-number">10</span>,
+  <span class="json-key">"isExclusive"</span>: <span class="json-bool">false</span>,
+  <span class="json-key">"isActive"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"createdAt"</span>: <span class="json-string">"2026-01-15T10:00:00.000Z"</span>,
+  <span class="json-key">"updatedAt"</span>: <span class="json-string">"2026-02-10T08:30:00.000Z"</span>
+}</code></pre>
+
+  <div class="success-box">
+    <strong>Decoupled Rule-Based Architecture</strong>
+    The rule-based approach completely decouples event producers from notification logic. Source systems (OMS, Magento, Mirakl, Chat Commerce) publish events without any knowledge of what notifications will be triggered. The operative team can create, modify, enable, or disable notification rules at any time through the Admin UI without requiring code changes or deployments. This empowers the business team to respond rapidly to changing communication requirements — adding a new WhatsApp channel to an existing order confirmation rule, for example, takes seconds rather than a development sprint.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 5. Template Service                                                -->
+  <!-- ================================================================== -->
+  <h2 id="template-service">5. Template Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Template Service manages the full lifecycle of notification message templates. It provides CRUD operations for templates, supports multi-channel variants (HTML email, plain text SMS, WhatsApp messages, push notification content), renders templates with dynamic variable substitution using the Handlebars engine, and maintains a complete version history for audit and rollback capabilities.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS with Handlebars (handlebars.js)</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3003</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>template_db</code></td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>PostgreSQL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>Template CRUD:</strong> Full create, read, update, and delete operations for notification templates. Each template has a unique slug, display name, description, and one or more channel variants.</li>
+    <li><strong>Multi-Channel Variants:</strong> A single template can have different content variants for each notification channel — an HTML-rich email, a concise SMS (limited to 160 characters), a WhatsApp message (with optional media), and a push notification (title + body, limited to 256 characters total).</li>
+    <li><strong>Variable Substitution:</strong> Uses Handlebars for dynamic content rendering. Supports simple variables (<code>{{customerName}}</code>), conditional blocks (<code>{{#if trackingUrl}}</code>), iteration (<code>{{#each items}}</code>), and custom helpers (e.g., <code>{{formatCurrency totalAmount currency}}</code>, <code>{{formatDate timestamp "MMM DD, YYYY"}}</code>).</li>
+    <li><strong>Template Versioning:</strong> Every update creates a new version. Previous versions are immutable and retained indefinitely. Active notifications reference a specific version ID, ensuring delivery consistency even if a template is modified after a notification is queued.</li>
+    <li><strong>Template Preview &amp; Testing:</strong> Endpoints to preview a rendered template with sample data and send a test notification to a specified recipient.</li>
+  </ul>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>templates</code></td>
+        <td>Master template records</td>
+        <td><code>id</code>, <code>slug</code>, <code>name</code>, <code>description</code>, <code>current_version_id</code>, <code>is_active</code>, <code>created_at</code>, <code>updated_at</code></td>
+      </tr>
+      <tr>
+        <td><code>template_versions</code></td>
+        <td>Immutable version snapshots</td>
+        <td><code>id</code>, <code>template_id</code>, <code>version_number</code>, <code>change_summary</code>, <code>created_by</code>, <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><code>template_channels</code></td>
+        <td>Channel-specific content for each version</td>
+        <td><code>id</code>, <code>template_version_id</code>, <code>channel</code>, <code>subject</code>, <code>body</code>, <code>metadata</code></td>
+      </tr>
+      <tr>
+        <td><code>template_variables</code></td>
+        <td>Declared template variables with defaults and descriptions</td>
+        <td><code>id</code>, <code>template_id</code>, <code>variable_name</code>, <code>description</code>, <code>default_value</code>, <code>is_required</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Template Structure</h3>
+  <pre><code>{
+  <span class="json-key">"id"</span>: <span class="json-string">"tpl-order-shipped"</span>,
+  <span class="json-key">"slug"</span>: <span class="json-string">"order-shipped"</span>,
+  <span class="json-key">"name"</span>: <span class="json-string">"Order Shipped Confirmation"</span>,
+  <span class="json-key">"description"</span>: <span class="json-string">"Sent to customers when their order has been dispatched"</span>,
+  <span class="json-key">"currentVersion"</span>: <span class="json-number">3</span>,
+  <span class="json-key">"isActive"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"channels"</span>: {
+    <span class="json-key">"email"</span>: {
+      <span class="json-key">"subject"</span>: <span class="json-string">"Your order {{orderNumber}} has been shipped!"</span>,
+      <span class="json-key">"body"</span>: <span class="json-string">"&lt;html&gt;&lt;body&gt;&lt;h1&gt;Hi {{customerName}},&lt;/h1&gt;&lt;p&gt;Great news! Your order &lt;strong&gt;{{orderNumber}}&lt;/strong&gt; has been shipped.&lt;/p&gt;{{#if trackingUrl}}&lt;p&gt;&lt;a href=\"{{trackingUrl}}\"&gt;Track your package&lt;/a&gt;&lt;/p&gt;{{/if}}&lt;p&gt;Estimated delivery: {{estimatedDelivery}}&lt;/p&gt;{{#each items}}&lt;p&gt;- {{this.name}} (x{{this.quantity}})&lt;/p&gt;{{/each}}&lt;/body&gt;&lt;/html&gt;"</span>
+    },
+    <span class="json-key">"sms"</span>: {
+      <span class="json-key">"body"</span>: <span class="json-string">"Hi {{customerName}}, your order {{orderNumber}} has been shipped! {{#if trackingUrl}}Track it: {{trackingUrl}}{{/if}}"</span>
+    },
+    <span class="json-key">"whatsapp"</span>: {
+      <span class="json-key">"body"</span>: <span class="json-string">"Hello {{customerName}}! Your order *{{orderNumber}}* is on its way. {{#if trackingUrl}}Track your delivery here: {{trackingUrl}}{{/if}} Estimated arrival: {{estimatedDelivery}}"</span>
+    },
+    <span class="json-key">"push"</span>: {
+      <span class="json-key">"title"</span>: <span class="json-string">"Order Shipped"</span>,
+      <span class="json-key">"body"</span>: <span class="json-string">"Your order {{orderNumber}} is on its way!"</span>,
+      <span class="json-key">"data"</span>: {
+        <span class="json-key">"orderId"</span>: <span class="json-string">"{{orderId}}"</span>,
+        <span class="json-key">"action"</span>: <span class="json-string">"open_order_tracking"</span>
+      }
+    }
+  },
+  <span class="json-key">"variables"</span>: [
+    <span class="json-string">"customerName"</span>, <span class="json-string">"orderNumber"</span>, <span class="json-string">"trackingUrl"</span>,
+    <span class="json-string">"estimatedDelivery"</span>, <span class="json-string">"items"</span>, <span class="json-string">"orderId"</span>
+  ]
+}</code></pre>
+
+  <h3>Key Endpoints</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/templates</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all templates with pagination. Supports filters: <code>channel</code>, <code>isActive</code>, <code>search</code> (name/slug). Returns template metadata without full body content.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/templates</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Create a new template with channel variants. Validates Handlebars syntax, auto-detects variables, and creates version 1.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/templates/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retrieve full template details including all channel variants, variables, and version history.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/templates/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update a template. Creates a new immutable version. Requires a <code>changeSummary</code> field describing the modification.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/templates/:id/render</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Render a template with provided variable data. Accepts <code>channel</code> and <code>data</code> in the request body. Returns the fully rendered content for the specified channel.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/templates/:id/preview</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Preview a template with sample data across all channels. Returns rendered previews for each channel variant without sending any actual notifications.</p>
+    </div>
+  </div>
+
+  <h3>Supported Variables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>{{customerName}}</code></td>
+        <td>String</td>
+        <td>Full name of the customer</td>
+        <td>Jane Doe</td>
+      </tr>
+      <tr>
+        <td><code>{{customerEmail}}</code></td>
+        <td>String</td>
+        <td>Customer email address</td>
+        <td>jane@example.com</td>
+      </tr>
+      <tr>
+        <td><code>{{orderNumber}}</code></td>
+        <td>String</td>
+        <td>Order reference number</td>
+        <td>ORD-2026-00451</td>
+      </tr>
+      <tr>
+        <td><code>{{trackingUrl}}</code></td>
+        <td>String</td>
+        <td>Package tracking URL</td>
+        <td>https://track.carrier.com/ABC123</td>
+      </tr>
+      <tr>
+        <td><code>{{estimatedDelivery}}</code></td>
+        <td>String</td>
+        <td>Expected delivery date</td>
+        <td>Feb 25, 2026</td>
+      </tr>
+      <tr>
+        <td><code>{{totalAmount}}</code></td>
+        <td>Number</td>
+        <td>Order total amount</td>
+        <td>79.99</td>
+      </tr>
+      <tr>
+        <td><code>{{currency}}</code></td>
+        <td>String</td>
+        <td>Currency code</td>
+        <td>USD</td>
+      </tr>
+      <tr>
+        <td><code>{{items}}</code></td>
+        <td>Array</td>
+        <td>List of order items (iterable with <code>{{#each}}</code>)</td>
+        <td>[{ name, sku, quantity, price }]</td>
+      </tr>
+      <tr>
+        <td><code>{{storeName}}</code></td>
+        <td>String</td>
+        <td>Name of the store or brand</td>
+        <td>MyStore</td>
+      </tr>
+      <tr>
+        <td><code>{{supportUrl}}</code></td>
+        <td>String</td>
+        <td>Customer support link</td>
+        <td>https://support.mystore.com</td>
+      </tr>
+      <tr>
+        <td><code>{{unsubscribeUrl}}</code></td>
+        <td>String</td>
+        <td>Notification opt-out link</td>
+        <td>https://mystore.com/unsubscribe?token=xyz</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>Handlebars Template Engine</strong>
+    The Template Service uses <a href="https://handlebarsjs.com/">Handlebars.js</a> as its rendering engine. Handlebars provides logic-less templates with a simple <code>{{variable}}</code> syntax, conditional blocks (<code>{{#if}}</code>, <code>{{#unless}}</code>), iteration (<code>{{#each}}</code>), and partials. The service registers custom helpers for common formatting needs: <code>{{formatCurrency amount code}}</code> for locale-aware currency formatting, <code>{{formatDate date pattern}}</code> for date formatting, <code>{{uppercase text}}</code> and <code>{{lowercase text}}</code> for text transformation, and <code>{{truncate text length}}</code> for safe text truncation. Templates are pre-compiled and cached in memory for high-performance rendering.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 6. Channel Router Service                                          -->
+  <!-- ================================================================== -->
+  <h2 id="channel-router-service">6. Channel Router Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Channel Router Service is responsible for the last-mile delivery of notifications. It receives rendered notification messages from the Notification Engine (via RabbitMQ), routes them to the appropriate external delivery provider based on the target channel, manages delivery retries with exponential backoff, implements circuit breaker patterns for provider resilience, tracks delivery statuses, and supports fallback channel logic when a primary channel fails.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3004</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>channel_router_db</code></td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>RabbitMQ, External providers (SendGrid, Twilio, Firebase), PostgreSQL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>Channel Routing Logic:</strong> Receives notifications tagged with a target channel and routes them to the corresponding provider adapter. Each adapter encapsulates the provider-specific API integration.</li>
+    <li><strong>Provider Integration:</strong> Maintains dedicated adapter modules for each external provider — SendGrid for transactional email, Twilio for SMS and WhatsApp messaging, and Firebase Cloud Messaging (FCM) for push notifications.</li>
+    <li><strong>Retry Logic with Exponential Backoff:</strong> Failed deliveries are retried with configurable exponential backoff delays. Each channel has its own retry policy (max attempts, base delay, backoff multiplier). After exhausting retries, the notification is moved to the dead letter queue.</li>
+    <li><strong>Circuit Breaker Pattern:</strong> Implements a circuit breaker for each provider. If a provider exceeds a failure threshold within a time window, the circuit opens and subsequent requests are immediately failed (fast-fail) until the provider recovers. This prevents cascading failures and resource exhaustion.</li>
+    <li><strong>Delivery Status Tracking:</strong> Publishes delivery status updates (sent, delivered, bounced, failed) to the <code>notifications.status</code> exchange for consumption by the Audit Service and Notification Engine.</li>
+    <li><strong>Fallback Channel Support:</strong> When a primary channel fails after all retries, the service can optionally trigger a fallback channel (e.g., if SMS delivery fails, attempt email delivery) based on the notification's fallback configuration.</li>
+    <li><strong>Webhook Receivers:</strong> Exposes webhook endpoints for delivery status callbacks from providers (SendGrid delivery events, Twilio status callbacks).</li>
+  </ul>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>channels</code></td>
+        <td>Channel definitions (email, sms, whatsapp, push)</td>
+        <td><code>id</code>, <code>name</code>, <code>type</code>, <code>is_active</code>, <code>provider_id</code>, <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><code>channel_configs</code></td>
+        <td>Channel-level settings (sender identity, limits)</td>
+        <td><code>id</code>, <code>channel_id</code>, <code>config_key</code>, <code>config_value</code>, <code>is_encrypted</code></td>
+      </tr>
+      <tr>
+        <td><code>delivery_attempts</code></td>
+        <td>Record of each delivery attempt per notification per channel</td>
+        <td><code>id</code>, <code>notification_id</code>, <code>channel</code>, <code>attempt_number</code>, <code>status</code>, <code>provider_response</code>, <code>error_message</code>, <code>attempted_at</code></td>
+      </tr>
+      <tr>
+        <td><code>provider_configs</code></td>
+        <td>External provider credentials and settings</td>
+        <td><code>id</code>, <code>provider_name</code>, <code>config_json</code>, <code>is_active</code>, <code>circuit_breaker_state</code>, <code>last_health_check</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>RabbitMQ Configuration</h3>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Direction</th>
+        <th>Exchange / Queue</th>
+        <th>Routing Key</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Consumes</td>
+        <td><code>notifications.deliver</code> / <code>router.email</code></td>
+        <td><code>notification.deliver.email</code></td>
+        <td>Email delivery queue</td>
+      </tr>
+      <tr>
+        <td>Consumes</td>
+        <td><code>notifications.deliver</code> / <code>router.sms</code></td>
+        <td><code>notification.deliver.sms</code></td>
+        <td>SMS delivery queue</td>
+      </tr>
+      <tr>
+        <td>Consumes</td>
+        <td><code>notifications.deliver</code> / <code>router.whatsapp</code></td>
+        <td><code>notification.deliver.whatsapp</code></td>
+        <td>WhatsApp delivery queue</td>
+      </tr>
+      <tr>
+        <td>Consumes</td>
+        <td><code>notifications.deliver</code> / <code>router.push</code></td>
+        <td><code>notification.deliver.push</code></td>
+        <td>Push notification delivery queue</td>
+      </tr>
+      <tr>
+        <td>Publishes</td>
+        <td><code>notifications.status</code></td>
+        <td><code>notification.status.{outcome}</code></td>
+        <td>Delivery status updates</td>
+      </tr>
+      <tr>
+        <td>DLQ</td>
+        <td><code>notifications.dlq</code></td>
+        <td><code>#</code></td>
+        <td>Dead letter queue for permanently failed deliveries</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Provider Configuration</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Channel</th>
+        <th>Provider</th>
+        <th>Config Keys</th>
+        <th>Rate Limit</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-blue">Email</span></td>
+        <td>SendGrid</td>
+        <td><code>apiKey</code>, <code>fromAddress</code>, <code>fromName</code>, <code>replyToAddress</code></td>
+        <td>100 emails/sec</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">SMS</span></td>
+        <td>Twilio</td>
+        <td><code>accountSid</code>, <code>authToken</code>, <code>fromNumber</code>, <code>messagingServiceSid</code></td>
+        <td>30 SMS/sec</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-approved">WhatsApp</span></td>
+        <td>Twilio / Meta Business</td>
+        <td><code>accountSid</code>, <code>authToken</code>, <code>businessNumber</code>, <code>templateNamespace</code></td>
+        <td>80 messages/sec</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-purple">Push</span></td>
+        <td>Firebase Cloud Messaging</td>
+        <td><code>projectId</code>, <code>serviceAccountKey</code>, <code>defaultTopic</code></td>
+        <td>500 messages/sec</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Retry Strategy</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Attempt</th>
+        <th>Delay</th>
+        <th>Cumulative Wait</th>
+        <th>Applies To</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1st retry</td>
+        <td>5 seconds</td>
+        <td>5 seconds</td>
+        <td>All channels</td>
+      </tr>
+      <tr>
+        <td>2nd retry</td>
+        <td>30 seconds</td>
+        <td>35 seconds</td>
+        <td>All channels</td>
+      </tr>
+      <tr>
+        <td>3rd retry</td>
+        <td>2 minutes</td>
+        <td>~2.5 minutes</td>
+        <td>All channels</td>
+      </tr>
+      <tr>
+        <td>4th retry</td>
+        <td>10 minutes</td>
+        <td>~12.5 minutes</td>
+        <td>Email, WhatsApp, Push</td>
+      </tr>
+      <tr>
+        <td>5th retry</td>
+        <td>30 minutes</td>
+        <td>~42.5 minutes</td>
+        <td>Email only</td>
+      </tr>
+      <tr>
+        <td>Max exceeded</td>
+        <td>--</td>
+        <td>--</td>
+        <td>Moved to DLQ; fallback channel triggered if configured</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="text-small text-muted">
+    SMS has a maximum of 3 retry attempts due to the higher per-message cost and the time-sensitive nature of SMS content. Email allows up to 5 retries because delivery delays are more tolerable. Push notifications allow 4 retries. Retry delays use exponential backoff with jitter to avoid thundering herd effects.
+  </p>
+
+  <div class="warning-box">
+    <strong>Rate Limiting &amp; Provider Quotas</strong>
+    Each external provider enforces its own rate limits and quotas. The Channel Router implements a token bucket rate limiter per provider to ensure outbound request rates stay within contractual limits. Exceeding provider quotas can result in temporary bans, throttling, or financial penalties. Monitor the <code>provider_configs.circuit_breaker_state</code> field and the dashboard metrics for early warning signs. SendGrid free-tier accounts are limited to 100 emails/day — ensure production accounts have adequate provisioning. Twilio SMS rates vary by destination country; international SMS may incur significantly higher costs and stricter rate limits.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 7. Admin Service                                                   -->
+  <!-- ================================================================== -->
+  <h2 id="admin-service">7. Admin Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Admin Service provides the backoffice administration layer for the operative team. It manages admin user accounts and roles, provides CRUD operations for notification rules and channel configurations, delegates template management to the Template Service, supports recipient group management, aggregates notification history and search, and produces dashboard metrics.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3005</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>admin_db</code></td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>Notification Engine, Template Service, Channel Router, Audit Service</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>User Management:</strong> Manages admin user accounts including creation, deactivation, role assignment, and password reset. Supports RBAC with predefined roles: <span class="badge badge-blue">Super Admin</span>, <span class="badge badge-green">Admin</span>, <span class="badge badge-orange">Operator</span>, <span class="badge badge-purple">Viewer</span>.</li>
+    <li><strong>Notification Rule CRUD:</strong> Provides a management interface for creating, updating, enabling/disabling, and deleting notification rules. Validates rule configurations before persisting (via the Notification Engine).</li>
+    <li><strong>Channel Configuration:</strong> Manages provider credentials, sender identities, and channel-specific settings. Sensitive values (API keys, auth tokens) are encrypted at rest.</li>
+    <li><strong>Template Management Delegation:</strong> Proxies template management requests to the Template Service. The Admin Service does not store template data directly but provides a unified API surface.</li>
+    <li><strong>Recipient Group Management:</strong> Allows operators to create and manage named groups of recipients (e.g., "Operations Team", "VIP Customers", "Regional Managers") for use in notification rules.</li>
+    <li><strong>Notification History &amp; Search:</strong> Provides a comprehensive search interface across all sent notifications, filterable by channel, status, date range, recipient, and event type.</li>
+    <li><strong>Dashboard Data Aggregation:</strong> Aggregates metrics from multiple services to power the admin dashboard — total notifications, delivery rates, channel breakdown, failure rates, and trend analysis.</li>
+  </ul>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>admin_users</code></td>
+        <td>Admin user accounts</td>
+        <td><code>id</code>, <code>email</code>, <code>password_hash</code>, <code>full_name</code>, <code>role_id</code>, <code>is_active</code>, <code>last_login_at</code>, <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><code>admin_roles</code></td>
+        <td>Role definitions</td>
+        <td><code>id</code>, <code>name</code>, <code>description</code>, <code>permissions</code>, <code>is_system</code></td>
+      </tr>
+      <tr>
+        <td><code>admin_permissions</code></td>
+        <td>Granular permission definitions</td>
+        <td><code>id</code>, <code>resource</code>, <code>action</code>, <code>description</code></td>
+      </tr>
+      <tr>
+        <td><code>system_configs</code></td>
+        <td>Global system configuration key-value pairs</td>
+        <td><code>id</code>, <code>config_key</code>, <code>config_value</code>, <code>description</code>, <code>updated_by</code>, <code>updated_at</code></td>
+      </tr>
+      <tr>
+        <td><code>saml_identity_providers</code></td>
+        <td>SAML IdP configurations (Azure AD metadata, SP certs, attribute mapping)</td>
+        <td><code>id</code>, <code>name</code>, <code>entity_id</code>, <code>sso_url</code>, <code>certificate</code>, <code>metadata_xml</code>, <code>attribute_mapping</code>, <code>auto_provision</code>, <code>is_active</code></td>
+      </tr>
+      <tr>
+        <td><code>user_identity_links</code></td>
+        <td>Maps local users to external SAML identities</td>
+        <td><code>id</code>, <code>user_id</code>, <code>idp_id</code>, <code>external_id</code>, <code>linked_at</code>, <code>last_login_at</code>. Unique on <code>(idp_id, external_id)</code></td>
+      </tr>
+      <tr>
+        <td><code>saml_sessions</code></td>
+        <td>Active SAML sessions for Single Logout (SLO) support</td>
+        <td><code>id</code>, <code>user_id</code>, <code>idp_id</code>, <code>session_index</code>, <code>name_id</code>, <code>expires_at</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>SAML Tables:</strong> The three SAML-related tables (<code>saml_identity_providers</code>, <code>user_identity_links</code>, <code>saml_sessions</code>) support SAML 2.0 SSO with Azure AD. Full schema details including all columns and constraints are documented in <a href="04-authentication-identity.html#database-schema">04 — Authentication &amp; Identity §6</a>.
+  </div>
+
+  <h3>Key Endpoints</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/admin/dashboard</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Dashboard metrics endpoint. Returns notification volume (today, this week, this month), delivery success rate per channel, top triggered rules, recent failures, and system health indicators.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/admin/rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List notification rules with pagination, sorting, and filtering. Supports filters: <code>eventType</code>, <code>isActive</code>, <code>channel</code>. Returns rule summaries with recent trigger counts.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/admin/rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Create a new notification rule. Validates the rule configuration (event type exists, template exists, channels are active) before persisting. If a <code>suppression</code> configuration is provided, validates that <code>dedupKey</code> paths are valid dot-notation strings, at least one mode is specified, and all <code>windowMinutes</code> / <code>intervalMinutes</code> values are greater than zero. Returns the created rule with its generated ID.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/admin/rules/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update an existing rule. Supports partial updates. Setting <code>suppression: null</code> removes the suppression configuration from the rule. Changes are audit-logged with the admin user ID and timestamp.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/admin/channels</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all channel configurations with their current status, provider details, and health metrics. Sensitive configuration values (API keys) are masked in the response.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/admin/channels/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update channel configuration. Validates provider connectivity before saving (optional dry-run mode). Encrypted values are re-encrypted on update.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/admin/logs</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Notification audit logs with full-text search. Supports filters: <code>action</code>, <code>userId</code>, <code>resourceType</code>, <code>notificationId</code>, <code>dateFrom</code>, <code>dateTo</code>. Returns paginated log entries with detailed metadata.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/admin/saml/idp</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List configured SAML Identity Providers. <span class="badge badge-red">Super Admin</span> only. See <a href="04-authentication-identity.html#api-endpoints">04 — Auth &amp; Identity §7</a> for full CRUD endpoints.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/admin/saml/idp</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Register a new SAML Identity Provider by importing IdP metadata XML. Parses entityID, SSO URL, X.509 certificate. Generates SP keypair. <span class="badge badge-red">Super Admin</span> only.</p>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 8. Audit Service                                                   -->
+  <!-- ================================================================== -->
+  <h2 id="audit-service">8. Audit Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Audit Service provides comprehensive logging, tracking, and analytics for the entire notification lifecycle. It operates on an event-sourcing model, consuming status updates from all services via RabbitMQ, and maintains a complete, immutable record of every notification event from ingestion through delivery. This service is critical for compliance, debugging, and business intelligence.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3006</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>audit_db</code></td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>RabbitMQ (all status exchanges)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>Event Sourcing:</strong> Captures every state transition in the notification lifecycle as an immutable audit event. Events are never updated or deleted — only appended.</li>
+    <li><strong>Delivery Receipt Tracking:</strong> Records delivery receipts from external providers (opened, clicked, bounced, unsubscribed) via webhook callbacks proxied through the Channel Router.</li>
+    <li><strong>Searchable Notification History:</strong> Provides full-text search across notification content, recipients, and metadata. Supports complex queries for investigating delivery issues.</li>
+    <li><strong>Analytics Data:</strong> Aggregates notification metrics for dashboard consumption — delivery rates, channel performance, average delivery latency, hourly/daily volume trends, and failure categorization.</li>
+    <li><strong>Compliance Logging:</strong> Maintains records required for regulatory compliance (GDPR, CAN-SPAM). Tracks consent status, opt-out events, and data access requests.</li>
+    <li><strong>Data Retention:</strong> Implements configurable retention policies. Audit events are retained for the compliance-required period (default 2 years). Detailed payload data can be purged after a shorter window (default 90 days) while retaining metadata.</li>
+  </ul>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>audit_events</code></td>
+        <td>Immutable event log for all notification lifecycle transitions</td>
+        <td><code>id</code>, <code>notification_id</code>, <code>event_type</code>, <code>actor</code>, <code>metadata</code>, <code>payload_snapshot</code>, <code>created_at</code></td>
+      </tr>
+      <tr>
+        <td><code>delivery_receipts</code></td>
+        <td>Provider-reported delivery outcomes</td>
+        <td><code>id</code>, <code>notification_id</code>, <code>channel</code>, <code>provider</code>, <code>status</code>, <code>provider_message_id</code>, <code>raw_response</code>, <code>received_at</code></td>
+      </tr>
+      <tr>
+        <td><code>notification_analytics</code></td>
+        <td>Pre-aggregated analytics data (hourly/daily rollups)</td>
+        <td><code>id</code>, <code>period</code>, <code>period_start</code>, <code>channel</code>, <code>total_sent</code>, <code>total_delivered</code>, <code>total_failed</code>, <code>total_opened</code>, <code>total_clicked</code>, <code>avg_latency_ms</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>RabbitMQ Configuration</h3>
+  <p>
+    The Audit Service subscribes to multiple exchanges to capture the complete notification flow:
+  </p>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Exchange</th>
+        <th>Queue</th>
+        <th>Routing Key</th>
+        <th>Events Captured</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>events.normalized</code></td>
+        <td><code>audit.events</code></td>
+        <td><code>event.#</code></td>
+        <td>Event ingestion and normalization</td>
+      </tr>
+      <tr>
+        <td><code>notifications.render</code></td>
+        <td><code>audit.render</code></td>
+        <td><code>notification.render.#</code></td>
+        <td>Template rendering requests</td>
+      </tr>
+      <tr>
+        <td><code>notifications.deliver</code></td>
+        <td><code>audit.deliver</code></td>
+        <td><code>notification.deliver.#</code></td>
+        <td>Delivery dispatch events</td>
+      </tr>
+      <tr>
+        <td><code>notifications.status</code></td>
+        <td><code>audit.status</code></td>
+        <td><code>notification.status.#</code></td>
+        <td>Delivery status updates (sent, delivered, failed, bounced)</td>
+      </tr>
+      <tr>
+        <td><code>notifications.dlq</code></td>
+        <td><code>audit.dlq</code></td>
+        <td><code>#</code></td>
+        <td>Permanently failed notifications</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ================================================================== -->
+  <!-- 9. Email Ingest Service                                            -->
+  <!-- ================================================================== -->
+  <h2 id="email-ingest-service">9. Email Ingest Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Email Ingest Service extends the platform's event ingestion capabilities to support closed or legacy systems that cannot publish events via RabbitMQ or REST webhooks — systems that can only send emails. It acts as an SMTP server, receives emails from these source systems, parses them against configurable criteria (sender patterns, subject regex, body extraction rules), and generates standardized events that are published to the Event Ingestion layer via RabbitMQ.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS + <code>smtp-server</code> npm package</td></tr>
+      <tr><td><strong>REST Port</strong></td><td><code>3007</code></td></tr>
+      <tr><td><strong>SMTP Port</strong></td><td><code>2525</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>email_ingest_db</code></td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>RabbitMQ, PostgreSQL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>SMTP Server:</strong> Runs an embedded SMTP server on port <code>2525</code> using the <code>smtp-server</code> npm package. Accepts inbound emails from whitelisted source systems and processes them through the parsing pipeline.</li>
+    <li><strong>Sender Whitelisting:</strong> Maintains a registry of authorized email sources (<code>email_sources</code> table). Only emails from registered sender patterns are accepted; all others are rejected at the SMTP level.</li>
+    <li><strong>Email Parsing:</strong> Applies configurable parsing rules to extract structured data from incoming emails. Rules match on sender patterns, subject line regex, and body content extraction using regular expressions.</li>
+    <li><strong>Event Generation:</strong> Transforms parsed email data into canonical events using configurable payload templates. Generated events are published to the <code>events.incoming</code> RabbitMQ exchange with routing key <code>source.email-ingest.{eventType}</code>.</li>
+    <li><strong>Parsing Rule Management:</strong> Exposes REST API endpoints for CRUD operations on email parsing rules, allowing the operative team to configure how emails are parsed and mapped to events via the Admin UI.</li>
+    <li><strong>Audit Trail:</strong> Stores all received emails and their processing results in the <code>processed_emails</code> table for debugging, auditing, and reprocessing capabilities.</li>
+  </ul>
+
+  <h3>SMTP Configuration</h3>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Setting</th>
+        <th>Value</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Port</strong></td><td><code>2525</code></td><td>Non-standard SMTP port to avoid conflicts with system mail services</td></tr>
+      <tr><td><strong>TLS</strong></td><td>STARTTLS supported</td><td>Opportunistic TLS encryption for inbound connections</td></tr>
+      <tr><td><strong>Auth</strong></td><td>Optional SMTP AUTH</td><td>Configurable per-source authentication (PLAIN/LOGIN)</td></tr>
+      <tr><td><strong>Max Message Size</strong></td><td>10 MB</td><td>Configurable limit to prevent oversized email processing</td></tr>
+      <tr><td><strong>Concurrency</strong></td><td>10 concurrent connections</td><td>Limits simultaneous SMTP sessions to manage resource usage</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Email Parsing Rule Schema</h3>
+  <pre><code>{
+  <span class="json-key">"ruleId"</span>: <span class="json-string">"uuid"</span>,
+  <span class="json-key">"name"</span>: <span class="json-string">"ERP Order Confirmation"</span>,
+  <span class="json-key">"sourceFilter"</span>: {
+    <span class="json-key">"senderPattern"</span>: <span class="json-string">"*@erp-system.company.com"</span>,
+    <span class="json-key">"subjectRegex"</span>: <span class="json-string">"^Order Confirmation #\\d+"</span>
+  },
+  <span class="json-key">"bodyParsing"</span>: {
+    <span class="json-key">"format"</span>: <span class="json-string">"html | text"</span>,
+    <span class="json-key">"extractionRules"</span>: [
+      {
+        <span class="json-key">"field"</span>: <span class="json-string">"orderNumber"</span>,
+        <span class="json-key">"regex"</span>: <span class="json-string">"Order #(\\d+)"</span>
+      }
+    ]
+  },
+  <span class="json-key">"eventMapping"</span>: {
+    <span class="json-key">"eventType"</span>: <span class="json-string">"order.confirmed"</span>,
+    <span class="json-key">"payloadTemplate"</span>: {
+      <span class="json-key">"orderNumber"</span>: <span class="json-string">"{{orderNumber}}"</span>
+    }
+  },
+  <span class="json-key">"isActive"</span>: <span class="json-bool">true</span>
+}</code></pre>
+
+  <h3>Key API Endpoints</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/health</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Health check endpoint. Returns the service status, SMTP server health, RabbitMQ connection health, and database connectivity.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/parsing-rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all email parsing rules. Supports query parameters: <code>isActive</code>, <code>eventType</code>, <code>page</code>, <code>limit</code>.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/parsing-rules</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Create a new email parsing rule. Requires <code>name</code>, <code>sourceFilter</code>, <code>bodyParsing</code>, and <code>eventMapping</code> fields. Validates regex patterns before persisting.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/parsing-rules/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update an existing parsing rule. Supports partial updates. Changes take effect immediately for subsequent incoming emails.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-delete">
+      <span class="method-badge delete">DELETE</span>
+      <span>/parsing-rules/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Delete a parsing rule. Soft-deletes the rule (sets <code>isActive</code> to false) to preserve audit history.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/processed-emails</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List processed emails with filters. Supports query parameters: <code>status</code> (parsed, failed, skipped), <code>sender</code>, <code>dateFrom</code>, <code>dateTo</code>, <code>page</code>, <code>limit</code>.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/processed-emails/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retrieve full details for a specific processed email, including the original email content, matched parsing rule, extracted fields, and generated event payload.</p>
+    </div>
+  </div>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>email_parsing_rules</code></td>
+        <td>Configurable rules mapping email criteria to event types</td>
+        <td><code>id</code>, <code>name</code>, <code>sender_pattern</code>, <code>subject_regex</code>, <code>body_parsing_config</code>, <code>event_type</code>, <code>payload_template</code>, <code>is_active</code>, <code>created_at</code>, <code>updated_at</code></td>
+      </tr>
+      <tr>
+        <td><code>processed_emails</code></td>
+        <td>Log of all received and parsed emails (audit trail)</td>
+        <td><code>id</code>, <code>message_id</code>, <code>sender</code>, <code>subject</code>, <code>received_at</code>, <code>matched_rule_id</code>, <code>extracted_data</code>, <code>generated_event_id</code>, <code>status</code>, <code>error_message</code></td>
+      </tr>
+      <tr>
+        <td><code>email_sources</code></td>
+        <td>Registered source system identities (sender whitelist, auth config)</td>
+        <td><code>id</code>, <code>name</code>, <code>sender_pattern</code>, <code>description</code>, <code>auth_config</code>, <code>is_active</code>, <code>created_at</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>RabbitMQ Configuration</h3>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Direction</th>
+        <th>Exchange</th>
+        <th>Routing Key</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Publishes</td>
+        <td><code>events.incoming</code></td>
+        <td><code>source.email-ingest.{eventType}</code></td>
+        <td>Publish parsed email events for downstream processing by Event Ingestion Service</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>SMTP Security</strong>
+    The Email Ingest Service implements multiple security layers: sender whitelisting ensures only registered source systems can submit emails, STARTTLS provides encryption for inbound SMTP connections, optional SMTP AUTH adds per-source authentication, and all incoming emails are size-limited and rate-limited to prevent abuse. Emails from unknown senders are rejected at the SMTP handshake level before any content is accepted.
+  </div>
+
+  <div class="note-box">
+    <strong>Email Parsing Reliability</strong>
+    Email parsing is inherently less structured than REST or RabbitMQ event ingestion. Parsing rules should be thoroughly tested with sample emails before activation. The service logs all parsing failures with the original email content for investigation. When a parsing rule fails to extract required fields, the email is stored with a <code>failed</code> status and no event is generated — preventing malformed data from entering the notification pipeline. Operators can review failed emails through the Admin UI and adjust parsing rules accordingly.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 10. Bulk Upload Service                                            -->
+  <!-- ================================================================== -->
+  <h2 id="bulk-upload-service">10. Bulk Upload Service</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Bulk Upload Service enables the operative team to trigger bulk notifications by uploading XLSX spreadsheet files through the Admin UI. It accepts file uploads, parses each row into an event payload using a flexible column-mapping approach, and submits events to the Event Ingestion Service via HTTP (<code>POST /webhooks/events</code>). This preserves Event Ingestion as the single entry point for all events while giving business users a self-service mechanism for bulk operations without developer involvement.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>NestJS + <code>exceljs</code></td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3008</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>PostgreSQL &mdash; <code>bulk_upload_db</code></td></tr>
+      <tr><td><strong>Source Identifier</strong></td><td><code>bulk-upload</code> (used as <code>source</code> field in event payloads)</td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>Event Ingestion Service (HTTP), PostgreSQL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Responsibilities</h3>
+  <ul>
+    <li><strong>File Upload &amp; Validation:</strong> Accepts XLSX files via multipart/form-data. Validates file format (<code>.xlsx</code> only), file size (max 10 MB), and row count (max 5,000 rows). Rejects invalid files with descriptive error messages.</li>
+    <li><strong>Header Parsing &amp; Column Mapping:</strong> Reads the first row as column headers. The <code>eventType</code> column is required; all other column headers map directly as keys in the <code>payload</code> object of each event. This fully flexible mapping allows any event type to be submitted without a predefined schema.</li>
+    <li><strong>Row-to-Event Transformation:</strong> For each data row, extracts the <code>eventType</code> value and maps remaining columns to payload fields. Empty cells are omitted. Values that are valid JSON (e.g., arrays, objects) are parsed as JSON; otherwise treated as strings or numbers.</li>
+    <li><strong>Event Submission:</strong> Sends each mapped event to the Event Ingestion Service via HTTP <code>POST /webhooks/events</code> with <code>source: "bulk-upload"</code>. Configurable concurrency (default: 5 parallel requests, max 50 events/second) to avoid overwhelming the ingestion service.</li>
+    <li><strong>Progress Tracking:</strong> Tracks per-row status (<code>pending</code>, <code>processing</code>, <code>succeeded</code>, <code>failed</code>, <code>skipped</code>) in the <code>upload_rows</code> table and maintains aggregate counters in the <code>uploads</code> table for real-time progress reporting.</li>
+    <li><strong>Error Handling:</strong> Captures and stores per-row errors (validation failures, submission errors) with the original raw data. Failed rows can be retried independently without re-uploading the entire file.</li>
+  </ul>
+
+  <h3>XLSX File Format (Flexible Mapping)</h3>
+  <p>
+    The service uses a fully flexible column mapping approach. The only required column is <code>eventType</code>, which determines the event type for each row. All other columns are dynamic &mdash; each column header becomes a key in the <code>payload</code> object.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Rule</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Header Row</strong></td><td>First row must contain column names</td></tr>
+      <tr><td><strong>Required Column</strong></td><td><code>eventType</code> &mdash; determines the event type for each row</td></tr>
+      <tr><td><strong>Dynamic Columns</strong></td><td>All other column headers become keys in the <code>payload</code> object</td></tr>
+      <tr><td><strong>Empty Cells</strong></td><td>Omitted from the payload (not included as null)</td></tr>
+      <tr><td><strong>JSON Values</strong></td><td>Cell values that are valid JSON (e.g., <code>[{"sku":"X"}]</code>) are parsed as JSON objects/arrays</td></tr>
+      <tr><td><strong>Max Rows</strong></td><td>5,000 rows per file</td></tr>
+      <tr><td><strong>Max File Size</strong></td><td>10 MB</td></tr>
+      <tr><td><strong>File Format</strong></td><td><code>.xlsx</code> only</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Example XLSX</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>eventType</th>
+        <th>customerEmail</th>
+        <th>customerName</th>
+        <th>orderId</th>
+        <th>totalAmount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>order.shipped</td><td>jane@example.com</td><td>Jane Doe</td><td>ORD-001</td><td>79.99</td></tr>
+      <tr><td>order.created</td><td>john@example.com</td><td>John Smith</td><td>ORD-002</td><td>149.50</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Resulting Event Payload (Row 1)</h4>
+  <pre><code>{
+  <span class="json-key">"source"</span>: <span class="json-string">"bulk-upload"</span>,
+  <span class="json-key">"eventType"</span>: <span class="json-string">"order.shipped"</span>,
+  <span class="json-key">"payload"</span>: {
+    <span class="json-key">"customerEmail"</span>: <span class="json-string">"jane@example.com"</span>,
+    <span class="json-key">"customerName"</span>: <span class="json-string">"Jane Doe"</span>,
+    <span class="json-key">"orderId"</span>: <span class="json-string">"ORD-001"</span>,
+    <span class="json-key">"totalAmount"</span>: <span class="json-number">79.99</span>
+  }
+}</code></pre>
+
+  <h3>Key API Endpoints</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/uploads</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Upload an XLSX file for bulk processing. Accepts <code>multipart/form-data</code>. Validates file format, size, and header row. Returns <code>202 Accepted</code> with <code>uploadId</code> and initial metadata. Processing begins asynchronously in background.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/uploads</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List uploads with pagination and filters. Supports query parameters: <code>status</code>, <code>uploadedBy</code>, <code>dateFrom</code>, <code>dateTo</code>, <code>page</code>, <code>limit</code>. Returns upload summaries with progress counters.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/uploads/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Get upload status and detailed progress. Returns total rows, processed rows, succeeded rows, failed rows, upload status, and timing information.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/uploads/:id/errors</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Get failed row details for an upload. Returns paginated list of failed rows including row number, error message, and the raw data from the XLSX row. Supports downloading failed rows as CSV.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/uploads/:id/retry</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retry failed rows for an upload. Resets failed rows to <code>pending</code> status and resubmits them to the Event Ingestion Service. Only available when upload status is <code>completed</code> or <code>partial</code>.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-delete">
+      <span class="method-badge delete">DELETE</span>
+      <span>/uploads/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Cancel an in-progress upload (stops processing remaining rows) or delete a completed upload record. Sets status to <code>cancelled</code>.</p>
+    </div>
+  </div>
+
+  <h3>Processing Flow</h3>
+  <ol>
+    <li>User uploads XLSX via Admin UI &rarr; Gateway &rarr; Bulk Upload Service</li>
+    <li>Service validates file (size, format, header row present, <code>eventType</code> column exists) &rarr; returns <code>202 Accepted</code> with <code>uploadId</code></li>
+    <li>Background worker parses file row-by-row using <code>exceljs</code></li>
+    <li>For each row: extract <code>eventType</code>, map remaining columns to <code>payload</code> fields, attempt JSON parsing of values</li>
+    <li>Events sent to Event Ingestion Service (<code>POST /webhooks/events</code>) with <code>source: "bulk-upload"</code>; configurable concurrency (default: 5 parallel, max 50 events/s)</li>
+    <li>Per-row status tracked in <code>upload_rows</code> table; aggregate counters updated in <code>uploads</code> table</li>
+    <li>Admin UI polls <code>/uploads/:id</code> for progress updates</li>
+  </ol>
+
+  <h3>Database Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Description</th>
+        <th>Key Columns</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>uploads</code></td>
+        <td>Master record for each file upload with aggregate progress</td>
+        <td><code>id</code> (UUID PK), <code>file_name</code>, <code>file_size</code>, <code>total_rows</code>, <code>processed_rows</code>, <code>succeeded_rows</code>, <code>failed_rows</code>, <code>status</code>, <code>uploaded_by</code>, <code>started_at</code>, <code>completed_at</code>, <code>created_at</code>, <code>updated_at</code></td>
+      </tr>
+      <tr>
+        <td><code>upload_rows</code></td>
+        <td>Per-row tracking with raw data and mapped payload</td>
+        <td><code>id</code> (UUID PK), <code>upload_id</code> (FK), <code>row_number</code>, <code>raw_data</code> (JSONB), <code>mapped_payload</code> (JSONB), <code>event_id</code> (UUID, nullable), <code>status</code>, <code>error_message</code>, <code>processed_at</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>Upload Status State Machine</h4>
+  <table>
+    <thead>
+      <tr><th>Status</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="badge badge-draft">queued</span></td><td>Upload received, file validated, awaiting processing</td></tr>
+      <tr><td><span class="badge badge-blue">processing</span></td><td>Background worker is actively parsing and submitting rows</td></tr>
+      <tr><td><span class="badge badge-approved">completed</span></td><td>All rows processed successfully (0 failures)</td></tr>
+      <tr><td><span class="badge badge-orange">partial</span></td><td>Processing finished but some rows failed</td></tr>
+      <tr><td><span class="badge badge-red">failed</span></td><td>Upload-level failure (e.g., file corruption, all rows failed)</td></tr>
+      <tr><td><span class="badge badge-draft">cancelled</span></td><td>Upload was cancelled by an admin before completion</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Error Handling</h3>
+  <table>
+    <thead>
+      <tr><th>Error Type</th><th>Scope</th><th>Handling</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>File-level errors</strong></td>
+        <td>Upload</td>
+        <td>Invalid format, oversized file, missing header row, missing <code>eventType</code> column. Upload rejected immediately with <code>400 Bad Request</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Row-level validation errors</strong></td>
+        <td>Individual row</td>
+        <td>Missing <code>eventType</code> value, unparseable JSON in cells. Row marked as <code>failed</code> with error message; processing continues for remaining rows.</td>
+      </tr>
+      <tr>
+        <td><strong>Submission errors</strong></td>
+        <td>Individual row</td>
+        <td>Event Ingestion Service returns error (4xx/5xx). Row marked as <code>failed</code> with error details. Transient errors (5xx) are retried up to 3 times with exponential backoff before marking as failed.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Security Considerations</h3>
+  <ul>
+    <li><strong>RBAC:</strong> Upload, list, and view operations available to <span class="badge badge-blue">Admin</span> and <span class="badge badge-green">Operator</span> roles. Retry and cancel operations require <span class="badge badge-red">Admin</span> role.</li>
+    <li><strong>File Validation:</strong> Only <code>.xlsx</code> files accepted. File content is validated (not just extension) using the XLSX magic bytes. Files are processed in memory and not persisted to disk beyond the upload lifecycle.</li>
+    <li><strong>Rate Limiting:</strong> Event submission rate capped at configurable maximum (default 50 events/second) to protect the Event Ingestion Service from bulk traffic spikes.</li>
+    <li><strong>Audit Trail:</strong> All upload operations (upload, retry, cancel) are logged with the admin user identity and timestamp via the standard audit pipeline.</li>
+  </ul>
+
+  <div class="info-box">
+    <strong>Design Decision: HTTP to Event Ingestion (Not Direct RabbitMQ)</strong>
+    The Bulk Upload Service sends events via HTTP <code>POST /webhooks/events</code> to the Event Ingestion Service rather than publishing directly to RabbitMQ. This preserves the Event Ingestion Service as the single entry point for all events, ensuring consistent validation, normalization, schema enforcement, and deduplication regardless of the event source. It also means the Bulk Upload Service does not need RabbitMQ credentials or knowledge of the exchange topology.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 11. Notification Admin UI (Frontend)                               -->
+  <!-- ================================================================== -->
+  <h2 id="notification-admin-ui">11. Notification Admin UI (Frontend)</h2>
+
+  <h3>Purpose</h3>
+  <p>
+    The Notification Admin UI is the Next.js-powered backoffice application used by the operative team to manage all aspects of the notification platform. It provides a modern, responsive interface for managing notification rules, editing templates, configuring channels, monitoring delivery metrics, and searching notification history.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Attribute</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Technology</strong></td><td>Next.js 14 (App Router) with TypeScript</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3010</code></td></tr>
+      <tr><td><strong>Database</strong></td><td>None (all data through API)</td></tr>
+      <tr><td><strong>Dependencies</strong></td><td>Notification Gateway (BFF) only</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Key Pages &amp; Features</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Page</th>
+        <th>Route</th>
+        <th>Features</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Dashboard</strong></td>
+        <td><code>/dashboard</code></td>
+        <td>Real-time notification volume charts, delivery success rate gauges, channel breakdown pie chart, recent failures list, top triggered rules, system health indicators</td>
+      </tr>
+      <tr>
+        <td><strong>Rule Management</strong></td>
+        <td><code>/rules</code></td>
+        <td>List view with search, filter, and sort. Create/edit rule modal with event type selector, condition builder (visual), template picker, channel selector, recipient configuration, enable/disable toggle</td>
+      </tr>
+      <tr>
+        <td><strong>Template Editor</strong></td>
+        <td><code>/templates</code></td>
+        <td>List view with template cards. WYSIWYG editor for HTML email templates (based on TipTap/ProseMirror), plain text editor for SMS, WhatsApp message composer, push notification previewer. Live preview panel, variable insertion toolbar, version history sidebar</td>
+      </tr>
+      <tr>
+        <td><strong>Channel Configuration</strong></td>
+        <td><code>/channels</code></td>
+        <td>Channel cards showing provider status and health. Configuration forms for each provider (SendGrid, Twilio, Firebase). Connection test button, credential rotation workflow</td>
+      </tr>
+      <tr>
+        <td><strong>Notification Logs</strong></td>
+        <td><code>/logs</code></td>
+        <td>Searchable, filterable log table with expandable rows. Filters: date range, channel, status, recipient, event type. Detail view showing full lifecycle timeline, rendered content, delivery attempts</td>
+      </tr>
+      <tr>
+        <td><strong>User Management</strong></td>
+        <td><code>/users</code></td>
+        <td>Admin user list, role assignment, invitation workflow, activity log per user. Restricted to Super Admin and Admin roles</td>
+      </tr>
+      <tr>
+        <td><strong>Login</strong></td>
+        <td><code>/login</code></td>
+        <td>Email/password login form with "Sign in with SSO" button (displayed when a SAML IdP is configured). Forgot password link. See <a href="04-authentication-identity.html#frontend-integration">04 — Auth &amp; Identity §8</a></td>
+      </tr>
+      <tr>
+        <td><strong>Identity Provider Settings</strong></td>
+        <td><code>/settings/identity-providers</code></td>
+        <td>SAML IdP configuration: metadata XML import, attribute mapping, auto-provisioning toggle, SP metadata download, certificate expiry warnings. <span class="badge badge-red">Super Admin</span> only</td>
+      </tr>
+      <tr>
+        <td><strong>Bulk Upload</strong></td>
+        <td><code>/bulk-upload</code></td>
+        <td>Drag-and-drop XLSX file upload zone, upload progress bar with real-time polling, upload history table (file name, uploaded by, date, status, row counts), error detail panel for failed rows with CSV export, sample template download. <span class="badge badge-blue">Admin</span> <span class="badge badge-green">Operator</span> — retry and cancel require <span class="badge badge-red">Admin</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note-box">
+    <strong>BFF Pattern — Frontend Communication</strong>
+    The Notification Admin UI communicates <strong>exclusively</strong> through the Notification Gateway (BFF) on port <code>3000</code>. It never calls internal microservices directly. This provides a single security boundary, consistent API surface, and allows the gateway to handle authentication, rate limiting, and response transformation. The frontend uses <code>fetch</code> with JWT bearer tokens stored in HTTP-only cookies for secure authentication. Server components in the Next.js App Router fetch data during SSR through the gateway, while client components use SWR for data fetching with automatic revalidation.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 12. Database Schema Overview                                       -->
+  <!-- ================================================================== -->
+  <h2 id="database-schema-overview">12. Database Schema Overview</h2>
+
+  <h3>Database Summary</h3>
+  <p>
+    Each microservice owns its database, following the database-per-service pattern. This ensures loose coupling, independent schema evolution, and isolated failure domains. Cross-service data access is performed exclusively through APIs, never through shared databases.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Database</th>
+        <th>Owner Service</th>
+        <th>Tables</th>
+        <th>Estimated Size (Year 1)</th>
+        <th>Growth Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>event_ingestion_db</code></td>
+        <td>Event Ingestion Service</td>
+        <td><code>events</code>, <code>event_sources</code>, <code>event_schemas</code></td>
+        <td>~50 GB</td>
+        <td>~5 GB/month</td>
+      </tr>
+      <tr>
+        <td><code>notification_engine_db</code></td>
+        <td>Notification Engine</td>
+        <td><code>notification_rules</code>, <code>notifications</code>, <code>notification_recipients</code>, <code>notification_status_log</code>, <code>recipient_groups</code>, <code>recipient_preferences</code></td>
+        <td>~80 GB</td>
+        <td>~8 GB/month</td>
+      </tr>
+      <tr>
+        <td><code>template_db</code></td>
+        <td>Template Service</td>
+        <td><code>templates</code>, <code>template_versions</code>, <code>template_channels</code>, <code>template_variables</code></td>
+        <td>~500 MB</td>
+        <td>Minimal</td>
+      </tr>
+      <tr>
+        <td><code>channel_router_db</code></td>
+        <td>Channel Router</td>
+        <td><code>channels</code>, <code>channel_configs</code>, <code>delivery_attempts</code>, <code>provider_configs</code></td>
+        <td>~60 GB</td>
+        <td>~6 GB/month</td>
+      </tr>
+      <tr>
+        <td><code>admin_db</code></td>
+        <td>Admin Service</td>
+        <td><code>admin_users</code>, <code>admin_roles</code>, <code>admin_permissions</code>, <code>system_configs</code>, <code>saml_identity_providers</code>, <code>user_identity_links</code>, <code>saml_sessions</code></td>
+        <td>~100 MB</td>
+        <td>Minimal</td>
+      </tr>
+      <tr>
+        <td><code>audit_db</code></td>
+        <td>Audit Service</td>
+        <td><code>audit_events</code>, <code>delivery_receipts</code>, <code>notification_analytics</code></td>
+        <td>~120 GB</td>
+        <td>~12 GB/month</td>
+      </tr>
+      <tr>
+        <td><code>email_ingest_db</code></td>
+        <td>Email Ingest Service</td>
+        <td><code>email_parsing_rules</code>, <code>processed_emails</code>, <code>email_sources</code></td>
+        <td>~20 GB</td>
+        <td>~2 GB/month</td>
+      </tr>
+      <tr>
+        <td><code>bulk_upload_db</code></td>
+        <td>Bulk Upload Service</td>
+        <td><code>uploads</code>, <code>upload_rows</code></td>
+        <td>~5 GB</td>
+        <td>~500 MB/month</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Key Relationships</h3>
+  <p>
+    While each database is physically isolated, logical relationships exist across service boundaries. These are maintained through shared identifiers (UUIDs) rather than foreign keys:
+  </p>
+  <ul>
+    <li><strong>Event &rarr; Notification:</strong> The <code>notifications.event_id</code> column in the Notification Engine DB references the <code>events.event_id</code> from the Event Ingestion DB. This link is maintained by passing the event ID through RabbitMQ messages.</li>
+    <li><strong>Notification &rarr; Template:</strong> The <code>notifications.template_id</code> references a template in the Template DB. The Notification Engine resolves this by calling the Template Service API at render time.</li>
+    <li><strong>Notification &rarr; Delivery Attempts:</strong> The <code>delivery_attempts.notification_id</code> in the Channel Router DB corresponds to the <code>notifications.id</code> in the Notification Engine DB. This is propagated via RabbitMQ message headers.</li>
+    <li><strong>Notification &rarr; Audit Events:</strong> The <code>audit_events.notification_id</code> in the Audit DB references notifications across all services. The audit service reconstructs the full lifecycle by correlating events with the same notification ID.</li>
+    <li><strong>Rule &rarr; Template:</strong> The <code>notification_rules.actions[].templateId</code> references a template. This is validated at rule creation time by calling the Template Service.</li>
+  </ul>
+
+  <h3>Data Retention Policies</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Data Category</th>
+        <th>Retention Period</th>
+        <th>Purge Strategy</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Raw event payloads</td>
+        <td>90 days</td>
+        <td>Automated daily job; payload set to null, metadata retained</td>
+        <td>Full payload available for debugging within 90 days</td>
+      </tr>
+      <tr>
+        <td>Notification records</td>
+        <td>1 year</td>
+        <td>Archived to cold storage after 1 year, deleted after 3 years</td>
+        <td>Metadata and status retained; rendered content purged</td>
+      </tr>
+      <tr>
+        <td>Delivery attempts</td>
+        <td>6 months</td>
+        <td>Aggregated into analytics; raw records deleted</td>
+        <td>Provider responses may contain PII</td>
+      </tr>
+      <tr>
+        <td>Audit events</td>
+        <td>2 years</td>
+        <td>Immutable; archived to cold storage after 2 years</td>
+        <td>Required for regulatory compliance</td>
+      </tr>
+      <tr>
+        <td>Analytics rollups</td>
+        <td>Indefinite</td>
+        <td>No purge; aggregated data only (no PII)</td>
+        <td>Hourly rollups compacted to daily after 90 days</td>
+      </tr>
+      <tr>
+        <td>Template versions</td>
+        <td>Indefinite</td>
+        <td>No purge</td>
+        <td>Required for audit trail of sent notifications</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ================================================================== -->
+  <!-- 13. Inter-Service Communication                                    -->
+  <!-- ================================================================== -->
+  <h2 id="inter-service-communication">13. Inter-Service Communication</h2>
+
+  <p>
+    The microservices communicate through two patterns: synchronous HTTP/REST for request-response interactions, and asynchronous RabbitMQ messaging for event-driven, fire-and-forget workflows. The choice of pattern depends on whether the caller needs an immediate response (synchronous) or can operate with eventual consistency (asynchronous).
+  </p>
+
+  <h3>Communication Map</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>From</th>
+        <th>To</th>
+        <th>Protocol</th>
+        <th>Pattern</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Admin UI</td>
+        <td>Notification Gateway</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>All frontend API calls (CRUD, dashboard, logs)</td>
+      </tr>
+      <tr>
+        <td>Notification Gateway</td>
+        <td>All internal services</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Request proxying and aggregation</td>
+      </tr>
+      <tr>
+        <td>Source Systems (OMS, Magento, etc.)</td>
+        <td>Event Ingestion</td>
+        <td>AMQP / HTTP</td>
+        <td>Asynchronous</td>
+        <td>Business event delivery</td>
+      </tr>
+      <tr>
+        <td>Event Ingestion</td>
+        <td>Notification Engine</td>
+        <td>AMQP</td>
+        <td>Asynchronous</td>
+        <td>Normalized event publishing</td>
+      </tr>
+      <tr>
+        <td>Notification Engine</td>
+        <td>Template Service</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Template rendering requests</td>
+      </tr>
+      <tr>
+        <td>Notification Engine</td>
+        <td>Channel Router</td>
+        <td>AMQP</td>
+        <td>Asynchronous</td>
+        <td>Rendered notification dispatch</td>
+      </tr>
+      <tr>
+        <td>Channel Router</td>
+        <td>External Providers</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>SendGrid, Twilio, Firebase API calls</td>
+      </tr>
+      <tr>
+        <td>Channel Router</td>
+        <td>Notification Engine</td>
+        <td>AMQP</td>
+        <td>Asynchronous</td>
+        <td>Delivery status updates</td>
+      </tr>
+      <tr>
+        <td>All Services</td>
+        <td>Audit Service</td>
+        <td>AMQP</td>
+        <td>Asynchronous</td>
+        <td>Lifecycle events and status updates</td>
+      </tr>
+      <tr>
+        <td>Admin Service</td>
+        <td>Notification Engine</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Rule management, notification queries</td>
+      </tr>
+      <tr>
+        <td>Admin Service</td>
+        <td>Channel Router</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Channel configuration management</td>
+      </tr>
+      <tr>
+        <td>Admin Service</td>
+        <td>Audit Service</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Log queries and analytics data</td>
+      </tr>
+      <tr>
+        <td>Email Ingest Service</td>
+        <td>Event Ingestion (via RabbitMQ)</td>
+        <td>AMQP</td>
+        <td>Asynchronous</td>
+        <td>Publish parsed email events to <code>events.incoming</code> exchange</td>
+      </tr>
+      <tr>
+        <td>Notification Gateway</td>
+        <td>Email Ingest Service</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Email parsing rule management, processed email queries</td>
+      </tr>
+      <tr>
+        <td>Notification Gateway</td>
+        <td>Bulk Upload Service</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Bulk upload operations (upload, list, status, errors, retry, cancel)</td>
+      </tr>
+      <tr>
+        <td>Bulk Upload Service</td>
+        <td>Event Ingestion Service</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Submit parsed XLSX rows as events via <code>POST /webhooks/events</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Synchronous vs. Asynchronous Patterns</h3>
+
+  <h4>Synchronous (HTTP/REST)</h4>
+  <p>
+    Used when the caller requires an immediate response to proceed. Examples include template rendering (the engine needs the rendered content before it can dispatch), dashboard data aggregation (the admin UI needs data to display), and CRUD operations (the user expects confirmation). Synchronous calls use circuit breakers and timeouts (default 5 seconds) to prevent cascading failures.
+  </p>
+
+  <h4>Asynchronous (RabbitMQ / AMQP)</h4>
+  <p>
+    Used for the core notification pipeline where loose coupling, resilience, and throughput are prioritized over immediate response. Event ingestion, notification dispatch, delivery status updates, and audit logging all use asynchronous messaging. Messages are durable and persisted to disk by RabbitMQ, ensuring no data loss even if a consumer is temporarily unavailable. All queues are configured with dead letter exchanges for handling poison messages.
+  </p>
+
+  <div class="info-box">
+    <strong>Eventual Consistency</strong>
+    The asynchronous communication pattern means the system operates under eventual consistency. When an event is ingested, there is a brief window (typically milliseconds to seconds) before the Notification Engine processes it and the Audit Service records it. The Admin UI dashboard may show slightly stale data during peak loads. This trade-off is intentional — it enables the system to handle high event volumes (10,000+ events/minute) without blocking, while providing resilience against individual service failures. If a downstream service is temporarily unavailable, messages queue up in RabbitMQ and are processed when the service recovers, ensuring zero data loss.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 14. Security Considerations                                        -->
+  <!-- ================================================================== -->
+  <h2 id="security-considerations">14. Security Considerations</h2>
+
+  <h3>JWT Authentication at Gateway Level</h3>
+  <p>
+    All external requests (from the Admin UI and external API consumers) must pass through the Notification Gateway, which enforces authentication on every request. The gateway validates JWT access tokens using RS256 asymmetric signatures. Tokens are issued by the platform itself after successful authentication via either local credentials (email/password with bcrypt verification) or SAML 2.0 SSO with Azure AD. Both methods produce identical JWT tokens, so downstream services are unaware of the authentication method. Tokens contain the user's identity, role, permissions, and <code>auth_method</code> claim ("local" or "saml"). Access tokens have a short expiry (15 minutes) and are refreshed using HTTP-only, secure, SameSite refresh tokens (7-day expiry with rotation). See <a href="04-authentication-identity.html">04 — Authentication &amp; Identity</a> for the complete authentication and SSO design.
+  </p>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Auth Method</th>
+        <th>Used By</th>
+        <th>Token Type</th>
+        <th>Expiry</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>JWT Bearer Token</td>
+        <td>Admin UI users</td>
+        <td>Access Token (RS256)</td>
+        <td>15 minutes</td>
+      </tr>
+      <tr>
+        <td>Refresh Token</td>
+        <td>Admin UI users</td>
+        <td>HTTP-only Cookie</td>
+        <td>7 days (with rotation)</td>
+      </tr>
+      <tr>
+        <td>API Key</td>
+        <td>External integrations</td>
+        <td>X-API-Key header</td>
+        <td>Configurable (default 90 days)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Service-to-Service Authentication</h3>
+  <p>
+    Internal microservices communicate within a trusted network boundary (Docker bridge network or Kubernetes cluster network). Service-to-service HTTP calls use a shared HMAC-based authentication mechanism: each request includes a signed <code>X-Service-Signature</code> header computed from the request body and a shared secret. In production environments, mutual TLS (mTLS) is recommended for an additional layer of transport security. RabbitMQ connections use dedicated service accounts with per-queue permissions following the principle of least privilege.
+  </p>
+
+  <h3>Data Encryption</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Scope</th>
+        <th>Method</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>In Transit</strong></td>
+        <td>TLS 1.2+</td>
+        <td>All HTTP traffic between services uses TLS. RabbitMQ connections use AMQPS (AMQP over TLS). Database connections use SSL mode <code>require</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>At Rest — Database</strong></td>
+        <td>PostgreSQL TDE</td>
+        <td>Transparent Data Encryption enabled for all databases. Managed encryption keys via the cloud provider's KMS.</td>
+      </tr>
+      <tr>
+        <td><strong>At Rest — Secrets</strong></td>
+        <td>AES-256-GCM</td>
+        <td>Provider credentials (API keys, auth tokens) stored in <code>channel_configs</code> and <code>provider_configs</code> are encrypted at the application level using AES-256-GCM with keys managed by the secrets manager.</td>
+      </tr>
+      <tr>
+        <td><strong>At Rest — Backups</strong></td>
+        <td>AES-256</td>
+        <td>Database backups are encrypted using the cloud provider's managed encryption.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>PII Handling in Notification Data</h3>
+  <p>
+    Notifications inherently contain personally identifiable information (PII) — customer names, email addresses, phone numbers, order details. The platform implements the following safeguards:
+  </p>
+  <ul>
+    <li><strong>Data Minimization:</strong> Services only store the PII they need to fulfill their function. The Audit Service, for example, stores notification IDs and metadata but can be configured to redact PII from payload snapshots after a retention window.</li>
+    <li><strong>Access Control:</strong> Database access is restricted to the owning service. No cross-database queries are permitted. Admin users see PII only through the gateway, which enforces role-based access.</li>
+    <li><strong>Log Sanitization:</strong> Application logs are sanitized to replace PII with masked values (e.g., <code>j***@example.com</code>, <code>+1***567890</code>). Full PII is never written to application log files.</li>
+    <li><strong>Right to Erasure (GDPR Article 17):</strong> The system supports a "forget" workflow that, given a customer identifier, purges or anonymizes all PII across all databases while retaining anonymized aggregate data for analytics.</li>
+    <li><strong>Consent Tracking:</strong> The <code>recipient_preferences</code> table tracks opt-in/opt-out status per channel. The Notification Engine checks consent before dispatching, ensuring compliance with GDPR and CAN-SPAM requirements.</li>
+    <li><strong>Audit Trail:</strong> All access to PII-containing records through the Admin UI is logged in the Audit Service, including the admin user identity, timestamp, and the specific records accessed.</li>
+  </ul>
+
+  <div class="warning-box">
+    <strong>Security Review Required</strong>
+    Before production deployment, a comprehensive security review must be conducted covering: penetration testing of the gateway endpoints, review of RBAC policies and permission grants, validation of encryption key management procedures, verification of PII handling compliance with GDPR and local data protection regulations, and audit of RabbitMQ access control lists. All provider API credentials must be rotated from development values to production secrets managed through a dedicated secrets manager (e.g., HashiCorp Vault, AWS Secrets Manager).
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- Footer                                                             -->
+  <!-- ================================================================== -->
+  <div class="doc-footer">
+    <p>Notification API Documentation v1.0 &bull; Architecture Team &bull; 2026</p>
+  </div>
+</div>
+</body>
+</html>

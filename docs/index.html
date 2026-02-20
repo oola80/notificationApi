@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notification API — Documentation Hub</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="doc-container">
+  <div class="doc-header">
+    <h1>Notification API</h1>
+    <p class="subtitle">Unified Notification Platform — Documentation Hub</p>
+    <div class="doc-meta">
+      <span><strong>Version:</strong> 1.0</span>
+      <span><strong>Date:</strong> 2026-02-19</span>
+      <span><strong>Author:</strong> Architecture Team</span>
+      <span><strong>Status:</strong> <span class="badge badge-review">In Review</span></span>
+    </div>
+  </div>
+
+  <!-- Project Overview Section -->
+  <h2 id="overview">Project Overview</h2>
+  <p>The Notification API is a unified event-driven platform designed to consolidate the fragmented notification landscape across our eCommerce ecosystem. Today, customer-facing notifications originate independently from OMS, Magento 2, the Mirakl Marketplace, Chat Commerce workflows, closed/legacy systems, and various manual processes — each with its own delivery logic, templates, and provider integrations. This platform replaces that patchwork with a single, centralized microservices system capable of ingesting events from all source systems — including closed/legacy systems via email ingestion — and orchestrating multi-channel delivery across Email, WhatsApp, SMS, and Push Notifications. The result is a consistent customer communication experience, a self-service backoffice for the operative team, centralized template management with versioning, and a complete audit trail for every notification sent.</p>
+
+  <div class="info-box">
+    <strong>Architecture Highlights</strong>
+    <p>Event-driven microservices architecture built with NestJS, Next.js, RabbitMQ, and PostgreSQL. Supports Email, WhatsApp, SMS, and Push Notification channels with extensible provider integrations. Each microservice owns its own database, communicates asynchronously through RabbitMQ exchanges, and is independently deployable via Docker containers. The system is designed for horizontal scalability, provider failover, and zero-downtime deployments.</p>
+  </div>
+
+  <!-- Key Features -->
+  <h2 id="features">Key Capabilities</h2>
+  <p>The platform delivers six core capabilities that together provide end-to-end notification lifecycle management — from event ingestion through delivery, tracking, and analytics.</p>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 1.5rem 0;">
+    <div class="feature-card">
+      <h3>Unified Event Ingestion</h3>
+      <p>Consolidates events from OMS, Magento 2, Mirakl Marketplace, Chat Commerce, and closed/legacy systems into a standardized event schema. Source systems publish events via REST API or RabbitMQ, while closed/legacy systems that can only send email are integrated through a dedicated Email Ingest Service that parses incoming emails and generates standardized events. The ingestion layer normalizes, validates, and routes all events downstream.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Multi-Channel Delivery</h3>
+      <p>Delivers notifications across Email, SMS, WhatsApp, and Push Notification channels through pluggable provider adapters. Integrates with SendGrid, Twilio, WhatsApp Business API, and Firebase Cloud Messaging with built-in retry logic and provider failover.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Template Management</h3>
+      <p>Handlebars-based template engine supporting multi-channel variants, localization, and version history. Templates are managed through the backoffice with a live preview, ensuring the operative team can update notification content without code deployments.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Rule-Based Routing</h3>
+      <p>Configurable event-to-notification mapping rules with conditional logic. Rules define which events trigger which notifications, on which channels, with support for customer preference overrides, time-based scheduling, and priority escalation.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Backoffice Administration</h3>
+      <p>Self-service Next.js admin interface for the operative team to manage templates, routing rules, channel configurations, and provider settings. Role-based access control ensures appropriate permissions across teams and functions.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Audit &amp; Analytics</h3>
+      <p>Complete notification lifecycle tracking from event ingestion to final delivery status. Captures delivery receipts, open rates, failure reasons, and retry history. Provides dashboards for delivery analytics, channel performance, and system health monitoring.</p>
+    </div>
+  </div>
+
+  <!-- Technology Stack -->
+  <h2 id="tech-stack">Technology Stack</h2>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Technology</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>NestJS</td>
+        <td>Backend microservices framework providing modular architecture, dependency injection, and native RabbitMQ transport support</td>
+      </tr>
+      <tr>
+        <td>Next.js</td>
+        <td>Admin backoffice frontend with server-side rendering, API routes, and role-based access control</td>
+      </tr>
+      <tr>
+        <td>RabbitMQ</td>
+        <td>Message broker for asynchronous inter-service communication, event fan-out, and delivery queue management</td>
+      </tr>
+      <tr>
+        <td>PostgreSQL</td>
+        <td>Relational databases with per-service isolation for events, templates, routing rules, and notification logs</td>
+      </tr>
+      <tr>
+        <td>Docker</td>
+        <td>Containerization for consistent local development, CI/CD pipelines, and production deployment orchestration</td>
+      </tr>
+      <tr>
+        <td>Jest / Playwright / Allure</td>
+        <td>Testing stack: Jest for unit tests (NestJS + Next.js), Playwright for cross-browser E2E, Allure for unified reporting</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Documentation Index -->
+  <h2 id="documents">Documentation</h2>
+  <p>Explore the detailed design documentation below. Each document covers a specific aspect of the platform architecture and implementation.</p>
+
+  <div class="doc-grid">
+    <a href="01-executive-summary.html" class="doc-card">
+      <span class="doc-number">01</span>
+      <h3>Executive Summary</h3>
+      <p>Project overview, problem statement, proposed solution, objectives, technology stack, and benefits of the unified notification platform.</p>
+    </a>
+    <a href="02-detailed-microservices.html" class="doc-card">
+      <span class="doc-number">02</span>
+      <h3>Detailed Microservices</h3>
+      <p>In-depth specification of each microservice including API endpoints, database schemas, RabbitMQ configuration, and inter-service communication.</p>
+    </a>
+    <a href="03-system-architecture.html" class="doc-card">
+      <span class="doc-number">03</span>
+      <h3>System Architecture</h3>
+      <p>Architecture diagrams, layer design, event flows, RabbitMQ topology, database architecture, security, scalability, and deployment patterns.</p>
+    </a>
+    <a href="04-authentication-identity.html" class="doc-card">
+      <span class="doc-number">04</span>
+      <h3>Authentication &amp; Identity</h3>
+      <p>Local authentication, SAML 2.0 SSO with Azure AD, JWT session management, account linking, database schema additions, and security considerations.</p>
+    </a>
+    <a href="05-testing-strategy.html" class="doc-card">
+      <span class="doc-number">05</span>
+      <h3>Testing Strategy</h3>
+      <p>Jest unit testing, Playwright frontend E2E, backend E2E scaffolding, Allure reporting, CI/CD integration, and quality gates.</p>
+    </a>
+    <a href="06-changelog.html" class="doc-card">
+      <span class="doc-number">06</span>
+      <h3>Changelog</h3>
+      <p>Documentation and feature change log tracking all notable additions, changes, fixes, and removals across versions.</p>
+    </a>
+  </div>
+
+  <div class="doc-footer">
+    <p>Notification API Documentation v1.0 &bull; Architecture Team &bull; 2026</p>
+  </div>
+</div>
+</body>
+</html>

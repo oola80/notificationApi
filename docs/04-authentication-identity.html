@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04 — Authentication &amp; Identity | Notification API</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="doc-container">
+  <nav class="doc-nav">
+    <a href="index.html">Home</a>
+    <a href="01-executive-summary.html">Executive Summary</a>
+    <a href="02-detailed-microservices.html">Microservices Detail</a>
+    <a href="03-system-architecture.html">System Architecture</a>
+    <a href="04-authentication-identity.html" class="active">Auth &amp; Identity</a>
+    <a href="05-testing-strategy.html">Testing Strategy</a>
+    <a href="06-changelog.html">Changelog</a>
+  </nav>
+
+  <div class="doc-header">
+    <h1>04 — Authentication &amp; Identity</h1>
+    <p class="subtitle">Notification API — Authentication, SSO &amp; Session Management</p>
+    <div class="doc-meta">
+      <span><strong>Version:</strong> 1.0</span>
+      <span><strong>Date:</strong> 2026-02-19</span>
+      <span><strong>Author:</strong> Architecture Team</span>
+      <span><strong>Status:</strong> <span class="badge badge-review">In Review</span></span>
+    </div>
+  </div>
+
+  <!-- Table of Contents -->
+  <div class="toc">
+    <h3 class="mt-0">Table of Contents</h3>
+    <ol>
+      <li><a href="#authentication-overview">Authentication Overview</a></li>
+      <li><a href="#local-authentication">Local Authentication</a></li>
+      <li><a href="#saml-sso">SAML 2.0 Single Sign-On</a></li>
+      <li><a href="#session-management">Session Management &amp; Token Bridge</a></li>
+      <li><a href="#account-linking">Account Linking &amp; User Provisioning</a></li>
+      <li><a href="#database-schema">Database Schema Additions</a></li>
+      <li><a href="#api-endpoints">API Endpoints</a></li>
+      <li><a href="#frontend-integration">Frontend Integration</a></li>
+      <li><a href="#configuration">Configuration &amp; Environment Variables</a></li>
+      <li><a href="#security-considerations">Security Considerations</a></li>
+    </ol>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 1. Authentication Overview                                         -->
+  <!-- ================================================================== -->
+  <h2 id="authentication-overview">1. Authentication Overview</h2>
+  <p>
+    The Notification API platform supports two authentication methods for admin users: <strong>Local Authentication</strong> (username/password) and <strong>SAML 2.0 Single Sign-On</strong> with Azure AD. Both methods converge on a unified JWT session model — once authenticated, all downstream services receive the same JWT tokens regardless of how the user originally authenticated.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Aspect</th>
+        <th>Local Authentication</th>
+        <th>SAML 2.0 SSO (Azure AD)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Identity Source</strong></td>
+        <td>Platform's own <code>admin_users</code> table</td>
+        <td>Azure Active Directory</td>
+      </tr>
+      <tr>
+        <td><strong>Credential Storage</strong></td>
+        <td>bcrypt-hashed passwords in <code>admin_db</code></td>
+        <td>No passwords stored — delegated to IdP</td>
+      </tr>
+      <tr>
+        <td><strong>Login Flow</strong></td>
+        <td>POST email/password to <code>/api/v1/auth/login</code></td>
+        <td>SP-initiated redirect to Azure AD</td>
+      </tr>
+      <tr>
+        <td><strong>Session Token</strong></td>
+        <td>JWT (RS256) issued by platform</td>
+        <td>JWT (RS256) issued by platform after SAML assertion validation</td>
+      </tr>
+      <tr>
+        <td><strong>MFA</strong></td>
+        <td>Not included in Phase 1 (upgrade path available)</td>
+        <td>Enforced by Azure AD policies</td>
+      </tr>
+      <tr>
+        <td><strong>Use Case</strong></td>
+        <td>Default for environments without enterprise IdP</td>
+        <td>Enterprise environments with Azure AD</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>Unified JWT Model:</strong> Regardless of whether a user authenticates via local credentials or SAML SSO, the platform issues its own JWT tokens. Downstream services (Notification Engine, Template Service, etc.) only see JWTs — they are completely unaware of the authentication method used. This design keeps the authentication boundary at the Gateway and Admin Service, with no SAML dependencies leaking into the rest of the system.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 2. Local Authentication                                            -->
+  <!-- ================================================================== -->
+  <h2 id="local-authentication">2. Local Authentication</h2>
+  <p>
+    Local authentication allows admin users to sign in using an email address and password managed directly by the platform. Credentials are validated against bcrypt-hashed passwords stored in the <code>admin_users</code> table.
+  </p>
+
+  <h3>2.1 Login Flow</h3>
+  <ol>
+    <li>User submits email and password to <code>POST /api/v1/auth/login</code>.</li>
+    <li>Gateway forwards the request to the Admin Service.</li>
+    <li>Admin Service looks up the user by email in <code>admin_users</code>.</li>
+    <li>If the account is locked (exceeded rate limit), return <code>429 Too Many Requests</code> with a <code>Retry-After</code> header.</li>
+    <li>bcrypt compares the submitted password against the stored <code>password_hash</code>.</li>
+    <li>On success: reset failed attempt counter, update <code>last_login_at</code>, issue JWT access token + refresh token.</li>
+    <li>On failure: increment failed attempt counter. After 5 failed attempts within 15 minutes, lock the account for 15 minutes.</li>
+  </ol>
+
+  <h3>2.2 Password Policy</h3>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Rule</th>
+        <th>Requirement</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Minimum length</td><td>12 characters</td></tr>
+      <tr><td>Complexity</td><td>At least one uppercase, one lowercase, one digit, and one special character</td></tr>
+      <tr><td>Hashing algorithm</td><td>bcrypt with cost factor 12</td></tr>
+      <tr><td>Password history</td><td>Cannot reuse last 5 passwords</td></tr>
+      <tr><td>Maximum age</td><td>90 days (configurable)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.3 Rate Limiting</h3>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Max failed attempts</td><td>5 per account</td></tr>
+      <tr><td>Lockout window</td><td>15 minutes</td></tr>
+      <tr><td>Lockout duration</td><td>15 minutes (auto-unlock)</td></tr>
+      <tr><td>Global rate limit</td><td>20 login requests/minute per IP</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.4 Password Reset</h3>
+  <ol>
+    <li>User requests password reset via <code>POST /api/v1/auth/forgot-password</code> with their email.</li>
+    <li>System generates a cryptographically random token (32 bytes, hex-encoded), stores its SHA-256 hash with a 1-hour expiry.</li>
+    <li>A password reset email is sent via the platform's own email channel (SendGrid).</li>
+    <li>User submits new password with the token to <code>POST /api/v1/auth/reset-password</code>.</li>
+    <li>System validates the token, enforces password policy, updates the hash, and invalidates all existing sessions.</li>
+  </ol>
+
+  <h3>2.5 Refresh Token Rotation</h3>
+  <p>
+    Refresh tokens are stored as HTTP-only, Secure, SameSite=Strict cookies. Each time a refresh token is used to obtain a new access token, the old refresh token is invalidated and a new one is issued. This rotation strategy limits the window of exposure if a refresh token is compromised. If a previously-used refresh token is presented (replay detection), all tokens for that user are invalidated, forcing re-authentication.
+  </p>
+
+  <!-- ================================================================== -->
+  <!-- 3. SAML 2.0 Single Sign-On                                        -->
+  <!-- ================================================================== -->
+  <h2 id="saml-sso">3. SAML 2.0 Single Sign-On</h2>
+  <p>
+    The platform acts as a <strong>SAML 2.0 Service Provider (SP)</strong>, integrating with Azure AD (or any SAML 2.0-compliant Identity Provider) for enterprise single sign-on. Authentication is delegated to the IdP; the platform validates SAML assertions and issues its own JWT tokens. The implementation uses the <code>@node-saml/passport-saml</code> library.
+  </p>
+
+  <h3>3.1 SP Metadata Generation</h3>
+  <p>
+    The platform generates SP metadata XML at <code>GET /api/v1/auth/saml/metadata</code>. This metadata is imported into Azure AD to establish the trust relationship.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>SP Metadata Element</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>entityID</code></td>
+        <td>Configurable (e.g., <code>https://notifications.example.com/saml</code>)</td>
+      </tr>
+      <tr>
+        <td><code>AssertionConsumerService</code></td>
+        <td><code>POST /api/v1/auth/saml/acs</code> (HTTP-POST binding)</td>
+      </tr>
+      <tr>
+        <td><code>SingleLogoutService</code></td>
+        <td><code>POST /api/v1/auth/saml/slo</code> (HTTP-POST binding)</td>
+      </tr>
+      <tr>
+        <td><code>NameIDFormat</code></td>
+        <td><code>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</code></td>
+      </tr>
+      <tr>
+        <td>Signing Certificate</td>
+        <td>SP's X.509 certificate for AuthnRequest signing</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 IdP Metadata Import</h3>
+  <p>
+    Azure AD's federation metadata XML is imported via <code>POST /admin/saml/idp</code> (Super Admin only). The system parses the metadata and extracts:
+  </p>
+  <ul>
+    <li><strong>entityID:</strong> The IdP's unique identifier</li>
+    <li><strong>SSO URL:</strong> The IdP's SingleSignOnService endpoint (HTTP-Redirect or HTTP-POST)</li>
+    <li><strong>SLO URL:</strong> The IdP's SingleLogoutService endpoint</li>
+    <li><strong>X.509 Certificate:</strong> The IdP's signing certificate for assertion signature validation</li>
+    <li><strong>NameID Format:</strong> Expected NameID format from the IdP</li>
+  </ul>
+
+  <h3>3.3 SSO Flow (SP-Initiated)</h3>
+  <p>The following sequence diagram shows the complete SP-initiated SAML SSO flow:</p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 900 520" xmlns="http://www.w3.org/2000/svg" style="max-width: 860px; width: 100%; height: auto; font-family: 'Segoe UI', Arial, sans-serif;">
+      <!-- Background -->
+      <rect x="0" y="0" width="900" height="520" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+
+      <!-- Title -->
+      <text x="450" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">SAML 2.0 SSO Flow (SP-Initiated)</text>
+
+      <!-- Participants -->
+      <rect x="50" y="45" width="120" height="36" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="110" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Browser</text>
+
+      <rect x="280" y="45" width="120" height="36" rx="6" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+      <text x="340" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#15803d">Gateway / SP</text>
+
+      <rect x="510" y="45" width="120" height="36" rx="6" fill="#fae8ff" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="570" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#7e22ce">Admin Service</text>
+
+      <rect x="740" y="45" width="120" height="36" rx="6" fill="#fed7aa" stroke="#f97316" stroke-width="1.5"/>
+      <text x="800" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#c2410c">Azure AD (IdP)</text>
+
+      <!-- Lifelines -->
+      <line x1="110" y1="81" x2="110" y2="500" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="340" y1="81" x2="340" y2="500" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="570" y1="81" x2="570" y2="500" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="800" y1="81" x2="800" y2="500" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,4"/>
+
+      <!-- Step 1: Click SSO -->
+      <line x1="110" y1="110" x2="335" y2="110" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="222" y="104" text-anchor="middle" font-size="9" fill="#475569">1. Click "Sign in with SSO"</text>
+
+      <!-- Step 2: Generate AuthnRequest -->
+      <line x1="340" y1="140" x2="565" y2="140" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="452" y="134" text-anchor="middle" font-size="9" fill="#475569">2. Generate AuthnRequest</text>
+
+      <!-- Step 3: Return AuthnRequest + IdP URL -->
+      <line x1="565" y1="165" x2="340" y2="165" stroke="#22c55e" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="452" y="159" text-anchor="middle" font-size="9" fill="#475569">3. Signed AuthnRequest + IdP SSO URL</text>
+
+      <!-- Step 4: Redirect to IdP -->
+      <line x1="335" y1="195" x2="110" y2="195" stroke="#22c55e" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="222" y="189" text-anchor="middle" font-size="9" fill="#475569">4. 302 Redirect to Azure AD</text>
+
+      <!-- Step 5: Browser to IdP -->
+      <line x1="110" y1="225" x2="795" y2="225" stroke="#a855f7" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="450" y="219" text-anchor="middle" font-size="9" fill="#475569">5. AuthnRequest (HTTP-Redirect / HTTP-POST)</text>
+
+      <!-- Step 6: User authenticates -->
+      <rect x="730" y="240" width="140" height="30" rx="4" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
+      <text x="800" y="260" text-anchor="middle" font-size="9" fill="#92400e">6. User authenticates at IdP</text>
+
+      <!-- Step 7: SAML Response -->
+      <line x1="795" y1="290" x2="110" y2="290" stroke="#a855f7" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="450" y="284" text-anchor="middle" font-size="9" fill="#475569">7. SAML Response (HTTP-POST to ACS)</text>
+
+      <!-- Step 8: Browser posts to ACS -->
+      <line x1="110" y1="320" x2="335" y2="320" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="222" y="314" text-anchor="middle" font-size="9" fill="#475569">8. POST SAML Response to ACS</text>
+
+      <!-- Step 9: Validate assertion -->
+      <line x1="340" y1="350" x2="565" y2="350" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="452" y="344" text-anchor="middle" font-size="9" fill="#475569">9. Validate assertion, link/create user</text>
+
+      <!-- Step 10: Return JWT -->
+      <line x1="565" y1="380" x2="340" y2="380" stroke="#22c55e" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="452" y="374" text-anchor="middle" font-size="9" fill="#475569">10. User record + session index</text>
+
+      <!-- Step 11: Issue JWT -->
+      <line x1="335" y1="410" x2="110" y2="410" stroke="#22c55e" stroke-width="1.5" marker-end="url(#saml-arrow)"/>
+      <text x="222" y="404" text-anchor="middle" font-size="9" fill="#475569">11. JWT access token + refresh token cookie</text>
+
+      <!-- Step 12: Redirect to dashboard -->
+      <rect x="40" y="430" width="140" height="30" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1"/>
+      <text x="110" y="450" text-anchor="middle" font-size="9" fill="#15803d">12. Redirect to /dashboard</text>
+
+      <!-- Arrow marker -->
+      <defs>
+        <marker id="saml-arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+        </marker>
+      </defs>
+    </svg>
+    <p class="diagram-caption">Figure 1 — SP-initiated SAML 2.0 SSO sequence</p>
+  </div>
+
+  <h3>3.4 Assertion Validation</h3>
+  <p>
+    Every SAML assertion received at the ACS endpoint is validated against the following checks before a JWT is issued:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Validation Check</th>
+        <th>Description</th>
+        <th>Failure Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Signature Verification</strong></td>
+        <td>Verify the assertion or response signature using the IdP's X.509 certificate</td>
+        <td>Reject — return 401</td>
+      </tr>
+      <tr>
+        <td><strong>Audience Restriction</strong></td>
+        <td>Assertion <code>Audience</code> must match the SP's <code>entityID</code></td>
+        <td>Reject — return 401</td>
+      </tr>
+      <tr>
+        <td><strong>Time Conditions</strong></td>
+        <td>Current time must be within <code>NotBefore</code> and <code>NotOnOrAfter</code> (with configurable clock skew tolerance)</td>
+        <td>Reject — return 401</td>
+      </tr>
+      <tr>
+        <td><strong>InResponseTo</strong></td>
+        <td>Response must reference a valid, pending AuthnRequest ID from the SP</td>
+        <td>Reject — return 401 (prevents unsolicited response attacks)</td>
+      </tr>
+      <tr>
+        <td><strong>Recipient</strong></td>
+        <td><code>Recipient</code> attribute must match the ACS URL</td>
+        <td>Reject — return 401</td>
+      </tr>
+      <tr>
+        <td><strong>Issuer</strong></td>
+        <td><code>Issuer</code> must match the configured IdP <code>entityID</code></td>
+        <td>Reject — return 401</td>
+      </tr>
+      <tr>
+        <td><strong>Replay Prevention</strong></td>
+        <td>Assertion ID must not have been seen before (tracked in cache with TTL matching assertion validity)</td>
+        <td>Reject — return 401</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warning-box">
+    <strong>Library:</strong> SAML processing is handled by <code>@node-saml/passport-saml</code>, which implements the above validations. The library handles XML signature verification, condition evaluation, and assertion parsing. Custom validation hooks are added for replay detection and account linking.
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 4. Session Management & Token Bridge                               -->
+  <!-- ================================================================== -->
+  <h2 id="session-management">4. Session Management &amp; Token Bridge</h2>
+  <p>
+    Both authentication methods produce the same JWT token structure. SAML authenticates the user; the platform then issues its own JWT. The SAML session index is stored for Single Logout (SLO) support.
+  </p>
+
+  <h3>4.1 JWT Claims</h3>
+  <pre><code>{
+  "sub": "uuid-of-admin-user",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "role": "admin",
+  "permissions": ["rules:read", "rules:write", "templates:read", ...],
+  "auth_method": "local" | "saml",
+  "idp_id": "uuid-of-idp" | null,
+  "iat": 1708300800,
+  "exp": 1708301700,
+  "iss": "notification-api"
+}</code></pre>
+
+  <h3>4.2 Session Lifecycle</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>Local Auth</th>
+        <th>SAML SSO</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Login</strong></td>
+        <td>POST credentials → validate → issue JWT + refresh token</td>
+        <td>SAML flow → validate assertion → issue JWT + refresh token + store session index</td>
+      </tr>
+      <tr>
+        <td><strong>Refresh</strong></td>
+        <td>Present refresh token → rotate → issue new JWT + refresh token</td>
+        <td>Same as local (JWT-based, independent of IdP)</td>
+      </tr>
+      <tr>
+        <td><strong>Logout</strong></td>
+        <td>Invalidate refresh token, clear cookie</td>
+        <td>Invalidate refresh token, clear cookie, delete SAML session record</td>
+      </tr>
+      <tr>
+        <td><strong>Single Logout (SLO)</strong></td>
+        <td>N/A</td>
+        <td>IdP sends LogoutRequest → SP invalidates all sessions for that NameID + session index → responds with LogoutResponse</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>Token Independence:</strong> After the initial SAML authentication, the JWT-based session is independent of the IdP. Token refresh does not require communication with Azure AD. This ensures that the platform remains functional even if the IdP experiences temporary downtime (existing sessions continue to work; only new SSO logins are affected).
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 5. Account Linking & User Provisioning                             -->
+  <!-- ================================================================== -->
+  <h2 id="account-linking">5. Account Linking &amp; User Provisioning</h2>
+  <p>
+    When a user authenticates via SAML, the platform links the SAML identity (NameID) to a local <code>admin_users</code> record. The NameID format is <code>emailAddress</code>, matching against the <code>admin_users.email</code> column.
+  </p>
+
+  <h3>5.1 User Types</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+        <th><code>password_hash</code></th>
+        <th>Login Methods</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Local-only</strong></td>
+        <td>User created manually, no IdP link</td>
+        <td>Set (bcrypt hash)</td>
+        <td>Email/password only</td>
+      </tr>
+      <tr>
+        <td><strong>SAML-only</strong></td>
+        <td>User provisioned via SAML (auto or manual), no local password</td>
+        <td><code>NULL</code></td>
+        <td>SSO only</td>
+      </tr>
+      <tr>
+        <td><strong>Hybrid</strong></td>
+        <td>Local user linked to a SAML identity</td>
+        <td>Set (bcrypt hash)</td>
+        <td>Email/password or SSO</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 Auto-Provisioning</h3>
+  <p>
+    When enabled (per IdP configuration, default: <strong>off</strong>), the platform automatically creates a local <code>admin_users</code> record when a SAML user authenticates for the first time and no matching email is found. The auto-provisioned user is assigned a configurable default role (default: <span class="badge badge-draft">Viewer</span>).
+  </p>
+
+  <h3>5.3 Attribute Mapping</h3>
+  <p>
+    Azure AD claims from the SAML assertion are mapped to local user fields:
+  </p>
+  <table class="compact">
+    <thead>
+      <tr>
+        <th>Azure AD Claim</th>
+        <th>SAML Attribute</th>
+        <th>Local Field</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>User Principal Name</td>
+        <td><code>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress</code></td>
+        <td><code>admin_users.email</code></td>
+      </tr>
+      <tr>
+        <td>Display Name</td>
+        <td><code>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name</code></td>
+        <td><code>admin_users.full_name</code></td>
+      </tr>
+      <tr>
+        <td>Given Name</td>
+        <td><code>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname</code></td>
+        <td><code>admin_users.first_name</code> (optional)</td>
+      </tr>
+      <tr>
+        <td>Surname</td>
+        <td><code>http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname</code></td>
+        <td><code>admin_users.last_name</code> (optional)</td>
+      </tr>
+      <tr>
+        <td>Groups</td>
+        <td><code>http://schemas.microsoft.com/ws/2008/06/identity/claims/groups</code></td>
+        <td>Role mapping (configurable per IdP)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ================================================================== -->
+  <!-- 6. Database Schema Additions                                       -->
+  <!-- ================================================================== -->
+  <h2 id="database-schema">6. Database Schema Additions</h2>
+  <p>
+    Three new tables are added to <code>admin_db</code> to support SAML SSO. These extend the existing <code>admin_users</code>, <code>admin_roles</code>, and <code>admin_permissions</code> tables already defined in the <a href="02-detailed-microservices.html#admin-service">Admin Service specification</a>.
+  </p>
+
+  <h3>6.1 <code>saml_identity_providers</code></h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Column</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID (PK)</td><td>Unique IdP identifier</td></tr>
+      <tr><td><code>name</code></td><td>VARCHAR(255)</td><td>Display name (e.g., "Corporate Azure AD")</td></tr>
+      <tr><td><code>entity_id</code></td><td>VARCHAR(512) UNIQUE</td><td>IdP entityID from metadata</td></tr>
+      <tr><td><code>sso_url</code></td><td>VARCHAR(1024)</td><td>IdP SSO endpoint URL</td></tr>
+      <tr><td><code>slo_url</code></td><td>VARCHAR(1024)</td><td>IdP SLO endpoint URL (nullable)</td></tr>
+      <tr><td><code>certificate</code></td><td>TEXT</td><td>IdP X.509 signing certificate (PEM)</td></tr>
+      <tr><td><code>metadata_xml</code></td><td>TEXT</td><td>Raw imported IdP metadata XML</td></tr>
+      <tr><td><code>sp_entity_id</code></td><td>VARCHAR(512)</td><td>SP entityID for this IdP configuration</td></tr>
+      <tr><td><code>sp_certificate</code></td><td>TEXT</td><td>SP signing certificate (PEM)</td></tr>
+      <tr><td><code>sp_private_key_enc</code></td><td>TEXT</td><td>SP private key (AES-256-GCM encrypted)</td></tr>
+      <tr><td><code>attribute_mapping</code></td><td>JSONB</td><td>Claim-to-field mapping configuration</td></tr>
+      <tr><td><code>default_role_id</code></td><td>UUID (FK → admin_roles)</td><td>Role assigned to auto-provisioned users</td></tr>
+      <tr><td><code>auto_provision</code></td><td>BOOLEAN</td><td>Auto-create users on first SSO login (default: false)</td></tr>
+      <tr><td><code>is_active</code></td><td>BOOLEAN</td><td>Enable/disable this IdP</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td>Creation timestamp</td></tr>
+      <tr><td><code>updated_at</code></td><td>TIMESTAMPTZ</td><td>Last update timestamp</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.2 <code>user_identity_links</code></h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Column</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID (PK)</td><td>Link identifier</td></tr>
+      <tr><td><code>user_id</code></td><td>UUID (FK → admin_users)</td><td>Local user account</td></tr>
+      <tr><td><code>idp_id</code></td><td>UUID (FK → saml_identity_providers)</td><td>Identity provider</td></tr>
+      <tr><td><code>external_id</code></td><td>VARCHAR(512)</td><td>NameID value from the IdP</td></tr>
+      <tr><td><code>linked_at</code></td><td>TIMESTAMPTZ</td><td>When the link was established</td></tr>
+      <tr><td><code>last_login_at</code></td><td>TIMESTAMPTZ</td><td>Last SSO login via this link</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Unique constraint:</strong> <code>(idp_id, external_id)</code> — each external identity maps to exactly one local user per IdP.</p>
+
+  <h3>6.3 <code>saml_sessions</code></h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Column</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID (PK)</td><td>Session record identifier</td></tr>
+      <tr><td><code>user_id</code></td><td>UUID (FK → admin_users)</td><td>Local user account</td></tr>
+      <tr><td><code>idp_id</code></td><td>UUID (FK → saml_identity_providers)</td><td>Identity provider</td></tr>
+      <tr><td><code>session_index</code></td><td>VARCHAR(512)</td><td>SAML SessionIndex from the assertion</td></tr>
+      <tr><td><code>name_id</code></td><td>VARCHAR(512)</td><td>SAML NameID for this session</td></tr>
+      <tr><td><code>name_id_format</code></td><td>VARCHAR(256)</td><td>NameID format URI</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMPTZ</td><td>Session creation time</td></tr>
+      <tr><td><code>expires_at</code></td><td>TIMESTAMPTZ</td><td>Session expiry (matches refresh token expiry)</td></tr>
+    </tbody>
+  </table>
+  <p>Used for Single Logout (SLO) — when the IdP sends a LogoutRequest, the platform looks up sessions by <code>name_id</code> + <code>session_index</code> and invalidates the corresponding JWT refresh tokens.</p>
+
+  <!-- ================================================================== -->
+  <!-- 7. API Endpoints                                                   -->
+  <!-- ================================================================== -->
+  <h2 id="api-endpoints">7. API Endpoints</h2>
+
+  <h3>7.1 Local Authentication</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/login</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Authenticate with email and password. Returns JWT access token in response body and sets refresh token as HTTP-only cookie. Rate limited: 5 failed attempts per account per 15 minutes, 20 requests per IP per minute.</p>
+      <p><strong>Request:</strong> <code>{ "email": "string", "password": "string" }</code></p>
+      <p><strong>Response (200):</strong> <code>{ "accessToken": "string", "expiresIn": 900, "user": { "id", "email", "name", "role" } }</code></p>
+      <p><strong>Errors:</strong> 401 Invalid credentials, 429 Account locked / rate limited</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/refresh</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Exchange a valid refresh token (from HTTP-only cookie) for a new access token and rotated refresh token. The old refresh token is invalidated.</p>
+      <p><strong>Response (200):</strong> <code>{ "accessToken": "string", "expiresIn": 900 }</code></p>
+      <p><strong>Errors:</strong> 401 Invalid or expired refresh token</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/logout</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Invalidate the current session. Revokes the refresh token and clears the cookie. For SAML sessions, also deletes the SAML session record.</p>
+      <p><strong>Response (204):</strong> No content</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/forgot-password</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Request a password reset email. Always returns 200 regardless of whether the email exists (prevents user enumeration).</p>
+      <p><strong>Request:</strong> <code>{ "email": "string" }</code></p>
+      <p><strong>Response (200):</strong> <code>{ "message": "If an account exists, a reset email has been sent." }</code></p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/reset-password</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Set a new password using a valid reset token. Invalidates all existing sessions for the user.</p>
+      <p><strong>Request:</strong> <code>{ "token": "string", "newPassword": "string" }</code></p>
+      <p><strong>Response (200):</strong> <code>{ "message": "Password has been reset." }</code></p>
+      <p><strong>Errors:</strong> 400 Invalid/expired token, 422 Password does not meet policy</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/change-password</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Change password for the currently authenticated user. Requires the current password for verification. Not available for SAML-only users.</p>
+      <p><strong>Request:</strong> <code>{ "currentPassword": "string", "newPassword": "string" }</code></p>
+      <p><strong>Response (200):</strong> <code>{ "message": "Password changed successfully." }</code></p>
+      <p><strong>Errors:</strong> 400 Current password incorrect, 403 SAML-only account, 422 Password policy violation</p>
+    </div>
+  </div>
+
+  <h3>7.2 SAML SSO</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/auth/saml/login</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Initiate SP-initiated SAML SSO flow. Generates an AuthnRequest, stores its ID for InResponseTo validation, and redirects the browser to the IdP's SSO URL.</p>
+      <p><strong>Query parameter:</strong> <code>idp</code> (optional — IdP ID if multiple IdPs configured; defaults to the primary active IdP)</p>
+      <p><strong>Response (302):</strong> Redirect to Azure AD with AuthnRequest</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/saml/acs</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Assertion Consumer Service endpoint. Receives the SAML Response from the IdP (HTTP-POST binding), validates the assertion, links/creates the user, issues JWT tokens, and redirects to the frontend.</p>
+      <p><strong>Request:</strong> <code>application/x-www-form-urlencoded</code> with <code>SAMLResponse</code> and optional <code>RelayState</code></p>
+      <p><strong>Response (302):</strong> Redirect to <code>/dashboard</code> (or RelayState URL) with refresh token cookie set</p>
+      <p><strong>Errors:</strong> 401 Assertion validation failed, 403 User not provisioned and auto-provision disabled</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/auth/saml/metadata</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Returns the SP metadata XML document. Used to configure trust in the IdP (Azure AD Enterprise Application).</p>
+      <p><strong>Response (200):</strong> <code>application/xml</code> — SPSSODescriptor with entityID, ACS, SLO, NameIDFormat, and signing certificate</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/auth/saml/slo</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Single Logout endpoint. Receives LogoutRequest from the IdP, invalidates all platform sessions associated with the NameID and session index, and responds with a LogoutResponse.</p>
+      <p><strong>Request:</strong> <code>application/x-www-form-urlencoded</code> with <code>SAMLRequest</code></p>
+      <p><strong>Response (200):</strong> LogoutResponse or redirect</p>
+    </div>
+  </div>
+
+  <h3>7.3 Current User</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/auth/me</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Returns the currently authenticated user's profile and permissions. Used by the frontend to determine navigation and feature access.</p>
+      <p><strong>Response (200):</strong> <code>{ "id", "email", "fullName", "role", "permissions": [...], "authMethod": "local"|"saml", "lastLoginAt" }</code></p>
+    </div>
+  </div>
+
+  <h3>7.4 IdP Administration</h3>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/admin/saml/idp</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all configured SAML Identity Providers. <span class="badge badge-red">Super Admin</span> only.</p>
+      <p><strong>Response (200):</strong> Array of IdP configurations (certificate and private key fields redacted)</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/admin/saml/idp</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Register a new SAML Identity Provider. Accepts IdP metadata XML (file upload or URL fetch), parses it to extract entityID, SSO URL, SLO URL, and certificate. Generates SP keypair if not provided. <span class="badge badge-red">Super Admin</span> only.</p>
+      <p><strong>Request:</strong> <code>{ "name": "string", "metadataXml": "string" | "metadataUrl": "string", "autoProvision": boolean, "defaultRoleId": "uuid", "attributeMapping": {...} }</code></p>
+      <p><strong>Response (201):</strong> Created IdP configuration</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/admin/saml/idp/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update an existing IdP configuration. Supports partial updates. Re-importing metadata XML will update the certificate and URLs. <span class="badge badge-red">Super Admin</span> only.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-delete">
+      <span class="method-badge delete">DELETE</span>
+      <span>/admin/saml/idp/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Delete an IdP configuration. Fails if there are SAML-only users linked to this IdP (must migrate or delete users first). <span class="badge badge-red">Super Admin</span> only.</p>
+      <p><strong>Errors:</strong> 409 Conflict — SAML-only users still linked</p>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <!-- 8. Frontend Integration                                            -->
+  <!-- ================================================================== -->
+  <h2 id="frontend-integration">8. Frontend Integration</h2>
+
+  <h3>8.1 Login Page</h3>
+  <p>
+    The login page (<code>/login</code>) presents two authentication options:
+  </p>
+  <ul>
+    <li><strong>Email/Password Form:</strong> Standard form with email and password fields, "Forgot password?" link, and a "Sign in" button. Form validation enforces email format and non-empty password.</li>
+    <li><strong>"Sign in with SSO" Button:</strong> Displayed when at least one active SAML IdP is configured. Clicking initiates the SP-initiated SSO flow by redirecting to <code>/api/v1/auth/saml/login</code>. If multiple IdPs are configured, a dropdown or selection modal is shown.</li>
+  </ul>
+
+  <h3>8.2 Identity Provider Settings Page</h3>
+  <p>
+    Available at <code>/settings/identity-providers</code>, restricted to <span class="badge badge-red">Super Admin</span> role. Features:
+  </p>
+  <ul>
+    <li>List of configured IdPs with status indicators (active/inactive)</li>
+    <li>"Add Identity Provider" button — opens a form with metadata XML upload (drag-and-drop or paste), name, auto-provisioning toggle, default role selector, and attribute mapping configuration</li>
+    <li>Per-IdP detail view showing parsed metadata values, SP metadata download link, user count linked to this IdP, and test connection button</li>
+    <li>IdP certificate expiry warnings</li>
+  </ul>
+
+  <!-- ================================================================== -->
+  <!-- 9. Configuration & Environment Variables                           -->
+  <!-- ================================================================== -->
+  <h2 id="configuration">9. Configuration &amp; Environment Variables</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>JWT_PRIVATE_KEY_PATH</code></td><td>Path to RS256 private key for signing JWTs</td><td><code>./keys/jwt-private.pem</code></td></tr>
+      <tr><td><code>JWT_PUBLIC_KEY_PATH</code></td><td>Path to RS256 public key for verifying JWTs</td><td><code>./keys/jwt-public.pem</code></td></tr>
+      <tr><td><code>JWT_ACCESS_TOKEN_EXPIRY</code></td><td>Access token TTL</td><td><code>15m</code></td></tr>
+      <tr><td><code>JWT_REFRESH_TOKEN_EXPIRY</code></td><td>Refresh token TTL</td><td><code>7d</code></td></tr>
+      <tr><td><code>BCRYPT_ROUNDS</code></td><td>bcrypt cost factor</td><td><code>12</code></td></tr>
+      <tr><td><code>LOGIN_RATE_LIMIT_MAX</code></td><td>Max failed login attempts per account</td><td><code>5</code></td></tr>
+      <tr><td><code>LOGIN_RATE_LIMIT_WINDOW</code></td><td>Rate limit window duration</td><td><code>15m</code></td></tr>
+      <tr><td><code>LOGIN_LOCKOUT_DURATION</code></td><td>Account lockout duration after max attempts</td><td><code>15m</code></td></tr>
+      <tr><td><code>SAML_SP_ENTITY_ID</code></td><td>Default SP entityID for SAML metadata</td><td><code>https://notifications.example.com/saml</code></td></tr>
+      <tr><td><code>SAML_SP_CERT_PATH</code></td><td>Path to SP signing certificate</td><td><code>./keys/saml-sp-cert.pem</code></td></tr>
+      <tr><td><code>SAML_SP_KEY_PATH</code></td><td>Path to SP private key</td><td><code>./keys/saml-sp-key.pem</code></td></tr>
+      <tr><td><code>SAML_CLOCK_SKEW_MS</code></td><td>Allowed clock skew for assertion validation</td><td><code>30000</code> (30s)</td></tr>
+      <tr><td><code>PASSWORD_MAX_AGE_DAYS</code></td><td>Maximum password age before forced reset</td><td><code>90</code></td></tr>
+      <tr><td><code>PASSWORD_RESET_TOKEN_EXPIRY</code></td><td>Password reset token TTL</td><td><code>1h</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ================================================================== -->
+  <!-- 10. Security Considerations                                        -->
+  <!-- ================================================================== -->
+  <h2 id="security-considerations">10. Security Considerations</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Concern</th>
+        <th>Mitigation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Assertion Signature Validation</strong></td>
+        <td>Mandatory for all SAML assertions. Unsigned or incorrectly signed assertions are rejected. The IdP certificate is stored per-IdP and validated on every assertion.</td>
+      </tr>
+      <tr>
+        <td><strong>Encrypted Assertions</strong></td>
+        <td>Recommended but not required. When the IdP supports assertion encryption, the SP's public key (from SP metadata) is used. The SP decrypts using its private key before validation.</td>
+      </tr>
+      <tr>
+        <td><strong>Clock Skew Tolerance</strong></td>
+        <td>Configurable tolerance (default 30 seconds) for assertion time conditions (<code>NotBefore</code> / <code>NotOnOrAfter</code>). Prevents valid assertions from being rejected due to minor time synchronization differences.</td>
+      </tr>
+      <tr>
+        <td><strong>Replay Prevention</strong></td>
+        <td>Assertion IDs are tracked in a time-bounded cache (TTL = assertion validity window). Duplicate assertion IDs are rejected. <code>InResponseTo</code> validation ensures assertions correspond to platform-initiated requests.</td>
+      </tr>
+      <tr>
+        <td><strong>SP Key Rotation</strong></td>
+        <td>SP signing keys can be rotated by generating a new keypair, updating the SP metadata, and re-importing into the IdP. During rotation, both old and new certificates are included in SP metadata to allow a transition window.</td>
+      </tr>
+      <tr>
+        <td><strong>IdP Certificate Rollover</strong></td>
+        <td>When Azure AD rotates its signing certificate, the admin re-imports the updated metadata XML. The platform supports multiple IdP certificates during the rollover period to prevent authentication disruption.</td>
+      </tr>
+      <tr>
+        <td><strong>CSRF Protection</strong></td>
+        <td>The ACS endpoint validates <code>InResponseTo</code> to prevent unsolicited SAML responses. The login form uses CSRF tokens. Refresh tokens use SameSite=Strict cookies.</td>
+      </tr>
+      <tr>
+        <td><strong>User Enumeration</strong></td>
+        <td>The forgot-password endpoint always returns the same response regardless of whether the email exists. Login error messages do not distinguish between "user not found" and "wrong password".</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warning-box">
+    <strong>Pre-Production Checklist:</strong>
+    <ul>
+      <li>Generate production RS256 keypair for JWT signing (minimum 2048-bit RSA)</li>
+      <li>Generate production X.509 certificate and key for SAML SP signing</li>
+      <li>Configure Azure AD Enterprise Application with SP metadata</li>
+      <li>Test SAML SSO flow end-to-end in a staging environment</li>
+      <li>Verify assertion validation with clock skew edge cases</li>
+      <li>Conduct penetration testing on all auth endpoints</li>
+      <li>Review and tune rate limiting thresholds based on expected user base</li>
+    </ul>
+  </div>
+
+  <!-- Footer -->
+  <div class="doc-footer">
+    <p>Notification API Documentation v1.0 &bull; Architecture Team &bull; 2026</p>
+  </div>
+</div>
+</body>
+</html>
