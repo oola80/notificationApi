@@ -16,6 +16,7 @@
     <a href="04-authentication-identity.html">Auth &amp; Identity</a>
     <a href="05-testing-strategy.html">Testing Strategy</a>
     <a href="06-changelog.html">Changelog</a>
+    <a href="07-event-ingestion-service.html">Event Ingestion</a>
   </nav>
 
   <div class="doc-header">
@@ -141,10 +142,11 @@
   <h2 id="proposed-solution">3. Proposed Solution</h2>
   <p>
     The Notification API is a <strong>unified, event-driven notification platform</strong> that decouples notification
-    logic from source systems and centralizes it into a purpose-built set of microservices. Source systems will publish
-    business events (e.g., "order placed", "shipment dispatched", "payment failed") to a message broker, and the
-    Notification API will handle everything downstream: determining what to send, to whom, through which channel, using
-    which template, and tracking the result.
+    logic from source systems and centralizes it into a purpose-built set of microservices. Any registered source system
+    integrates via REST webhook or direct AMQP, publishing business events (e.g., "order placed", "shipment dispatched",
+    "payment failed") to the platform. Admin-configured runtime field mappings normalize each source's payload into a
+    canonical format — no code changes are needed to onboard new sources. The Notification API handles everything
+    downstream: determining what to send, to whom, through which channel, using which template, and tracking the result.
   </p>
 
   <h3>3.1 Core Design Principles</h3>
@@ -152,9 +154,9 @@
     <div class="feature-card">
       <h4>Event-Driven Architecture</h4>
       <p>
-        Source systems publish events to RabbitMQ. The notification platform subscribes to relevant events and
-        processes them asynchronously. This fully decouples producers from consumers, allowing each to evolve
-        independently.
+        Any registered source system publishes events to RabbitMQ (direct AMQP) or sends them via REST webhook.
+        The notification platform subscribes to relevant events and processes them asynchronously. This fully
+        decouples producers from consumers, allowing each to evolve independently.
       </p>
     </div>
     <div class="feature-card">
@@ -181,9 +183,10 @@
   </div>
 
   <div class="success-box">
-    <strong>Result:</strong> Source systems (OMS, Magento, Mirakl, Chat Commerce) become simple event publishers.
-    All notification intelligence — what to send, when, to whom, and how — lives in the Notification API platform,
-    managed through a centralized admin interface.
+    <strong>Result:</strong> Source systems become simple event publishers, integrating via REST webhook or direct AMQP
+    with admin-configured runtime field mappings. All notification intelligence — what to send, when, to whom, and
+    how — lives in the Notification API platform, managed through a centralized admin interface. New sources can be
+    onboarded entirely through admin configuration — no code changes required.
   </div>
 
   <!-- 4. Key Objectives -->
@@ -192,8 +195,9 @@
     <div class="feature-card">
       <h4>Unify Notification Sources</h4>
       <p>
-        Consolidate notifications from OMS, Magento 2, Mirakl Marketplace, Chat Commerce, and manual processes
-        into a single platform. All systems emit standardized events that the platform consumes uniformly.
+        Consolidate notifications from any registered source system into a single platform. Sources integrate via
+        REST webhook or direct AMQP, and admin-configured runtime field mappings normalize their payloads into a
+        canonical format. New sources can be onboarded without code changes.
       </p>
     </div>
     <div class="feature-card">
@@ -293,19 +297,19 @@
       <text x="95" y="75" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Source Systems</text>
 
       <rect x="35" y="90" width="120" height="32" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1"/>
-      <text x="95" y="111" text-anchor="middle" font-size="10" fill="#78350f">OMS</text>
+      <text x="95" y="111" text-anchor="middle" font-size="10" fill="#78350f">Source A</text>
 
       <rect x="35" y="130" width="120" height="32" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1"/>
-      <text x="95" y="151" text-anchor="middle" font-size="10" fill="#78350f">Magento 2</text>
+      <text x="95" y="151" text-anchor="middle" font-size="10" fill="#78350f">Source B</text>
 
       <rect x="35" y="170" width="120" height="32" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1"/>
-      <text x="95" y="191" text-anchor="middle" font-size="10" fill="#78350f">Mirakl</text>
+      <text x="95" y="191" text-anchor="middle" font-size="10" fill="#78350f">Source N</text>
 
       <rect x="35" y="210" width="120" height="32" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1"/>
-      <text x="95" y="231" text-anchor="middle" font-size="10" fill="#78350f">Chat Commerce</text>
+      <text x="95" y="231" text-anchor="middle" font-size="10" fill="#78350f">Email Ingest</text>
 
       <rect x="35" y="250" width="120" height="32" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1"/>
-      <text x="95" y="271" text-anchor="middle" font-size="10" fill="#78350f">Manual</text>
+      <text x="95" y="271" text-anchor="middle" font-size="10" fill="#78350f">Bulk Upload</text>
 
       <rect x="35" y="290" width="120" height="32" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1"/>
       <text x="95" y="311" text-anchor="middle" font-size="10" fill="#78350f">Closed Systems</text>
@@ -313,7 +317,7 @@
       <!-- Email Ingest Service -->
       <rect x="215" y="265" width="140" height="55" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
       <text x="285" y="288" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Email Ingest</text>
-      <text x="285" y="302" text-anchor="middle" font-size="8" fill="#3b82f6">SMTP :2525 / REST :3007</text>
+      <text x="285" y="302" text-anchor="middle" font-size="8" fill="#3b82f6">SMTP :2525 / REST :3157</text>
 
       <!-- Arrow: Closed Systems to Email Ingest -->
       <line x1="155" y1="306" x2="210" y2="295" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
@@ -399,8 +403,8 @@
 
   <h3>5.3 Event Flow Summary</h3>
   <ol>
-    <li><strong>Event Publication:</strong> A source system (OMS, Magento, Mirakl, Chat Commerce) publishes a business event to RabbitMQ or sends it via a REST webhook to the Event Ingestion Service.</li>
-    <li><strong>Event Normalization:</strong> The Event Ingestion Service validates the incoming event payload, normalizes it into a canonical event schema, and publishes it to the appropriate RabbitMQ exchange.</li>
+    <li><strong>Event Publication:</strong> Events arrive from any registered source system via direct AMQP or REST webhook to the Event Ingestion Service. Closed/legacy systems send emails to the Email Ingest Service, which parses them and generates standardized events.</li>
+    <li><strong>Event Normalization:</strong> The Event Ingestion Service validates the incoming event payload, applies runtime mapping configuration to normalize it into a flat canonical event format, and publishes it to the appropriate RabbitMQ exchange. The runtime mapping engine handles source-specific field transformations without code changes.</li>
     <li><strong>Orchestration:</strong> The Notification Engine consumes the normalized event, evaluates notification rules (what templates to use, which recipients to notify, which channels to deliver through), and coordinates with the Template Service for message rendering.</li>
     <li><strong>Template Rendering:</strong> The Template Service resolves the appropriate template version, performs variable substitution with event data, and returns rendered content for each target channel.</li>
     <li><strong>Channel Routing:</strong> The Channel Router receives the rendered message and routes it to the appropriate delivery provider (SendGrid for email, Twilio for SMS/WhatsApp, Firebase Cloud Messaging for push notifications). Retry logic and circuit breakers ensure resilient delivery.</li>
@@ -513,7 +517,7 @@
       </tr>
       <tr>
         <td><strong>event-ingestion-service</strong></td>
-        <td>Receives raw business events from all source systems via RabbitMQ consumers and REST webhooks. Validates, normalizes events into a canonical schema, and publishes them for downstream processing.</td>
+        <td>Receives events from any registered source, applies runtime field mappings, normalizes to canonical format, and publishes them for downstream processing. Sources integrate via direct AMQP or REST webhook; new sources are onboarded through admin configuration without code changes.</td>
         <td>NestJS</td>
         <td>RabbitMQ (inbound/outbound), REST (webhooks)</td>
       </tr>
@@ -656,7 +660,7 @@
       </tr>
       <tr>
         <td><strong>Source System Integration</strong></td>
-        <td>OMS events (order lifecycle), Magento 2 events (eCommerce transactions), Mirakl Marketplace events (marketplace operations), Closed/legacy system email integration (via Email Ingest Service)</td>
+        <td>Any registered source system via REST webhook or direct AMQP with admin-configured runtime field mappings. Initial sources include OMS, Magento 2, and Mirakl Marketplace. Closed/legacy system email integration via Email Ingest Service. New sources onboarded via admin configuration — no code changes required.</td>
       </tr>
       <tr>
         <td><strong>Core Event Types</strong></td>
@@ -703,8 +707,8 @@
       </tr>
       <tr>
         <td><strong>Existing Infrastructure Integration</strong></td>
-        <td>Source systems (OMS, Magento, Mirakl) have varying API capabilities and event formats. Some may require custom adapters.</td>
-        <td>The Event Ingestion Service is designed with pluggable adapters to handle diverse input formats and normalize them into a canonical schema.</td>
+        <td>Source systems have varying API capabilities and event formats. Each source's payload structure may differ significantly.</td>
+        <td>The Event Ingestion Service uses a runtime mapping engine with admin-configured field mappings to normalize diverse input formats into a canonical schema. New sources can be onboarded via admin configuration without code changes.</td>
       </tr>
       <tr>
         <td><strong>Provider Rate Limits</strong></td>

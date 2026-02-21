@@ -16,6 +16,7 @@
     <a href="04-authentication-identity.html" class="active">Auth &amp; Identity</a>
     <a href="05-testing-strategy.html">Testing Strategy</a>
     <a href="06-changelog.html">Changelog</a>
+    <a href="07-event-ingestion-service.html">Event Ingestion</a>
   </nav>
 
   <div class="doc-header">
@@ -70,7 +71,7 @@
       </tr>
       <tr>
         <td><strong>Credential Storage</strong></td>
-        <td>bcrypt-hashed passwords in <code>admin_db</code></td>
+        <td>bcrypt-hashed passwords in <code>admin_service</code> schema</td>
         <td>No passwords stored — delegated to IdP</td>
       </tr>
       <tr>
@@ -516,7 +517,7 @@
   <!-- ================================================================== -->
   <h2 id="database-schema">6. Database Schema Additions</h2>
   <p>
-    Three new tables are added to <code>admin_db</code> to support SAML SSO. These extend the existing <code>admin_users</code>, <code>admin_roles</code>, and <code>admin_permissions</code> tables already defined in the <a href="02-detailed-microservices.html#admin-service">Admin Service specification</a>.
+    Three new tables are added to the <code>admin_service</code> schema to support SAML SSO. These extend the existing <code>admin_users</code>, <code>admin_roles</code>, and <code>admin_permissions</code> tables already defined in the <a href="02-detailed-microservices.html#admin-service">Admin Service specification</a>.
   </p>
 
   <h3>6.1 <code>saml_identity_providers</code></h3>

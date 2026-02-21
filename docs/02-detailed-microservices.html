@@ -16,6 +16,7 @@
     <a href="04-authentication-identity.html">Auth &amp; Identity</a>
     <a href="05-testing-strategy.html">Testing Strategy</a>
     <a href="06-changelog.html">Changelog</a>
+    <a href="07-event-ingestion-service.html">Event Ingestion</a>
   </nav>
 
   <div class="doc-header">
@@ -44,7 +45,7 @@
       <li><a href="#email-ingest-service">Email Ingest Service</a></li>
       <li><a href="#bulk-upload-service">Bulk Upload Service</a></li>
       <li><a href="#notification-admin-ui">Notification Admin UI (Frontend)</a></li>
-      <li><a href="#database-schema-overview">Database Schema Overview</a></li>
+      <li><a href="#database-schema-overview">Schema Overview</a></li>
       <li><a href="#inter-service-communication">Inter-Service Communication</a></li>
       <li><a href="#security-considerations">Security Considerations</a></li>
     </ol>
@@ -66,7 +67,7 @@
       <tr>
         <th>Service Name</th>
         <th>Port</th>
-        <th>Database</th>
+        <th>Schema</th>
         <th>Key Responsibility</th>
         <th>Dependencies</th>
       </tr>
@@ -74,70 +75,70 @@
     <tbody>
       <tr>
         <td><strong>Notification Gateway</strong></td>
-        <td><code>3000</code></td>
-        <td>None (stateless)</td>
+        <td><code>3150</code></td>
+        <td><code>notification_gateway</code></td>
         <td>BFF / API Gateway — auth, validation, routing</td>
         <td>All internal services</td>
       </tr>
       <tr>
         <td><strong>Event Ingestion</strong></td>
-        <td><code>3001</code></td>
-        <td><code>event_ingestion_db</code></td>
+        <td><code>3151</code></td>
+        <td><code>event_ingestion_service</code></td>
         <td>Receive &amp; normalize events from source systems</td>
         <td>RabbitMQ</td>
       </tr>
       <tr>
         <td><strong>Notification Engine</strong></td>
-        <td><code>3002</code></td>
-        <td><code>notification_engine_db</code></td>
+        <td><code>3152</code></td>
+        <td><code>notification_engine_service</code></td>
         <td>Rule matching, orchestration, lifecycle management</td>
         <td>Event Ingestion, Template Service, Channel Router, RabbitMQ</td>
       </tr>
       <tr>
         <td><strong>Template Service</strong></td>
-        <td><code>3003</code></td>
-        <td><code>template_db</code></td>
+        <td><code>3153</code></td>
+        <td><code>template_service</code></td>
         <td>Template CRUD, rendering with Handlebars</td>
         <td>PostgreSQL</td>
       </tr>
       <tr>
         <td><strong>Channel Router</strong></td>
-        <td><code>3004</code></td>
-        <td><code>channel_router_db</code></td>
+        <td><code>3154</code></td>
+        <td><code>channel_router_service</code></td>
         <td>Route to delivery providers (SendGrid, Twilio, Firebase)</td>
         <td>External providers, RabbitMQ</td>
       </tr>
       <tr>
         <td><strong>Admin Service</strong></td>
-        <td><code>3005</code></td>
-        <td><code>admin_db</code></td>
+        <td><code>3155</code></td>
+        <td><code>admin_service</code></td>
         <td>Backoffice administration, user &amp; rule management</td>
         <td>Notification Engine, Template Service, Channel Router</td>
       </tr>
       <tr>
         <td><strong>Audit Service</strong></td>
-        <td><code>3006</code></td>
-        <td><code>audit_db</code></td>
+        <td><code>3156</code></td>
+        <td><code>audit_service</code></td>
         <td>Event sourcing, delivery tracking, compliance logging</td>
         <td>RabbitMQ (all status exchanges)</td>
       </tr>
       <tr>
         <td><strong>Email Ingest</strong></td>
-        <td><code>3007</code> / <code>2525</code></td>
-        <td><code>email_ingest_db</code></td>
+        <td><code>3157</code> / <code>2525</code></td>
+        <td><code>email_ingest_service</code></td>
         <td>SMTP ingest — receive emails, parse against rules, generate events</td>
         <td>RabbitMQ, PostgreSQL</td>
       </tr>
       <tr>
         <td><strong>Bulk Upload</strong></td>
-        <td><code>3008</code></td>
-        <td><code>bulk_upload_db</code></td>
+        <td><code>3158</code></td>
+        <td><code>bulk_upload_service</code></td>
         <td>XLSX file upload, row parsing, event submission to Event Ingestion</td>
         <td>Event Ingestion Service (HTTP), PostgreSQL</td>
       </tr>
       <tr>
         <td><strong>Notification Admin UI</strong></td>
-        <td><code>3010</code></td>
+        <td><code>3159</code></td>
         <td>None</td>
         <td>Next.js backoffice for the operative team</td>
         <td>Notification Gateway (BFF)</td>
@@ -164,8 +165,8 @@
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3000</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>None (stateless proxy)</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3150</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td><code>notification_gateway</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>All internal microservices</td></tr>
     </tbody>
   </table>
@@ -433,7 +434,7 @@
 
   <div class="note-box">
     <strong>Authentication Strategy</strong>
-    The gateway uses a two-tier authentication model. Admin users authenticate via local credentials (email/password) or SAML 2.0 SSO with Azure AD — both methods issue platform-managed JWT tokens (short-lived access tokens with refresh token rotation). External system integrations (OMS, Magento, etc.) authenticate using API keys passed in the <code>X-API-Key</code> header. API keys are scoped to specific endpoints and rate-limited independently. All tokens and keys are validated on every request before proxying to internal services. Internal service-to-service calls bypass the gateway and use mutual TLS or shared secrets. See <a href="04-authentication-identity.html">04 — Authentication &amp; Identity</a> for the complete authentication design.
+    The gateway uses a two-tier authentication model. Admin users authenticate via local credentials (email/password) or SAML 2.0 SSO with Azure AD — both methods issue platform-managed JWT tokens (short-lived access tokens with refresh token rotation). External source system integrations authenticate using API keys passed in the <code>X-API-Key</code> header. API keys are scoped to specific endpoints and rate-limited independently. All tokens and keys are validated on every request before proxying to internal services. Internal service-to-service calls bypass the gateway and use mutual TLS or shared secrets. See <a href="04-authentication-identity.html">04 — Authentication &amp; Identity</a> for the complete authentication design.
   </div>
 
   <!-- ================================================================== -->
@@ -443,7 +444,7 @@
 
   <h3>Purpose</h3>
   <p>
-    The Event Ingestion Service is the universal entry point for all business events that may trigger notifications. It receives events from five distinct source systems — OMS (in-house order management), Magento 2 (eCommerce platform), Mirakl Marketplace, Chat Commerce, and manual triggers — normalizes them into a canonical event schema, and publishes them to the internal RabbitMQ exchange for downstream processing.
+    The Event Ingestion Service is the universal entry point for all business events that may trigger notifications. It receives events from any registered source system, normalizes them into a canonical event schema using runtime field mapping configurations, and publishes them to the internal RabbitMQ exchange for downstream processing. Source systems are registered dynamically through the Admin UI — no code changes are required to onboard a new event source.
   </p>
 
   <table class="compact">
@@ -455,18 +456,18 @@
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS with RabbitMQ consumers (amqplib / @golevelup/nestjs-rabbitmq)</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3001</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>event_ingestion_db</code></td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3151</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL — <code>event_ingestion_service</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>RabbitMQ, PostgreSQL</td></tr>
     </tbody>
   </table>
 
   <h3>Responsibilities</h3>
   <ul>
-    <li><strong>RabbitMQ Consumers:</strong> Dedicated consumers for each source system (OMS, Magento 2, Mirakl, Chat Commerce) that listen on source-specific queues. Each consumer understands the schema of its source system and can map it to the canonical format.</li>
-    <li><strong>REST Webhook Endpoint:</strong> An HTTP endpoint (<code>POST /webhooks/events</code>) for external integrations that cannot publish directly to RabbitMQ. Accepts events with a source identifier and processes them through the same normalization pipeline.</li>
-    <li><strong>Event Schema Validation:</strong> Validates incoming events against registered JSON schemas per source and event type. Invalid events are rejected with detailed error messages and logged for investigation.</li>
-    <li><strong>Event Normalization:</strong> Transforms source-specific event payloads into the canonical event format. This includes field mapping, data type coercion, timestamp normalization (to ISO-8601 UTC), and enrichment with metadata (correlation IDs, source event IDs).</li>
+    <li><strong>RabbitMQ Consumers:</strong> Dynamic consumers that listen on source-specific queues. Each consumer applies runtime mapping configurations (stored in the <code>event_mappings</code> table) to transform source payloads into the canonical format — no hardcoded adapters per source system.</li>
+    <li><strong>REST Webhook Endpoint:</strong> An HTTP endpoint (<code>POST /webhooks/events</code>) for external integrations that cannot publish directly to RabbitMQ. Accepts events with a <code>sourceId</code> identifier and processes them through the same normalization pipeline.</li>
+    <li><strong>Event Mapping Validation:</strong> Validates incoming events against the mapping configuration registered for the given source and event type. Invalid events are rejected with detailed error messages and logged for investigation.</li>
+    <li><strong>Event Normalization:</strong> Transforms source-specific event payloads into the canonical event format using runtime field mappings. This includes field mapping, data type coercion, timestamp normalization (to ISO-8601 UTC), and enrichment with metadata (correlation IDs, source event IDs).</li>
     <li><strong>Publishing Normalized Events:</strong> Publishes validated and normalized events to the <code>events.normalized</code> exchange with appropriate routing keys for downstream consumers.</li>
     <li><strong>Event Persistence:</strong> Stores all raw and normalized events in the database for auditability and replay capabilities.</li>
   </ul>
@@ -511,31 +512,13 @@
     </thead>
     <tbody>
       <tr>
-        <td><code>events.oms</code></td>
+        <td><code>q.events.amqp</code></td>
         <td><code>events.incoming</code></td>
-        <td><code>source.oms.#</code></td>
+        <td><code>source.*.#</code></td>
         <td>3</td>
       </tr>
       <tr>
-        <td><code>events.magento</code></td>
-        <td><code>events.incoming</code></td>
-        <td><code>source.magento.#</code></td>
-        <td>3</td>
-      </tr>
-      <tr>
-        <td><code>events.mirakl</code></td>
-        <td><code>events.incoming</code></td>
-        <td><code>source.mirakl.#</code></td>
-        <td>2</td>
-      </tr>
-      <tr>
-        <td><code>events.chat</code></td>
-        <td><code>events.incoming</code></td>
-        <td><code>source.chat.#</code></td>
-        <td>2</td>
-      </tr>
-      <tr>
-        <td><code>events.webhook</code></td>
+        <td><code>q.events.webhook</code></td>
         <td><code>events.incoming</code></td>
         <td><code>source.webhook.#</code></td>
         <td>2</td>
@@ -549,36 +532,40 @@
     </tbody>
   </table>
 
-  <h3>Canonical Event Schema</h3>
+  <h3>Canonical Event Schema (v2.0 — Flat Format)</h3>
   <pre><code>{
-  <span class="json-key">"eventId"</span>: <span class="json-string">"a]f47ac10b-58cc-4372-a567-0e02b2c3d479"</span>,
-  <span class="json-key">"source"</span>: <span class="json-string">"oms | magento | mirakl | chat | manual | email-ingest"</span>,
-  <span class="json-key">"eventType"</span>: <span class="json-string">"order.created | order.shipped | order.delivered | order.cancelled | payment.confirmed | return.requested | return.approved | chat.escalated"</span>,
+  <span class="json-key">"eventId"</span>: <span class="json-string">"af47ac10b-58cc-4372-a567-0e02b2c3d479"</span>,
+  <span class="json-key">"sourceId"</span>: <span class="json-string">"oms"</span>,
+  <span class="json-key">"eventType"</span>: <span class="json-string">"order.shipped"</span>,
   <span class="json-key">"timestamp"</span>: <span class="json-string">"2026-02-19T14:30:00.000Z"</span>,
-  <span class="json-key">"payload"</span>: {
-    <span class="json-key">"orderId"</span>: <span class="json-string">"ORD-2026-00451"</span>,
-    <span class="json-key">"customerEmail"</span>: <span class="json-string">"customer@example.com"</span>,
-    <span class="json-key">"customerName"</span>: <span class="json-string">"Jane Doe"</span>,
-    <span class="json-key">"customerPhone"</span>: <span class="json-string">"+1234567890"</span>,
-    <span class="json-key">"items"</span>: [
-      {
-        <span class="json-key">"sku"</span>: <span class="json-string">"PROD-001"</span>,
-        <span class="json-key">"name"</span>: <span class="json-string">"Wireless Headphones"</span>,
-        <span class="json-key">"quantity"</span>: <span class="json-number">1</span>,
-        <span class="json-key">"price"</span>: <span class="json-number">79.99</span>
-      }
-    ],
-    <span class="json-key">"totalAmount"</span>: <span class="json-number">79.99</span>,
-    <span class="json-key">"currency"</span>: <span class="json-string">"USD"</span>
-  },
+  <span class="json-key">"orderId"</span>: <span class="json-string">"ORD-2026-00451"</span>,
+  <span class="json-key">"customerEmail"</span>: <span class="json-string">"customer@example.com"</span>,
+  <span class="json-key">"customerName"</span>: <span class="json-string">"Jane Doe"</span>,
+  <span class="json-key">"customerPhone"</span>: <span class="json-string">"+1234567890"</span>,
+  <span class="json-key">"customerId"</span>: <span class="json-string">"CUST-98765"</span>,
+  <span class="json-key">"items"</span>: [
+    {
+      <span class="json-key">"sku"</span>: <span class="json-string">"PROD-001"</span>,
+      <span class="json-key">"name"</span>: <span class="json-string">"Wireless Headphones"</span>,
+      <span class="json-key">"quantity"</span>: <span class="json-number">1</span>,
+      <span class="json-key">"price"</span>: <span class="json-number">79.99</span>
+    }
+  ],
+  <span class="json-key">"totalAmount"</span>: <span class="json-number">79.99</span>,
+  <span class="json-key">"currency"</span>: <span class="json-string">"USD"</span>,
   <span class="json-key">"metadata"</span>: {
     <span class="json-key">"correlationId"</span>: <span class="json-string">"corr-8f14e45f-ceea-467f-a8f5-5f1b39e5c7e2"</span>,
     <span class="json-key">"sourceEventId"</span>: <span class="json-string">"OMS-EVT-78901"</span>,
     <span class="json-key">"receivedAt"</span>: <span class="json-string">"2026-02-19T14:30:00.123Z"</span>,
     <span class="json-key">"normalizedAt"</span>: <span class="json-string">"2026-02-19T14:30:00.456Z"</span>,
-    <span class="json-key">"schemaVersion"</span>: <span class="json-string">"1.0"</span>
+    <span class="json-key">"schemaVersion"</span>: <span class="json-string">"2.0"</span>
   }
 }</code></pre>
+
+  <div class="info-box">
+    <strong>Flat Event Schema (v2.0)</strong>
+    The canonical event schema uses a flat structure where business fields (<code>customerEmail</code>, <code>orderId</code>, <code>customerId</code>, <code>totalAmount</code>, etc.) are placed at the top level rather than nested under a <code>payload</code> object. This simplifies rule conditions, template variable access, and suppression dedup key paths — all field references use direct names (e.g., <code>customerEmail</code>) instead of dot-notation paths (e.g., <code>payload.customerEmail</code>). The <code>sourceId</code> field identifies the registered source system that produced the event.
+  </div>
 
   <h3>Database Tables</h3>
   <table>
@@ -593,7 +580,7 @@
       <tr>
         <td><code>events</code></td>
         <td>Stores all ingested events (raw and normalized)</td>
-        <td><code>id</code>, <code>event_id</code>, <code>source</code>, <code>event_type</code>, <code>raw_payload</code>, <code>normalized_payload</code>, <code>status</code>, <code>created_at</code></td>
+        <td><code>id</code>, <code>event_id</code>, <code>source_id</code>, <code>event_type</code>, <code>raw_payload</code>, <code>normalized_payload</code>, <code>status</code>, <code>created_at</code></td>
       </tr>
       <tr>
         <td><code>event_sources</code></td>
@@ -601,9 +588,9 @@
         <td><code>id</code>, <code>name</code>, <code>type</code>, <code>connection_config</code>, <code>is_active</code>, <code>created_at</code></td>
       </tr>
       <tr>
-        <td><code>event_schemas</code></td>
-        <td>JSON schemas for validating events per source and type</td>
-        <td><code>id</code>, <code>source</code>, <code>event_type</code>, <code>schema_json</code>, <code>version</code>, <code>is_active</code></td>
+        <td><code>event_mappings</code></td>
+        <td>Runtime field mapping configurations per source and event type</td>
+        <td><code>id</code> (UUID PK), <code>source_id</code> (VARCHAR(50)), <code>event_type</code> (VARCHAR(100)), <code>name</code> (VARCHAR(255)), <code>field_mappings</code> (JSONB), <code>event_type_mapping</code> (JSONB), <code>validation_schema</code> (JSONB), <code>is_active</code> (BOOLEAN), <code>version</code> (INTEGER), <code>created_by</code> (VARCHAR(100)), <code>updated_by</code> (VARCHAR(100)), <code>created_at</code> (TIMESTAMPTZ), <code>updated_at</code> (TIMESTAMPTZ)</td>
       </tr>
     </tbody>
   </table>
@@ -616,7 +603,7 @@
       <span>/webhooks/events</span>
     </div>
     <div class="endpoint-body">
-      <p>Receive webhook events from external integrations. Expects a JSON body with <code>source</code>, <code>eventType</code>, and <code>payload</code> fields. Returns <code>202 Accepted</code> with an <code>eventId</code> for tracking. The event is validated, normalized, and published asynchronously.</p>
+      <p>Receive webhook events from external integrations. Expects a JSON body with <code>sourceId</code>, <code>eventType</code>, and event fields. Returns <code>202 Accepted</code> with an <code>eventId</code> for tracking. The event is validated against the runtime mapping configuration for the given <code>sourceId</code> and <code>eventType</code>, normalized, and published asynchronously.</p>
     </div>
   </div>
 
@@ -632,7 +619,16 @@
 
   <div class="info-box">
     <strong>Idempotency Handling</strong>
-    Every incoming event is assigned or carries a <code>sourceEventId</code> from the originating system. The Event Ingestion Service maintains a deduplication window (configurable, default 24 hours) using a unique constraint on <code>(source, source_event_id)</code> in the <code>events</code> table. If a duplicate event is received within the window, the service returns <code>200 OK</code> with the existing <code>eventId</code> and does not re-publish to RabbitMQ. This guarantees at-least-once delivery semantics without producing duplicate notifications downstream.
+    Every incoming event is assigned or carries a <code>sourceEventId</code> from the originating system. The Event Ingestion Service maintains a deduplication window (configurable, default 24 hours) using a unique constraint on <code>(source_id, source_event_id)</code> in the <code>events</code> table. If a duplicate event is received within the window, the service returns <code>200 OK</code> with the existing <code>eventId</code> and does not re-publish to RabbitMQ. This guarantees at-least-once delivery semantics without producing duplicate notifications downstream.
+  </div>
+
+  <div class="success-box">
+    <strong>Deep-Dive Available:</strong> For the complete Event Ingestion Service specification — including runtime mapping configuration details, field mappings, the 10-step processing pipeline, RabbitMQ topology diagrams, full REST API contracts, database ERD, mapping validation flow, idempotency edge cases, and sequence diagrams — see <a href="07-event-ingestion-service.html">07 — Event Ingestion Service Deep-Dive</a>.
+  </div>
+
+  <div class="note-box">
+    <strong>Mapping Cache Configuration</strong>
+    The <code>MAPPING_CACHE_TTL</code> environment variable (replacing the previous <code>SCHEMA_CACHE_TTL</code>) controls how long runtime mapping configurations are cached in memory before being refreshed from the database. Default: <code>300</code> seconds (5 minutes). Set to <code>0</code> to disable caching during development.
   </div>
 
   <!-- ================================================================== -->
@@ -654,8 +650,8 @@
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3002</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>notification_engine_db</code></td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3152</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL — <code>notification_engine_service</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>Event Ingestion (via RabbitMQ), Template Service (HTTP), Channel Router (via RabbitMQ), PostgreSQL</td></tr>
     </tbody>
   </table>
@@ -664,7 +660,7 @@
   <ul>
     <li><strong>Event Consumption:</strong> Subscribes to the <code>events.normalized</code> exchange and processes each normalized event through the rule evaluation pipeline.</li>
     <li><strong>Rule Matching:</strong> Evaluates each event against all active notification rules. A rule matches when the event type equals the rule's configured event type and all additional conditions (e.g., source channel, order priority, customer segment) are satisfied.</li>
-    <li><strong>Recipient Resolution:</strong> Determines the notification recipients based on the rule's <code>recipientType</code>. For <code>customer</code>, extracts contact details from the event payload. For <code>group</code>, resolves the recipient group membership. For <code>custom</code>, uses the explicitly defined recipient list.</li>
+    <li><strong>Recipient Resolution:</strong> Determines the notification recipients based on the rule's <code>recipientType</code>. For <code>customer</code>, extracts contact details from the flat event fields (e.g., <code>customerEmail</code>, <code>customerPhone</code>). For <code>group</code>, resolves the recipient group membership. For <code>custom</code>, uses the explicitly defined recipient list.</li>
     <li><strong>Template Rendering Coordination:</strong> Calls the Template Service (HTTP) to render the appropriate template for each channel, passing the event payload as variable data.</li>
     <li><strong>Dispatch to Channel Router:</strong> Publishes rendered notifications to the <code>notifications.deliver</code> exchange with channel-specific routing keys for the Channel Router to pick up.</li>
     <li><strong>Lifecycle Management:</strong> Tracks each notification through its lifecycle states: <span class="badge badge-blue">Pending</span> <span class="badge badge-orange">Processing</span> <span class="badge badge-green">Sent</span> <span class="badge badge-approved">Delivered</span> <span class="badge badge-red">Failed</span>. Status transitions are logged in the <code>notification_status_log</code> table.</li>
@@ -674,7 +670,7 @@
 
   <h3>Rule Engine</h3>
   <p>
-    The rule engine uses a declarative, condition-based matching system. When a normalized event arrives, the engine queries all active rules whose <code>eventType</code> matches the event. For each matching rule, it evaluates the <code>conditions</code> object against the event payload using a simple expression evaluator. Conditions support equality checks, "in" list checks, and nested property access. When all conditions are satisfied, the rule's <code>actions</code> array is executed sequentially — each action specifies a template, a set of channels, and a recipient type.
+    The rule engine uses a declarative, condition-based matching system. When a normalized event arrives, the engine queries all active rules whose <code>eventType</code> matches the event. For each matching rule, it evaluates the <code>conditions</code> object against the flat event fields using a simple expression evaluator. Conditions support equality checks, "in" list checks, and direct field access (e.g., <code>customerEmail</code>, <code>totalAmount</code>). When all conditions are satisfied, the rule's <code>actions</code> array is executed sequentially — each action specifies a template, a set of channels, and a recipient type.
   </p>
   <p>
     Rules are prioritized by a <code>priority</code> field (lower number = higher priority). If multiple rules match a single event, all matching rules are executed unless a rule is marked as <code>exclusive</code>, in which case only the highest-priority exclusive rule runs and subsequent matches are skipped.
@@ -698,7 +694,7 @@
       <tr>
         <td><code>dedupKey</code></td>
         <td><code>string[]</code></td>
-        <td>Array of dot-notation paths resolved against the event context and recipient (e.g., <code>["eventType", "payload.orderId", "recipient.email"]</code>). Values are concatenated and SHA-256 hashed into a fixed-length lookup key.</td>
+        <td>Array of field names resolved against the flat event context and recipient (e.g., <code>["eventType", "orderId", "recipient.email"]</code>). Values are concatenated and SHA-256 hashed into a fixed-length lookup key.</td>
       </tr>
       <tr>
         <td><code>modes.dedup</code></td>
@@ -720,7 +716,7 @@
 
   <h4>Dedup Key Resolution</h4>
   <p>
-    At evaluation time, each path in the <code>dedupKey</code> array is resolved against the combined event context (event type, source, payload) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the <code>dedup_key_hash</code> column. The original resolved values are also stored in <code>dedup_key_values</code> (JSONB) for human-readable display in the Admin UI.
+    At evaluation time, each field name in the <code>dedupKey</code> array is resolved against the flat event context (event type, sourceId, top-level fields) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the <code>dedup_key_hash</code> column. The original resolved values are also stored in <code>dedup_key_values</code> (JSONB) for human-readable display in the Admin UI.
   </p>
 
   <h4>Suppression Evaluation Logic</h4>
@@ -754,13 +750,13 @@ ORDER BY created_at DESC;</code></pre>
 
   <p><strong>Late Delivery — no repeat within 24h:</strong></p>
   <pre><code><span class="json-key">"suppression"</span>: {
-  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"payload.orderId"</span>, <span class="json-string">"recipient.email"</span>],
+  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"orderId"</span>, <span class="json-string">"recipient.email"</span>],
   <span class="json-key">"modes"</span>: { <span class="json-key">"dedup"</span>: { <span class="json-key">"windowMinutes"</span>: <span class="json-number">1440</span> } }
 }</code></pre>
 
   <p><strong>Order Status — max 5 per order per week:</strong></p>
   <pre><code><span class="json-key">"suppression"</span>: {
-  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"payload.orderId"</span>, <span class="json-string">"recipient.email"</span>],
+  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"orderId"</span>, <span class="json-string">"recipient.email"</span>],
   <span class="json-key">"modes"</span>: { <span class="json-key">"maxCount"</span>: { <span class="json-key">"limit"</span>: <span class="json-number">5</span>, <span class="json-key">"windowMinutes"</span>: <span class="json-number">10080</span> } }
 }</code></pre>
 
@@ -772,7 +768,7 @@ ORDER BY created_at DESC;</code></pre>
 
   <p><strong>Payment Failure — combined dedup + max 3/week + 4h cooldown:</strong></p>
   <pre><code><span class="json-key">"suppression"</span>: {
-  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"payload.orderId"</span>, <span class="json-string">"payload.paymentAttemptId"</span>, <span class="json-string">"recipient.email"</span>],
+  <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"orderId"</span>, <span class="json-string">"paymentAttemptId"</span>, <span class="json-string">"recipient.email"</span>],
   <span class="json-key">"modes"</span>: {
     <span class="json-key">"dedup"</span>: { <span class="json-key">"windowMinutes"</span>: <span class="json-number">10080</span> },
     <span class="json-key">"maxCount"</span>: { <span class="json-key">"limit"</span>: <span class="json-number">3</span>, <span class="json-key">"windowMinutes"</span>: <span class="json-number">10080</span> },
@@ -861,9 +857,9 @@ ORDER BY created_at DESC;</code></pre>
   <span class="json-key">"name"</span>: <span class="json-string">"Order Shipped Notification"</span>,
   <span class="json-key">"eventType"</span>: <span class="json-string">"order.shipped"</span>,
   <span class="json-key">"conditions"</span>: {
-    <span class="json-key">"source"</span>: { <span class="json-key">"$in"</span>: [<span class="json-string">"oms"</span>, <span class="json-string">"magento"</span>] },
-    <span class="json-key">"payload.totalAmount"</span>: { <span class="json-key">"$gte"</span>: <span class="json-number">0</span> },
-    <span class="json-key">"payload.customerEmail"</span>: { <span class="json-key">"$exists"</span>: <span class="json-bool">true</span> }
+    <span class="json-key">"sourceId"</span>: { <span class="json-key">"$in"</span>: [<span class="json-string">"oms"</span>, <span class="json-string">"magento"</span>] },
+    <span class="json-key">"totalAmount"</span>: { <span class="json-key">"$gte"</span>: <span class="json-number">0</span> },
+    <span class="json-key">"customerEmail"</span>: { <span class="json-key">"$exists"</span>: <span class="json-bool">true</span> }
   },
   <span class="json-key">"actions"</span>: [
     {
@@ -881,7 +877,7 @@ ORDER BY created_at DESC;</code></pre>
     }
   ],
   <span class="json-key">"suppression"</span>: {
-    <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"payload.orderId"</span>, <span class="json-string">"recipient.email"</span>],
+    <span class="json-key">"dedupKey"</span>: [<span class="json-string">"eventType"</span>, <span class="json-string">"orderId"</span>, <span class="json-string">"recipient.email"</span>],
     <span class="json-key">"modes"</span>: {
       <span class="json-key">"cooldown"</span>: { <span class="json-key">"intervalMinutes"</span>: <span class="json-number">1440</span> }
     }
@@ -895,7 +891,7 @@ ORDER BY created_at DESC;</code></pre>
 
   <div class="success-box">
     <strong>Decoupled Rule-Based Architecture</strong>
-    The rule-based approach completely decouples event producers from notification logic. Source systems (OMS, Magento, Mirakl, Chat Commerce) publish events without any knowledge of what notifications will be triggered. The operative team can create, modify, enable, or disable notification rules at any time through the Admin UI without requiring code changes or deployments. This empowers the business team to respond rapidly to changing communication requirements — adding a new WhatsApp channel to an existing order confirmation rule, for example, takes seconds rather than a development sprint.
+    The rule-based approach completely decouples event producers from notification logic. Source systems publish events without any knowledge of what notifications will be triggered. The operative team can create, modify, enable, or disable notification rules at any time through the Admin UI without requiring code changes or deployments. This empowers the business team to respond rapidly to changing communication requirements — adding a new WhatsApp channel to an existing order confirmation rule, for example, takes seconds rather than a development sprint.
   </div>
 
   <!-- ================================================================== -->
@@ -917,8 +913,8 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS with Handlebars (handlebars.js)</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3003</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>template_db</code></td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3153</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL — <code>template_service</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>PostgreSQL</td></tr>
     </tbody>
   </table>
@@ -1165,8 +1161,8 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3004</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>channel_router_db</code></td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3154</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL — <code>channel_router_service</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>RabbitMQ, External providers (SendGrid, Twilio, Firebase), PostgreSQL</td></tr>
     </tbody>
   </table>
@@ -1380,8 +1376,8 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3005</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>admin_db</code></td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3155</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL — <code>admin_service</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>Notification Engine, Template Service, Channel Router, Audit Service</td></tr>
     </tbody>
   </table>
@@ -1541,6 +1537,67 @@ ORDER BY created_at DESC;</code></pre>
     </div>
   </div>
 
+  <!-- Event Mapping CRUD -->
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/event-mappings</span>
+    </div>
+    <div class="endpoint-body">
+      <p>List all event mapping configurations with pagination. Supports filters: <code>sourceId</code>, <code>eventType</code>, <code>isActive</code>. Returns mapping summaries.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/event-mappings</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Create a new event mapping configuration. Requires <code>sourceId</code>, <code>eventType</code>, <code>name</code>, and <code>fieldMappings</code>. Validates that the source exists and the mapping configuration is well-formed. Returns the created mapping with its generated ID.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-get">
+      <span class="method-badge get">GET</span>
+      <span>/api/v1/event-mappings/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Retrieve full details for a specific event mapping, including field mappings, event type mapping, validation schema, and version history.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-put">
+      <span class="method-badge put">PUT</span>
+      <span>/api/v1/event-mappings/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Update an existing event mapping configuration. Increments the <code>version</code> field. Changes are audit-logged with the admin user ID and timestamp.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-delete">
+      <span class="method-badge delete">DELETE</span>
+      <span>/api/v1/event-mappings/:id</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Delete an event mapping. Soft-deletes the mapping (sets <code>is_active</code> to false) to preserve audit history.</p>
+    </div>
+  </div>
+
+  <div class="endpoint">
+    <div class="endpoint-header method-post">
+      <span class="method-badge post">POST</span>
+      <span>/api/v1/event-mappings/:id/test</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Test an event mapping configuration with a sample payload. Accepts a raw source payload in the request body, applies the mapping configuration, and returns the resulting canonical event without persisting or publishing it. Useful for validating mapping configurations before activation.</p>
+    </div>
+  </div>
+
   <!-- ================================================================== -->
   <!-- 8. Audit Service                                                   -->
   <!-- ================================================================== -->
@@ -1560,8 +1617,8 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3006</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>audit_db</code></td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3156</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL — <code>audit_service</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>RabbitMQ (all status exchanges)</td></tr>
     </tbody>
   </table>
@@ -1670,9 +1727,9 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS + <code>smtp-server</code> npm package</td></tr>
-      <tr><td><strong>REST Port</strong></td><td><code>3007</code></td></tr>
+      <tr><td><strong>REST Port</strong></td><td><code>3157</code></td></tr>
       <tr><td><strong>SMTP Port</strong></td><td><code>2525</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL — <code>email_ingest_db</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL — <code>email_ingest_service</code></td></tr>
       <tr><td><strong>Dependencies</strong></td><td>RabbitMQ, PostgreSQL</td></tr>
     </tbody>
   </table>
@@ -1880,9 +1937,9 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>NestJS + <code>exceljs</code></td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3008</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>PostgreSQL &mdash; <code>bulk_upload_db</code></td></tr>
-      <tr><td><strong>Source Identifier</strong></td><td><code>bulk-upload</code> (used as <code>source</code> field in event payloads)</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3158</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>PostgreSQL &mdash; <code>bulk_upload_service</code></td></tr>
+      <tr><td><strong>Source Identifier</strong></td><td><code>bulk-upload</code> (used as <code>sourceId</code> field in event payloads)</td></tr>
       <tr><td><strong>Dependencies</strong></td><td>Event Ingestion Service (HTTP), PostgreSQL</td></tr>
     </tbody>
   </table>
@@ -1890,16 +1947,16 @@ ORDER BY created_at DESC;</code></pre>
   <h3>Responsibilities</h3>
   <ul>
     <li><strong>File Upload &amp; Validation:</strong> Accepts XLSX files via multipart/form-data. Validates file format (<code>.xlsx</code> only), file size (max 10 MB), and row count (max 5,000 rows). Rejects invalid files with descriptive error messages.</li>
-    <li><strong>Header Parsing &amp; Column Mapping:</strong> Reads the first row as column headers. The <code>eventType</code> column is required; all other column headers map directly as keys in the <code>payload</code> object of each event. This fully flexible mapping allows any event type to be submitted without a predefined schema.</li>
-    <li><strong>Row-to-Event Transformation:</strong> For each data row, extracts the <code>eventType</code> value and maps remaining columns to payload fields. Empty cells are omitted. Values that are valid JSON (e.g., arrays, objects) are parsed as JSON; otherwise treated as strings or numbers.</li>
-    <li><strong>Event Submission:</strong> Sends each mapped event to the Event Ingestion Service via HTTP <code>POST /webhooks/events</code> with <code>source: "bulk-upload"</code>. Configurable concurrency (default: 5 parallel requests, max 50 events/second) to avoid overwhelming the ingestion service.</li>
+    <li><strong>Header Parsing &amp; Column Mapping:</strong> Reads the first row as column headers. The <code>eventType</code> column is required; all other column headers map directly as top-level fields in the flat v2.0 canonical event. This fully flexible mapping allows any event type to be submitted without a predefined schema.</li>
+    <li><strong>Row-to-Event Transformation:</strong> For each data row, extracts the <code>eventType</code> value and maps remaining columns to top-level event fields. Empty cells are omitted. Values that are valid JSON (e.g., arrays, objects) are parsed as JSON; otherwise treated as strings or numbers.</li>
+    <li><strong>Event Submission:</strong> Sends each mapped event to the Event Ingestion Service via HTTP <code>POST /webhooks/events</code> with <code>sourceId: "bulk-upload"</code>. Configurable concurrency (default: 5 parallel requests, max 50 events/second) to avoid overwhelming the ingestion service.</li>
     <li><strong>Progress Tracking:</strong> Tracks per-row status (<code>pending</code>, <code>processing</code>, <code>succeeded</code>, <code>failed</code>, <code>skipped</code>) in the <code>upload_rows</code> table and maintains aggregate counters in the <code>uploads</code> table for real-time progress reporting.</li>
     <li><strong>Error Handling:</strong> Captures and stores per-row errors (validation failures, submission errors) with the original raw data. Failed rows can be retried independently without re-uploading the entire file.</li>
   </ul>
 
   <h3>XLSX File Format (Flexible Mapping)</h3>
   <p>
-    The service uses a fully flexible column mapping approach. The only required column is <code>eventType</code>, which determines the event type for each row. All other columns are dynamic &mdash; each column header becomes a key in the <code>payload</code> object.
+    The service uses a fully flexible column mapping approach. The only required column is <code>eventType</code>, which determines the event type for each row. All other columns are dynamic &mdash; each column header becomes a top-level field in the flat v2.0 canonical event.
   </p>
   <table>
     <thead>
@@ -1911,7 +1968,7 @@ ORDER BY created_at DESC;</code></pre>
     <tbody>
       <tr><td><strong>Header Row</strong></td><td>First row must contain column names</td></tr>
       <tr><td><strong>Required Column</strong></td><td><code>eventType</code> &mdash; determines the event type for each row</td></tr>
-      <tr><td><strong>Dynamic Columns</strong></td><td>All other column headers become keys in the <code>payload</code> object</td></tr>
+      <tr><td><strong>Dynamic Columns</strong></td><td>All other column headers become top-level fields in the canonical event</td></tr>
       <tr><td><strong>Empty Cells</strong></td><td>Omitted from the payload (not included as null)</td></tr>
       <tr><td><strong>JSON Values</strong></td><td>Cell values that are valid JSON (e.g., <code>[{"sku":"X"}]</code>) are parsed as JSON objects/arrays</td></tr>
       <tr><td><strong>Max Rows</strong></td><td>5,000 rows per file</td></tr>
@@ -1939,14 +1996,12 @@ ORDER BY created_at DESC;</code></pre>
 
   <h4>Resulting Event Payload (Row 1)</h4>
   <pre><code>{
-  <span class="json-key">"source"</span>: <span class="json-string">"bulk-upload"</span>,
+  <span class="json-key">"sourceId"</span>: <span class="json-string">"bulk-upload"</span>,
   <span class="json-key">"eventType"</span>: <span class="json-string">"order.shipped"</span>,
-  <span class="json-key">"payload"</span>: {
-    <span class="json-key">"customerEmail"</span>: <span class="json-string">"jane@example.com"</span>,
-    <span class="json-key">"customerName"</span>: <span class="json-string">"Jane Doe"</span>,
-    <span class="json-key">"orderId"</span>: <span class="json-string">"ORD-001"</span>,
-    <span class="json-key">"totalAmount"</span>: <span class="json-number">79.99</span>
-  }
+  <span class="json-key">"customerEmail"</span>: <span class="json-string">"jane@example.com"</span>,
+  <span class="json-key">"customerName"</span>: <span class="json-string">"Jane Doe"</span>,
+  <span class="json-key">"orderId"</span>: <span class="json-string">"ORD-001"</span>,
+  <span class="json-key">"totalAmount"</span>: <span class="json-number">79.99</span>
 }</code></pre>
 
   <h3>Key API Endpoints</h3>
@@ -2016,8 +2071,8 @@ ORDER BY created_at DESC;</code></pre>
     <li>User uploads XLSX via Admin UI &rarr; Gateway &rarr; Bulk Upload Service</li>
     <li>Service validates file (size, format, header row present, <code>eventType</code> column exists) &rarr; returns <code>202 Accepted</code> with <code>uploadId</code></li>
     <li>Background worker parses file row-by-row using <code>exceljs</code></li>
-    <li>For each row: extract <code>eventType</code>, map remaining columns to <code>payload</code> fields, attempt JSON parsing of values</li>
-    <li>Events sent to Event Ingestion Service (<code>POST /webhooks/events</code>) with <code>source: "bulk-upload"</code>; configurable concurrency (default: 5 parallel, max 50 events/s)</li>
+    <li>For each row: extract <code>eventType</code>, map remaining columns to top-level event fields, attempt JSON parsing of values</li>
+    <li>Events sent to Event Ingestion Service (<code>POST /webhooks/events</code>) with <code>sourceId: "bulk-upload"</code>; configurable concurrency (default: 5 parallel, max 50 events/s)</li>
     <li>Per-row status tracked in <code>upload_rows</code> table; aggregate counters updated in <code>uploads</code> table</li>
     <li>Admin UI polls <code>/uploads/:id</code> for progress updates</li>
   </ol>
@@ -2116,8 +2171,8 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr><td><strong>Technology</strong></td><td>Next.js 14 (App Router) with TypeScript</td></tr>
-      <tr><td><strong>Port</strong></td><td><code>3010</code></td></tr>
-      <tr><td><strong>Database</strong></td><td>None (all data through API)</td></tr>
+      <tr><td><strong>Port</strong></td><td><code>3159</code></td></tr>
+      <tr><td><strong>Schema</strong></td><td>None (all data through API)</td></tr>
       <tr><td><strong>Dependencies</strong></td><td>Notification Gateway (BFF) only</td></tr>
     </tbody>
   </table>
@@ -2177,20 +2232,25 @@ ORDER BY created_at DESC;</code></pre>
         <td><code>/bulk-upload</code></td>
         <td>Drag-and-drop XLSX file upload zone, upload progress bar with real-time polling, upload history table (file name, uploaded by, date, status, row counts), error detail panel for failed rows with CSV export, sample template download. <span class="badge badge-blue">Admin</span> <span class="badge badge-green">Operator</span> — retry and cancel require <span class="badge badge-red">Admin</span></td>
       </tr>
+      <tr>
+        <td><strong>Event Mappings</strong></td>
+        <td><code>/event-mappings</code></td>
+        <td>List, create, edit, and test runtime field mapping configurations. Visual mapping builder, event type mapping, transform configuration, and mapping test panel.</td>
+      </tr>
     </tbody>
   </table>
 
   <div class="note-box">
     <strong>BFF Pattern — Frontend Communication</strong>
-    The Notification Admin UI communicates <strong>exclusively</strong> through the Notification Gateway (BFF) on port <code>3000</code>. It never calls internal microservices directly. This provides a single security boundary, consistent API surface, and allows the gateway to handle authentication, rate limiting, and response transformation. The frontend uses <code>fetch</code> with JWT bearer tokens stored in HTTP-only cookies for secure authentication. Server components in the Next.js App Router fetch data during SSR through the gateway, while client components use SWR for data fetching with automatic revalidation.
+    The Notification Admin UI communicates <strong>exclusively</strong> through the Notification Gateway (BFF) on port <code>3150</code>. It never calls internal microservices directly. This provides a single security boundary, consistent API surface, and allows the gateway to handle authentication, rate limiting, and response transformation. The frontend uses <code>fetch</code> with JWT bearer tokens stored in HTTP-only cookies for secure authentication. Server components in the Next.js App Router fetch data during SSR through the gateway, while client components use SWR for data fetching with automatic revalidation.
   </div>
 
   <!-- ================================================================== -->
-  <!-- 12. Database Schema Overview                                       -->
+  <!-- 12. Schema Overview                                                -->
   <!-- ================================================================== -->
-  <h2 id="database-schema-overview">12. Database Schema Overview</h2>
+  <h2 id="database-schema-overview">12. Schema Overview</h2>
 
-  <h3>Database Summary</h3>
+  <h3>Schema Summary</h3>
   <p>
     Each microservice owns its database, following the database-per-service pattern. This ensures loose coupling, independent schema evolution, and isolated failure domains. Cross-service data access is performed exclusively through APIs, never through shared databases.
   </p>
@@ -2198,7 +2258,7 @@ ORDER BY created_at DESC;</code></pre>
   <table>
     <thead>
       <tr>
-        <th>Database</th>
+        <th>Schema</th>
         <th>Owner Service</th>
         <th>Tables</th>
         <th>Estimated Size (Year 1)</th>
@@ -2207,56 +2267,63 @@ ORDER BY created_at DESC;</code></pre>
     </thead>
     <tbody>
       <tr>
-        <td><code>event_ingestion_db</code></td>
+        <td><code>notification_gateway</code></td>
+        <td>Notification Gateway</td>
+        <td><code>gateway_rate_limits</code>, <code>gateway_api_keys</code></td>
+        <td>~100 MB</td>
+        <td>Minimal</td>
+      </tr>
+      <tr>
+        <td><code>event_ingestion_service</code></td>
         <td>Event Ingestion Service</td>
-        <td><code>events</code>, <code>event_sources</code>, <code>event_schemas</code></td>
+        <td><code>events</code>, <code>event_sources</code>, <code>event_mappings</code></td>
         <td>~50 GB</td>
         <td>~5 GB/month</td>
       </tr>
       <tr>
-        <td><code>notification_engine_db</code></td>
+        <td><code>notification_engine_service</code></td>
         <td>Notification Engine</td>
         <td><code>notification_rules</code>, <code>notifications</code>, <code>notification_recipients</code>, <code>notification_status_log</code>, <code>recipient_groups</code>, <code>recipient_preferences</code></td>
         <td>~80 GB</td>
         <td>~8 GB/month</td>
       </tr>
       <tr>
-        <td><code>template_db</code></td>
+        <td><code>template_service</code></td>
         <td>Template Service</td>
         <td><code>templates</code>, <code>template_versions</code>, <code>template_channels</code>, <code>template_variables</code></td>
         <td>~500 MB</td>
         <td>Minimal</td>
       </tr>
       <tr>
-        <td><code>channel_router_db</code></td>
+        <td><code>channel_router_service</code></td>
         <td>Channel Router</td>
         <td><code>channels</code>, <code>channel_configs</code>, <code>delivery_attempts</code>, <code>provider_configs</code></td>
         <td>~60 GB</td>
         <td>~6 GB/month</td>
       </tr>
       <tr>
-        <td><code>admin_db</code></td>
+        <td><code>admin_service</code></td>
         <td>Admin Service</td>
         <td><code>admin_users</code>, <code>admin_roles</code>, <code>admin_permissions</code>, <code>system_configs</code>, <code>saml_identity_providers</code>, <code>user_identity_links</code>, <code>saml_sessions</code></td>
         <td>~100 MB</td>
         <td>Minimal</td>
       </tr>
       <tr>
-        <td><code>audit_db</code></td>
+        <td><code>audit_service</code></td>
         <td>Audit Service</td>
         <td><code>audit_events</code>, <code>delivery_receipts</code>, <code>notification_analytics</code></td>
         <td>~120 GB</td>
         <td>~12 GB/month</td>
       </tr>
       <tr>
-        <td><code>email_ingest_db</code></td>
+        <td><code>email_ingest_service</code></td>
         <td>Email Ingest Service</td>
         <td><code>email_parsing_rules</code>, <code>processed_emails</code>, <code>email_sources</code></td>
         <td>~20 GB</td>
         <td>~2 GB/month</td>
       </tr>
       <tr>
-        <td><code>bulk_upload_db</code></td>
+        <td><code>bulk_upload_service</code></td>
         <td>Bulk Upload Service</td>
         <td><code>uploads</code>, <code>upload_rows</code></td>
         <td>~5 GB</td>
@@ -2363,11 +2430,11 @@ ORDER BY created_at DESC;</code></pre>
         <td>Request proxying and aggregation</td>
       </tr>
       <tr>
-        <td>Source Systems (OMS, Magento, etc.)</td>
+        <td>Source Systems (any registered source)</td>
         <td>Event Ingestion</td>
         <td>AMQP / HTTP</td>
         <td>Asynchronous</td>
-        <td>Business event delivery</td>
+        <td>Business event delivery; runtime mapping applied per source</td>
       </tr>
       <tr>
         <td>Event Ingestion</td>
@@ -2417,6 +2484,13 @@ ORDER BY created_at DESC;</code></pre>
         <td>HTTP/REST</td>
         <td>Synchronous</td>
         <td>Rule management, notification queries</td>
+      </tr>
+      <tr>
+        <td>Admin Service</td>
+        <td>Event Ingestion</td>
+        <td>HTTP/REST</td>
+        <td>Synchronous</td>
+        <td>Event mapping management (CRUD, test)</td>
       </tr>
       <tr>
         <td>Admin Service</td>

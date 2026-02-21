@@ -12,8 +12,8 @@
     <h1>Notification API</h1>
     <p class="subtitle">Unified Notification Platform — Documentation Hub</p>
     <div class="doc-meta">
-      <span><strong>Version:</strong> 1.0</span>
-      <span><strong>Date:</strong> 2026-02-19</span>
+      <span><strong>Version:</strong> 1.7</span>
+      <span><strong>Date:</strong> 2026-02-20</span>
       <span><strong>Author:</strong> Architecture Team</span>
       <span><strong>Status:</strong> <span class="badge badge-review">In Review</span></span>
     </div>
@@ -21,7 +21,7 @@
 
   <!-- Project Overview Section -->
   <h2 id="overview">Project Overview</h2>
-  <p>The Notification API is a unified event-driven platform designed to consolidate the fragmented notification landscape across our eCommerce ecosystem. Today, customer-facing notifications originate independently from OMS, Magento 2, the Mirakl Marketplace, Chat Commerce workflows, closed/legacy systems, and various manual processes — each with its own delivery logic, templates, and provider integrations. This platform replaces that patchwork with a single, centralized microservices system capable of ingesting events from all source systems — including closed/legacy systems via email ingestion — and orchestrating multi-channel delivery across Email, WhatsApp, SMS, and Push Notifications. The result is a consistent customer communication experience, a self-service backoffice for the operative team, centralized template management with versioning, and a complete audit trail for every notification sent.</p>
+  <p>The Notification API is a unified event-driven platform designed to consolidate the fragmented notification landscape across our eCommerce ecosystem. Today, customer-facing notifications originate independently from multiple source systems — each with its own delivery logic, templates, and provider integrations. This platform replaces that patchwork with a single, centralized microservices system capable of ingesting events from any registered source system via REST webhooks, direct RabbitMQ publishing, or email ingestion — and orchestrating multi-channel delivery across Email, WhatsApp, SMS, and Push Notifications. New source systems are onboarded through runtime mapping configuration in the Admin UI, requiring no code changes. The result is a consistent customer communication experience, a self-service backoffice for the operative team, centralized template management with versioning, and a complete audit trail for every notification sent.</p>
 
   <div class="info-box">
     <strong>Architecture Highlights</strong>
@@ -35,7 +35,7 @@
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 1.5rem 0;">
     <div class="feature-card">
       <h3>Unified Event Ingestion</h3>
-      <p>Consolidates events from OMS, Magento 2, Mirakl Marketplace, Chat Commerce, and closed/legacy systems into a standardized event schema. Source systems publish events via REST API or RabbitMQ, while closed/legacy systems that can only send email are integrated through a dedicated Email Ingest Service that parses incoming emails and generates standardized events. The ingestion layer normalizes, validates, and routes all events downstream.</p>
+      <p>Consolidates events from any registered source system into a standardized canonical event schema (v2.0). Source systems integrate via REST webhooks or direct RabbitMQ publishing, while closed/legacy systems that can only send email are integrated through a dedicated Email Ingest Service. Runtime field mapping configurations — managed through the Admin UI — normalize incoming payloads without code changes. The ingestion layer validates, deduplicates, and routes all events downstream.</p>
     </div>
     <div class="feature-card">
       <h3>Multi-Channel Delivery</h3>
@@ -131,10 +131,15 @@
       <h3>Changelog</h3>
       <p>Documentation and feature change log tracking all notable additions, changes, fixes, and removals across versions.</p>
     </a>
+    <a href="07-event-ingestion-service.html" class="doc-card">
+      <span class="doc-number">07</span>
+      <h3>Event Ingestion Service</h3>
+      <p>Deep-dive into the Event Ingestion Service — generic source integration, runtime mapping configuration, processing pipeline, RabbitMQ topology, REST API, idempotency, and sequence diagrams.</p>
+    </a>
   </div>
 
   <div class="doc-footer">
-    <p>Notification API Documentation v1.0 &bull; Architecture Team &bull; 2026</p>
+    <p>Notification API Documentation v1.7 &bull; Architecture Team &bull; 2026</p>
   </div>
 </div>
 </body>

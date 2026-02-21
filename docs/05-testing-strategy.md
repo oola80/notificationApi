@@ -210,7 +210,7 @@ export default defineConfig({
     ['allure-playwright']
   ],
   use: {
-    baseURL: 'http://localhost:3010',
+    baseURL: 'http://localhost:3159',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',

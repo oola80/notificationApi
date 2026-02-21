@@ -1,17 +1,17 @@
 # Notification API
 
-Unified notification platform for eCommerce — consolidates fragmented notifications from OMS, Magento 2, Mirakl Marketplace, Chat Commerce, and manual processes into a single event-driven microservices system.
+Unified notification platform for eCommerce — consolidates fragmented notifications from multiple source systems into a single event-driven microservices system. Source systems are onboarded dynamically via runtime mapping configuration (no code changes required).
 
 ## Project Status
 
-Design documentation phase. No application code yet — only architecture docs.
+Design documentation phase. Service folders and database scripts scaffolded — no application code yet.
 
 ## Tech Stack (Planned)
 
 - **Backend:** NestJS (TypeScript) microservices
 - **Frontend:** Next.js (Admin backoffice)
 - **Message Broker:** RabbitMQ (AMQP, topic exchanges, dead-letter queues)
-- **Database:** PostgreSQL (database-per-service pattern)
+- **Database:** PostgreSQL (schema-per-service pattern, single database with separate schemas)
 - **Containerization:** Docker / Docker Compose
 - **Notification Providers:** SendGrid (email), Twilio (SMS/WhatsApp), Firebase Cloud Messaging (push)
 
@@ -19,16 +19,49 @@ Design documentation phase. No application code yet — only architecture docs.
 
 | Service | Port | Purpose |
 |---|---|---|
-| notification-gateway | 3000 | BFF / API Gateway (auth, routing, rate limiting) |
-| event-ingestion-service | 3001 | Receives and normalizes events from source systems |
-| notification-engine-service | 3002 | Core orchestrator — rules, recipients, lifecycle |
-| template-service | 3003 | Template CRUD, Handlebars rendering, versioning |
-| channel-router-service | 3004 | Routes to delivery providers, retry/circuit breaker |
-| admin-service | 3005 | Backoffice administration |
-| audit-service | 3006 | Notification tracking, delivery receipts, analytics |
-| email-ingest-service | 3007/2525 | SMTP ingest — receives emails, parses, generates events |
-| bulk-upload-service | 3008 | XLSX bulk upload — parses spreadsheets, submits events |
-| notification-admin-ui | 3010 | Next.js admin frontend |
+| notification-gateway | 3150 | BFF / API Gateway (auth, routing, rate limiting) |
+| event-ingestion-service | 3151 | Receives and normalizes events from source systems via runtime field mappings; assigns priority tier (normal/critical) per mapping config |
+| notification-engine-service | 3152 | Core orchestrator — rules, recipients, lifecycle; priority-aware processing via tiered queues |
+| template-service | 3153 | Template CRUD, Handlebars rendering, versioning |
+| channel-router-service | 3154 | Routes to delivery providers, retry/circuit breaker; priority-tiered delivery queues per channel |
+| admin-service | 3155 | Backoffice administration |
+| audit-service | 3156 | Notification tracking, delivery receipts, analytics |
+| email-ingest-service | 3157/2525 | SMTP ingest — receives emails, parses, generates events |
+| bulk-upload-service | 3158 | XLSX bulk upload — parses spreadsheets, submits events |
+| notification-admin-ui | 3159 | Next.js admin frontend |
+
+### Service Folders
+
+Each microservice has its own folder at the project root.
+
+```
+notification-gateway/           # NestJS — port 3150
+event-ingestion-service/        # NestJS — port 3151
+notification-engine-service/    # NestJS — port 3152
+template-service/               # NestJS — port 3153
+channel-router-service/         # NestJS — port 3154
+admin-service/                  # NestJS — port 3155
+audit-service/                  # NestJS — port 3156
+email-ingest-service/           # NestJS — port 3157/2525
+bulk-upload-service/            # NestJS — port 3158
+notification-admin-ui/          # Next.js — port 3159
+```
+
+### Database Scripts
+
+Each backend service (all except `notification-admin-ui`) contains a `dbscripts/` subfolder with a PostgreSQL schema creation script following the naming convention `schema-{service-name}.sql`. Each script creates the schema, role, user, and grants all necessary privileges (schema-per-service pattern). Schema/role/user names use snake_case derived from the folder name. The `event-ingestion-service` script also creates the `event_mappings` table for runtime field mapping configuration (keyed by `source_id` + `event_type`) with a `priority` column (`normal`/`critical`, default `normal`), the `event_sources` table for registered source system configurations, and the `events` table for storing all ingested events (raw and normalized) with a required `cycle_id` column for business cycle tracking. A `purge_event_payloads()` PL/pgSQL function NULLs out `raw_payload` and `normalized_payload` on rows older than a configurable threshold (default 90 days) for scheduled retention. The `notification-engine-service` script also creates the `customer_channel_preferences` table for per-customer per-channel opt-in/opt-out preferences (keyed by `customer_id`, FILLFACTOR 90, with autovacuum tuning) and the `critical_channel_overrides` table for configurable forced-channel rules per event type (UUID PK, partial index on active overrides).
+
+| Service Folder | Schema | Role | User |
+|---|---|---|---|
+| notification-gateway | `notification_gateway` | `notification_gateway_user_role` | `notification_gateway_user` |
+| event-ingestion-service | `event_ingestion_service` | `event_ingestion_service_user_role` | `event_ingestion_service_user` |
+| notification-engine-service | `notification_engine_service` | `notification_engine_service_user_role` | `notification_engine_service_user` |
+| template-service | `template_service` | `template_service_user_role` | `template_service_user` |
+| channel-router-service | `channel_router_service` | `channel_router_service_user_role` | `channel_router_service_user` |
+| admin-service | `admin_service` | `admin_service_user_role` | `admin_service_user` |
+| audit-service | `audit_service` | `audit_service_user_role` | `audit_service_user` |
+| email-ingest-service | `email_ingest_service` | `email_ingest_service_user_role` | `email_ingest_service_user` |
+| bulk-upload-service | `bulk_upload_service` | `bulk_upload_service_user_role` | `bulk_upload_service_user` |
 
 ## Documentation
 
@@ -44,6 +77,8 @@ docs/
   04-authentication-identity.html / .md  # Auth flows, SAML SSO, JWT sessions, account linking
   05-testing-strategy.html / .md    # Jest, Playwright, Allure reporting, CI/CD gates
   06-changelog.html / .md           # Documentation & feature change log
+  07-event-ingestion-service.html / .md  # Event Ingestion Service detailed spec
+  08-notification-engine-service.md      # Notification Engine Service detailed spec
 ```
 
 ### HTML docs
@@ -65,4 +100,5 @@ docs/
 - CSS color palette primary: #0052CC, text: #172B4D, success: #00875A, warning: #FF991F, error: #FF5630
 - All HTML docs include nav bar with active page highlighted; index.html has no nav
 - Tables use blue headers (#0052CC bg, white text)
-- Every documentation or feature change must include a corresponding entry in `docs/06-changelog.html` and `docs/06-changelog.md`
+- Every documentation or feature change must include a corresponding entry in `docs/06-changelog.md` (and `docs/06-changelog.html` only when HTML updates are explicitly requested)
+- **Only modify `.md` files** when making documentation changes. Do NOT modify `.html` files unless explicitly asked to do so.

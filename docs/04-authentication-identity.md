@@ -33,7 +33,7 @@ The Notification API platform supports two authentication methods for admin user
 | Aspect | Local Authentication | SAML 2.0 SSO (Azure AD) |
 |---|---|---|
 | **Identity Source** | Platform's own `admin_users` table | Azure Active Directory |
-| **Credential Storage** | bcrypt-hashed passwords in `admin_db` | No passwords stored — delegated to IdP |
+| **Credential Storage** | bcrypt-hashed passwords in `admin_service` schema | No passwords stored — delegated to IdP |
 | **Login Flow** | POST email/password to `/api/v1/auth/login` | SP-initiated redirect to Azure AD |
 | **Session Token** | JWT (RS256) issued by platform | JWT (RS256) issued by platform after SAML assertion validation |
 | **MFA** | Not included in Phase 1 (upgrade path available) | Enforced by Azure AD policies |
@@ -251,7 +251,7 @@ Azure AD claims from the SAML assertion are mapped to local user fields:
 
 ## 6. Database Schema Additions
 
-Three new tables are added to `admin_db` to support SAML SSO. These extend the existing `admin_users`, `admin_roles`, and `admin_permissions` tables already defined in the [Admin Service specification](02-detailed-microservices.md#7-admin-service).
+Three new tables are added to the `admin_service` schema to support SAML SSO. These extend the existing `admin_users`, `admin_roles`, and `admin_permissions` tables already defined in the [Admin Service specification](02-detailed-microservices.md#7-admin-service).
 
 ### 6.1 `saml_identity_providers`
 

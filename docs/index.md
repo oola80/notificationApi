@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Version:** | 1.0 |
-| **Date:** | 2026-02-19 |
+| **Version:** | 1.7 |
+| **Date:** | 2026-02-20 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
 
@@ -13,7 +13,7 @@
 
 ## Project Overview
 
-The Notification API is a unified event-driven platform designed to consolidate the fragmented notification landscape across our eCommerce ecosystem. Today, customer-facing notifications originate independently from OMS, Magento 2, the Mirakl Marketplace, Chat Commerce workflows, closed/legacy systems, and various manual processes — each with its own delivery logic, templates, and provider integrations. This platform replaces that patchwork with a single, centralized microservices system capable of ingesting events from all source systems — including closed/legacy systems via email ingestion — and orchestrating multi-channel delivery across Email, WhatsApp, SMS, and Push Notifications. The result is a consistent customer communication experience, a self-service backoffice for the operative team, centralized template management with versioning, and a complete audit trail for every notification sent.
+The Notification API is a unified event-driven platform designed to consolidate the fragmented notification landscape across our eCommerce ecosystem. Today, customer-facing notifications originate independently from multiple source systems — each with its own delivery logic, templates, and provider integrations. This platform replaces that patchwork with a single, centralized microservices system capable of ingesting events from any registered source system via REST webhooks, direct RabbitMQ publishing, or email ingestion — and orchestrating multi-channel delivery across Email, WhatsApp, SMS, and Push Notifications. New source systems are onboarded through runtime mapping configuration in the Admin UI, requiring no code changes. The result is a consistent customer communication experience, a self-service backoffice for the operative team, centralized template management with versioning, and a complete audit trail for every notification sent.
 
 > **Info:** **Architecture Highlights**
 >
@@ -27,7 +27,7 @@ The platform delivers six core capabilities that together provide end-to-end not
 
 ### Unified Event Ingestion
 
-Consolidates events from OMS, Magento 2, Mirakl Marketplace, Chat Commerce, and closed/legacy systems into a standardized event schema. Source systems publish events via REST API or RabbitMQ, while closed/legacy systems that can only send email are integrated through a dedicated Email Ingest Service that parses incoming emails and generates standardized events. The ingestion layer normalizes, validates, and routes all events downstream.
+Consolidates events from any registered source system into a standardized canonical event schema (v2.0). Source systems integrate via REST webhooks or direct RabbitMQ publishing, while closed/legacy systems that can only send email are integrated through a dedicated Email Ingest Service. Runtime field mapping configurations — managed through the Admin UI — normalize incoming payloads without code changes. The ingestion layer validates, deduplicates, and routes all events downstream.
 
 ### Multi-Channel Delivery
 
@@ -104,6 +104,18 @@ Documentation and feature change log tracking all notable additions, changes, fi
 
 [Read Changelog](06-changelog.md)
 
+### 07 — Event Ingestion Service
+
+Deep-dive into the Event Ingestion Service — generic source integration, runtime mapping configuration, processing pipeline, RabbitMQ topology, REST API, idempotency, and sequence diagrams.
+
+[Read Event Ingestion Service](07-event-ingestion-service.md)
+
+### 08 — Notification Engine Service
+
+Deep-dive into the Notification Engine Service — rule engine with condition operators, recipient resolution, suppression query optimization, template rendering coordination, priority management, RabbitMQ topology, REST API, database design with FILLFACTOR and VACUUM tuning, notification lifecycle state machine, sequence diagrams, horizontal scalability, rule caching, asynchronous status logging, and performance strategies.
+
+[Read Notification Engine Service](08-notification-engine-service.md)
+
 ---
 
-*Notification API Documentation v1.0 -- Architecture Team -- 2026*
+*Notification API Documentation v1.7 -- Architecture Team -- 2026*

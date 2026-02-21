@@ -59,29 +59,33 @@ The following diagram illustrates the complete system topology, showing how sour
  +-----------------+       +----------------+       +--------------+       +------------------+       +--------------+
  | Source Systems  |       | Event          |       |              |       | Notification     |       | Channel      |
  |                 | ----> | Ingestion      | ----> |  RabbitMQ    | ----> | Engine           | ----> | Router       |
- | - OMS           |       | Normalize &    |       |  Exchanges   |       | Rules &          |       | Route &      |
- | - Magento 2     |       | Validate       |       |  & Queues    |       | Orchestration    |       | Deliver      |
- | - Mirakl        |       | REST + RabbitMQ|       |  Message     |       | Recipient        |       | Retry &      |
- | - Chat Commerce |       |                |       |  Broker      |       | Resolution       |       | Circuit      |
- | - Manual        |       | [event_        |       |              |       |                  |       | Breaker      |
- |   (Admin UI)    |       |  ingestion_db] |       |              |       | [notification_   |       |              |
- | - Closed/Legacy |       +----------------+       +--------------+       |  engine_db]      |       | [channel_    |
- +-----------------+                                      ^                +------------------+       |  router_db]  |
+ | - Source A      |       | Normalize &    |       |  Exchanges   |       | Rules &          |       | Route &      |
+ |   (AMQP)       |       | Validate       |       |  & Queues    |       | Orchestration    |       | Deliver      |
+ | - Source B      |       | REST + RabbitMQ|       |  Message     |       | Recipient        |       | Retry &      |
+ |   (Webhook)    |       |                |       |  Broker      |       | Resolution       |       | Circuit      |
+ | - Source N      |       | [event_        |       |              |       |                  |       | Breaker      |
+ |   (...)         |       |  ingestion_    |       |              |       | [notification_   |       |              |
+ | - Manual        |       |  service]      |       |              |       |  engine_         |       | [channel_    |
+ |   (Admin UI)    |       +----------------+       +--------------+       |  service]        |       |  router_     |
+ +-----------------+                                      ^                +------------------+       |  service]    |
+                                                          |                                           +--------------+
         |                                                 |
         | (SMTP)       +----------------+                 |
         +- - - - - - > | Email Ingest   | - - - - - - - - +
                        | SMTP :2525     |  (publishes to events.incoming)
-                       | REST :3007     |
+                       | REST :3157     |
                        | [email_        |
-                       |  ingest_db]    |
+                       |  ingest_       |
+                       |  service]      |
                        +----------------+
 
                        +----------------+
                        | Bulk Upload    |-----(HTTP POST)----> Event Ingestion
                        | XLSX Parse     |                      POST /webhooks/events
-                       | Port 3008      |
+                       | Port 3158      |
                        | [bulk_         |
-                       |  upload_db]    |
+                       |  upload_       |
+                       |  service]      |
                        +----------------+
                                                           |                        ^                  +--------------+
                                                           |                        |                        |
@@ -99,12 +103,12 @@ The following diagram illustrates the complete system topology, showing how sour
  +-----------------+       +----------------+       +----------------+
  | Admin UI        | ----> | Gateway (BFF)  | ----> | Admin Service  |
  | (Next.js)       |       | Auth, Routing  |       | Rules, Config  |
- | Port 3010       |       | Port 3000      |       | Port 3005      |
+ | Port 3159       |       | Port 3150      |       | Port 3155      |
  +-----------------+       +----------------+       +----------------+
                                                                            +----------------+
                                                                            | Audit Service  |
                                                                            | Tracking       |
-                                                                           | Port 3006      |
+                                                                           | Port 3156      |
                                                                            +----------------+
 
  Legend:
@@ -129,18 +133,18 @@ The system is organized into five distinct layers, each with a specific responsi
 |  EDGE LAYER                                                                            |
 |  +---------------------+  +----------------------------+  +---------------------+      |
 |  | Admin UI             |  | Notification Gateway       |  | External Webhooks   |      |
-|  | (Next.js :3010)      |  | (BFF :3000)                |  |                     |      |
+|  | (Next.js :3159)      |  | (BFF :3150)                |  |                     |      |
 |  +---------------------+  +----------------------------+  +---------------------+      |
 +========================================================================================+
 |  COMPUTE LAYER                                                                         |
 |  +---------------+ +------------------+ +---------------+ +---------------+             |
 |  | Event         | | Notification     | | Template      | | Channel       |             |
 |  | Ingestion     | | Engine           | | Service       | | Router        |             |
-|  | :3001         | | :3002            | | :3003         | | :3004         |             |
+|  | :3151         | | :3152            | | :3153         | | :3154         |             |
 |  +---------------+ +------------------+ +---------------+ +---------------+             |
 |  +---------------+ +---------------+ +--------------------+ +---------------+          |
 |  | Admin Service | | Audit Service | | Email Ingest       | | Bulk Upload   |          |
-|  | :3005         | | :3006         | | :3007/2525         | | :3008         |          |
+|  | :3155         | | :3156         | | :3157/2525         | | :3158         |          |
 |  +---------------+ +---------------+ +--------------------+ +---------------+          |
 +========================================================================================+
 |  MESSAGE LAYER                                                                         |
@@ -150,16 +154,21 @@ The system is organized into five distinct layers, each with a specific responsi
 |  +--------------------------------------------------------------------------------+   |
 +========================================================================================+
 |  DATA LAYER                                                                            |
-|  +-----------------+ +--------------------+ +------------+ +-----------------+         |
-|  | event_          | | notification_      | | template_  | | channel_        |         |
-|  | ingestion_db    | | engine_db          | | db         | | router_db       |         |
-|  +-----------------+ +--------------------+ +------------+ +-----------------+         |
-|  +------------+ +------------+ +------------------+ +----------------+                 |
-|  | admin_db   | | audit_db   | | email_ingest_db  | | bulk_upload_db |                 |
-|  +------------+ +------------+ +------------------+ +----------------+                 |
+|  +---------------------+ +---------------------+ +-----------------+ +-----------------+  |
+|  | event_ingestion_    | | notification_       | | template_       | | channel_router_ |  |
+|  | service             | | engine_service      | | service         | | service         |  |
+|  +---------------------+ +---------------------+ +-----------------+ +-----------------+  |
+|  +---------------------+ +-----------------+ +-----------------+ +-------------------+    |
+|  | notification_       | | admin_          | | audit_          | | email_ingest_     |    |
+|  | gateway             | | service         | | service         | | service           |    |
+|  +---------------------+ +-----------------+ +-----------------+ +-------------------+    |
+|  +------------------+                                                                     |
+|  | bulk_upload_     |                                                                     |
+|  | service          |                                                                     |
+|  +------------------+                                                                     |
 +========================================================================================+
 |  EXTERNAL INTEGRATION LAYER                                                            |
-|  SendGrid (Email)   Twilio (SMS/WhatsApp)   Firebase (Push)   OMS / Magento / Mirakl  |
+|  SendGrid (Email)   Twilio (SMS/WhatsApp)   Firebase (Push)   Source Systems (AMQP/HTTP) |
 +========================================================================================+
 ```
 
@@ -170,8 +179,8 @@ The system is organized into five distinct layers, each with a specific responsi
 | **[Edge]** | Client-facing API surface. Authentication, authorization, rate limiting, request validation, and routing. | notification-admin-ui, notification-gateway | Horizontal — stateless, load-balanced |
 | **[Compute]** | Core business logic. Event normalization, rule evaluation, template rendering, channel routing, administration, and audit recording. | event-ingestion, notification-engine, template-service, channel-router, admin-service, audit-service, email-ingest-service, bulk-upload-service | Horizontal — independent per service |
 | **[Message]** | Asynchronous inter-service communication. Event fan-out, delivery queue management, dead-letter handling. | RabbitMQ (6 exchanges, multiple queues) | Clustered — mirrored queues |
-| **[Data]** | Persistent storage. Each service owns its database with full schema control. | 8 PostgreSQL databases | Vertical + read replicas |
-| **[External]** | Third-party provider integrations and source system connections. | SendGrid, Twilio, FCM, OMS, Magento, Mirakl | Provider-managed |
+| **[Data]** | Persistent storage. Each service owns its database with full schema control. | 9 PostgreSQL schemas | Vertical + read replicas |
+| **[External]** | Third-party provider integrations and source system connections. | SendGrid, Twilio, FCM, registered source systems | Provider-managed |
 
 ---
 
@@ -183,9 +192,10 @@ The notification lifecycle follows a sequential event-driven flow from source sy
   (1) Source System         (2) RabbitMQ / Webhook       (3) Event Ingestion
       Emits Event               Received                     Normalizes
   +-------------------+    +----------------------+    +----------------------+
-  | e.g. order.shipped| -> | events.incoming      | -> | Canonical schema,    |
-  | from OMS          |    | exchange              |    | validation           |
-  +-------------------+    +----------------------+    +----------------------+
+  | e.g. order.shipped| -> | events.incoming      | -> | Mapping lookup,      |
+  | from any source   |    | exchange              |    | normalize via        |
+  +-------------------+    +----------------------+    | mapping engine       |
+                                                       +----------------------+
                                                                   |
                                                                   v
   (6) Resolve              (5) Engine Matches           (4) Publish to Normalized
@@ -213,7 +223,7 @@ The notification lifecycle follows a sequential event-driven flow from source sy
   Step Summary:
   1. Source system publishes business event
   2. Event arrives via RabbitMQ or webhook
-  3. Ingestion service normalizes to canonical schema
+  3. Ingestion service looks up runtime mapping and normalizes via mapping engine
   4. Normalized event published to internal exchange
   5. Engine evaluates notification rules
   6. Recipients resolved from rules and preferences
@@ -239,9 +249,9 @@ RabbitMQ is the backbone of the asynchronous communication layer. The exchange a
 | Exchange | Type | Purpose | Routing Key Pattern |
 |---|---|---|---|
 | `events.incoming` | Topic | Raw events from source systems | `source.{system}.{eventType}` |
-| `events.normalized` | Topic | Normalized canonical events | `event.{eventType}` |
+| `events.normalized` | Topic | Normalized canonical events with priority tier | `event.{priority}.{eventType}` |
 | `notifications.render` | Topic | Template render requests | `render.{channel}` |
-| `notifications.deliver` | Topic | Delivery requests per channel | `deliver.{channel}` |
+| `notifications.deliver` | Topic | Delivery requests per channel with priority tier | `deliver.{priority}.{channel}` |
 | `notifications.status` | Topic | Delivery status updates | `status.{notificationId}` |
 | `notifications.dlq` | Fanout | Dead-letter queue for failed messages | N/A (fanout) |
 
@@ -249,16 +259,19 @@ RabbitMQ is the backbone of the asynchronous communication layer. The exchange a
 
 | Queue | Bound Exchange | Routing Key | Consumer Service | DLQ |
 |---|---|---|---|---|
-| `q.events.oms` | events.incoming | `source.oms.#` | event-ingestion-service | Yes |
-| `q.events.magento` | events.incoming | `source.magento.#` | event-ingestion-service | Yes |
-| `q.events.mirakl` | events.incoming | `source.mirakl.#` | event-ingestion-service | Yes |
-| `q.events.chat` | events.incoming | `source.chat.#` | event-ingestion-service | Yes |
+| `q.events.amqp` | events.incoming | `source.*.#` | event-ingestion-service | Yes |
+| `q.events.webhook` | events.incoming | `source.webhook.#` | event-ingestion-service | Yes |
 | `q.events.email-ingest` | events.incoming | `source.email-ingest.#` | event-ingestion-service | Yes |
-| `q.events.normalized` | events.normalized | `event.#` | notification-engine-service | Yes |
-| `q.deliver.email` | notifications.deliver | `deliver.email` | channel-router-service | Yes |
-| `q.deliver.sms` | notifications.deliver | `deliver.sms` | channel-router-service | Yes |
-| `q.deliver.whatsapp` | notifications.deliver | `deliver.whatsapp` | channel-router-service | Yes |
-| `q.deliver.push` | notifications.deliver | `deliver.push` | channel-router-service | Yes |
+| `q.engine.events.critical` | events.normalized | `event.critical.#` | notification-engine-service (4 consumers) | Yes |
+| `q.engine.events.normal` | events.normalized | `event.normal.#` | notification-engine-service (2 consumers) | Yes |
+| `q.deliver.email.critical` | notifications.deliver | `deliver.critical.email` | channel-router-service (3 consumers) | Yes |
+| `q.deliver.email.normal` | notifications.deliver | `deliver.normal.email` | channel-router-service (2 consumers) | Yes |
+| `q.deliver.sms.critical` | notifications.deliver | `deliver.critical.sms` | channel-router-service (2 consumers) | Yes |
+| `q.deliver.sms.normal` | notifications.deliver | `deliver.normal.sms` | channel-router-service (1 consumer) | Yes |
+| `q.deliver.whatsapp.critical` | notifications.deliver | `deliver.critical.whatsapp` | channel-router-service (2 consumers) | Yes |
+| `q.deliver.whatsapp.normal` | notifications.deliver | `deliver.normal.whatsapp` | channel-router-service (1 consumer) | Yes |
+| `q.deliver.push.critical` | notifications.deliver | `deliver.critical.push` | channel-router-service (2 consumers) | Yes |
+| `q.deliver.push.normal` | notifications.deliver | `deliver.normal.push` | channel-router-service (1 consumer) | Yes |
 | `q.status.updates` | notifications.status | `status.#` | audit-service | Yes |
 | `q.dlq` | notifications.dlq | N/A | Manual review / reprocessing | No |
 
@@ -270,21 +283,22 @@ RabbitMQ is the backbone of the asynchronous communication layer. The exchange a
 
 The platform follows the **database-per-service** pattern. Each microservice owns and manages its own PostgreSQL database, ensuring data isolation, independent schema evolution, and no cross-service data coupling.
 
-| Database | Owner Service | Key Tables | Est. Size (Year 1) |
+| Schema | Owner Service | Key Tables | Est. Size (Year 1) |
 |---|---|---|---|
-| `event_ingestion_db` | event-ingestion-service | events, event_sources, event_schemas | ~50 GB |
-| `notification_engine_db` | notification-engine-service | notification_rules, notifications, notification_recipients, notification_status_log, recipient_groups, recipient_preferences | ~80 GB |
-| `template_db` | template-service | templates, template_versions, template_variables, template_channels | ~1 GB |
-| `channel_router_db` | channel-router-service | channels, channel_configs, delivery_attempts, provider_configs | ~30 GB |
-| `admin_db` | admin-service | admin_users, admin_roles, admin_permissions, system_configs | ~500 MB |
-| `audit_db` | audit-service | audit_events, delivery_receipts, notification_analytics | ~100 GB |
-| `email_ingest_db` | email-ingest-service | email_parsing_rules, processed_emails, email_sources | ~20 GB |
-| `bulk_upload_db` | bulk-upload-service | uploads, upload_rows | ~5 GB |
+| `notification_gateway` | notification-gateway | api_keys, rate_limits, sessions | ~500 MB |
+| `event_ingestion_service` | event-ingestion-service | events, event_sources, event_mappings | ~50 GB |
+| `notification_engine_service` | notification-engine-service | notification_rules, notifications, notification_recipients, notification_status_log, recipient_groups, recipient_preferences | ~80 GB |
+| `template_service` | template-service | templates, template_versions, template_variables, template_channels | ~1 GB |
+| `channel_router_service` | channel-router-service | channels, channel_configs, delivery_attempts, provider_configs | ~30 GB |
+| `admin_service` | admin-service | admin_users, admin_roles, admin_permissions, system_configs | ~500 MB |
+| `audit_service` | audit-service | audit_events, delivery_receipts, notification_analytics | ~100 GB |
+| `email_ingest_service` | email-ingest-service | email_parsing_rules, processed_emails, email_sources | ~20 GB |
+| `bulk_upload_service` | bulk-upload-service | uploads, upload_rows | ~5 GB |
 
-### 6.1 Core Entity Relationships (notification_engine_db)
+### 6.1 Core Entity Relationships (notification_engine_service)
 
 ```
-  notification_engine_db — Entity Relationships
+  notification_engine_service — Entity Relationships
 
   +-------------------------+        1:N        +---------------------------+        1:N        +---------------------------+
   | notification_rules      | ----------------> | notifications             | ----------------> | notification_recipients   |
@@ -311,9 +325,11 @@ The platform follows the **database-per-service** pattern. Each microservice own
                                                                                     +---------------------------+
 ```
 
-*Figure 6.1 — Core entity relationships in the notification_engine_db showing rules, notifications, recipients, and status tracking.*
+*Figure 6.1 — Core entity relationships in the notification_engine_service showing rules, notifications, recipients, and status tracking.*
 
 > **Info:** **Data Isolation:** Services never query another service's database directly. If the Admin Service needs notification delivery data, it queries the Audit Service via REST API. This ensures each service can independently evolve its schema, apply migrations, and optimize queries without affecting others.
+
+> **Deep-Dive Available:** For the complete notification_engine_service database design — including full column specifications, FILLFACTOR configuration, VACUUM tuning, index strategies (partial suppression index, covering indexes), growth estimates, and data retention policies — see [08 — Notification Engine Service Deep-Dive §12](08-notification-engine-service.md#12-database-design).
 
 ---
 
@@ -403,6 +419,7 @@ Security is implemented at multiple layers: API gateway authentication, role-bas
 | **Health Checks** | All services | Each service exposes `/health` and `/ready` endpoints for liveness and readiness probes. |
 | **Rate Limiting** | Gateway (inbound) | Configurable rate limits per API key / user to prevent abuse and protect backend services from traffic spikes. |
 | **Idempotency** | Event Ingestion | Duplicate events are detected via `eventId` deduplication, ensuring each event is processed exactly once. |
+| **Priority-Based Processing** | Event Ingestion → Engine → Channel Router | Events are classified as `normal` or `critical` at ingestion time (per mapping configuration). Separate RabbitMQ queues per priority tier ensure critical notifications (e.g., delivery delays, payment failures) are processed before normal notifications (e.g., promotions) during backpressure. More consumers are allocated to critical-tier queues. |
 
 > **Success:** **Scalability Benefits:** During peak events like flash sales, only the Channel Router and Notification Engine need to scale out. The Template Service, Admin Service, and Audit Service can remain at baseline capacity — optimizing infrastructure costs while handling traffic spikes reliably.
 
@@ -414,16 +431,16 @@ All services are containerized with Docker and orchestrated locally via Docker C
 
 | Container | Image | Port | Depends On |
 |---|---|---|---|
-| notification-admin-ui | notification-admin-ui:latest | 3010 | notification-gateway |
-| notification-gateway | notification-gateway:latest | 3000 | rabbitmq, all backend services |
-| event-ingestion-service | event-ingestion:latest | 3001 | rabbitmq, postgresql |
-| notification-engine-service | notification-engine:latest | 3002 | rabbitmq, postgresql, template-service |
-| template-service | template-service:latest | 3003 | postgresql |
-| channel-router-service | channel-router:latest | 3004 | rabbitmq, postgresql |
-| admin-service | admin-service:latest | 3005 | postgresql |
-| audit-service | audit-service:latest | 3006 | rabbitmq, postgresql |
-| email-ingest-service | email-ingest:latest | 3007 / 2525 | rabbitmq, postgresql |
-| bulk-upload-service | bulk-upload:latest | 3008 | postgresql, event-ingestion-service |
+| notification-admin-ui | notification-admin-ui:latest | 3159 | notification-gateway |
+| notification-gateway | notification-gateway:latest | 3150 | rabbitmq, all backend services |
+| event-ingestion-service | event-ingestion:latest | 3151 | rabbitmq, postgresql |
+| notification-engine-service | notification-engine:latest | 3152 | rabbitmq, postgresql, template-service |
+| template-service | template-service:latest | 3153 | postgresql |
+| channel-router-service | channel-router:latest | 3154 | rabbitmq, postgresql |
+| admin-service | admin-service:latest | 3155 | postgresql |
+| audit-service | audit-service:latest | 3156 | rabbitmq, postgresql |
+| email-ingest-service | email-ingest:latest | 3157 / 2525 | rabbitmq, postgresql |
+| bulk-upload-service | bulk-upload:latest | 3158 | postgresql, event-ingestion-service |
 | rabbitmq | rabbitmq:3-management | 5672 / 15672 | — |
 | postgresql | postgres:16-alpine | 5432 | — |
 
@@ -450,15 +467,13 @@ Each source system integrates with the Notification API through the most appropr
 
 | Source System | Integration Method | Event Types | Data Format |
 |---|---|---|---|
-| **OMS** (In-house) | Direct RabbitMQ publishing to `events.incoming` exchange | order.created, order.confirmed, order.shipped, order.delivered, order.cancelled | JSON (custom schema, normalized by ingestion) |
-| **Magento 2** | Webhook via REST API to `POST /webhooks/events` | order.placed, payment.received, payment.failed, shipment.created, refund.processed | JSON (Magento webhook payload, normalized by ingestion) |
-| **Mirakl Marketplace** | Webhook via REST API to `POST /webhooks/events` | marketplace.order.accepted, marketplace.order.shipped, marketplace.refund | JSON (Mirakl webhook payload, normalized by ingestion) |
-| **Chat Commerce** | RabbitMQ publishing to `events.incoming` exchange | chat.order.created, chat.support.escalated, chat.promotion.sent | JSON (custom schema, normalized by ingestion) |
+| **Any Source (AMQP)** | Direct RabbitMQ publish to `events.incoming` exchange | Any event type (defined by source mapping configuration) | JSON (source-specific schema, normalized by mapping engine) |
+| **Any Source (Webhook)** | HTTP POST to `POST /webhooks/events` | Any event type (defined by source mapping configuration) | JSON (source-specific payload, normalized by mapping engine) |
 | **Manual (Admin UI)** | REST API via Gateway: `POST /api/v1/notifications/send` | manual.notification (custom event type and payload) | JSON (admin-defined payload) |
-| **Closed/Legacy Systems** | SMTP email to Email Ingest Service (`:2525`) | Configurable via parsing rules (e.g., order.confirmed, inventory.updated) | Email (HTML/text body, parsed via regex extraction rules) |
+| **Email Ingest** | SMTP email to Email Ingest Service (`:2525`) | Configurable via parsing rules (e.g., order.confirmed, inventory.updated) | Email (HTML/text body, parsed via regex extraction rules) |
 | **Bulk Upload (Admin UI)** | XLSX file upload via Admin UI → Gateway → Bulk Upload Service → HTTP POST to Event Ingestion (`POST /webhooks/events`) | Any event type (defined per row via `eventType` column) | XLSX (column headers map to payload fields, parsed by `exceljs`) |
 
-> **Info:** **Adapter Pattern:** The Event Ingestion Service uses pluggable adapters for each source system. Each adapter knows how to parse the source-specific event format and map it to the canonical event schema. Adding a new source system requires only implementing a new adapter — no changes to downstream services.
+> **Info:** **Runtime Mapping Engine:** The Event Ingestion Service uses a runtime mapping engine to normalize events from any source system. Mapping configurations are stored in the database and define how each source's event format maps to the canonical event schema. Adding a new source system requires only creating a new mapping configuration — no code changes or redeployment needed.
 
 > **Warning:** **Webhook Security:** All webhook endpoints require API key authentication and HMAC-SHA256 payload signing. Source systems must register their API key and signing secret through the Admin Service before sending events. Unsigned or improperly authenticated webhook requests are rejected with a `401 Unauthorized` response.
 

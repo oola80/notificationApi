@@ -24,7 +24,7 @@
 9. [Email Ingest Service](#9-email-ingest-service)
 10. [Bulk Upload Service](#10-bulk-upload-service)
 11. [Notification Admin UI (Frontend)](#11-notification-admin-ui-frontend)
-12. [Database Schema Overview](#12-database-schema-overview)
+12. [Schema Overview](#12-schema-overview)
 13. [Inter-Service Communication](#13-inter-service-communication)
 14. [Security Considerations](#14-security-considerations)
 
@@ -32,22 +32,22 @@
 
 ## 1. Microservices Overview
 
-The Notification API platform is composed of nine backend services, one frontend application, and a shared messaging backbone built on RabbitMQ. Each microservice is independently deployable, owns its own PostgreSQL database (where applicable), and communicates through well-defined synchronous (HTTP/REST) or asynchronous (AMQP) interfaces. This architecture enables the team to develop, test, scale, and deploy each service independently while maintaining clear ownership boundaries.
+The Notification API platform is composed of nine backend services, one frontend application, and a shared messaging backbone built on RabbitMQ. Each microservice is independently deployable, owns its own PostgreSQL schema (where applicable), and communicates through well-defined synchronous (HTTP/REST) or asynchronous (AMQP) interfaces. This architecture enables the team to develop, test, scale, and deploy each service independently while maintaining clear ownership boundaries.
 
 The following table provides a high-level summary of every service in the ecosystem. Detailed specifications for each service follow in subsequent sections.
 
-| Service Name | Port | Database | Key Responsibility | Dependencies |
+| Service Name | Port | Schema | Key Responsibility | Dependencies |
 |---|---|---|---|---|
-| **Notification Gateway** | `3000` | None (stateless) | BFF / API Gateway — auth, validation, routing | All internal services |
-| **Event Ingestion** | `3001` | `event_ingestion_db` | Receive & normalize events from source systems | RabbitMQ |
-| **Notification Engine** | `3002` | `notification_engine_db` | Rule matching, orchestration, lifecycle management | Event Ingestion, Template Service, Channel Router, RabbitMQ |
-| **Template Service** | `3003` | `template_db` | Template CRUD, rendering with Handlebars | PostgreSQL |
-| **Channel Router** | `3004` | `channel_router_db` | Route to delivery providers (SendGrid, Twilio, Firebase) | External providers, RabbitMQ |
-| **Admin Service** | `3005` | `admin_db` | Backoffice administration, user & rule management | Notification Engine, Template Service, Channel Router |
-| **Audit Service** | `3006` | `audit_db` | Event sourcing, delivery tracking, compliance logging | RabbitMQ (all status exchanges) |
-| **Email Ingest** | `3007` / `2525` | `email_ingest_db` | SMTP ingest — receive emails, parse against rules, generate events | RabbitMQ, PostgreSQL |
-| **Bulk Upload** | `3008` | `bulk_upload_db` | XLSX file upload — parse rows into event payloads, submit to Event Ingestion | Event Ingestion Service |
-| **Notification Admin UI** | `3010` | None | Next.js backoffice for the operative team | Notification Gateway (BFF) |
+| **Notification Gateway** | `3150` | `notification_gateway` | BFF / API Gateway — auth, validation, routing | All internal services |
+| **Event Ingestion** | `3151` | `event_ingestion_service` | Receive & normalize events from source systems | RabbitMQ |
+| **Notification Engine** | `3152` | `notification_engine_service` | Rule matching, orchestration, lifecycle management | Event Ingestion, Template Service, Channel Router, RabbitMQ |
+| **Template Service** | `3153` | `template_service` | Template CRUD, rendering with Handlebars | PostgreSQL |
+| **Channel Router** | `3154` | `channel_router_service` | Route to delivery providers (SendGrid, Twilio, Firebase) | External providers, RabbitMQ |
+| **Admin Service** | `3155` | `admin_service` | Backoffice administration, user & rule management | Notification Engine, Template Service, Channel Router |
+| **Audit Service** | `3156` | `audit_service` | Event sourcing, delivery tracking, compliance logging | RabbitMQ (all status exchanges) |
+| **Email Ingest** | `3157` / `2525` | `email_ingest_service` | SMTP ingest — receive emails, parse against rules, generate events | RabbitMQ, PostgreSQL |
+| **Bulk Upload** | `3158` | `bulk_upload_service` | XLSX file upload — parse rows into event payloads, submit to Event Ingestion | Event Ingestion Service |
+| **Notification Admin UI** | `3159` | None | Next.js backoffice for the operative team | Notification Gateway (BFF) |
 
 ---
 
@@ -60,8 +60,8 @@ The Notification Gateway acts as the Backend-for-Frontend (BFF) and API Gateway 
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS |
-| **Port** | `3000` |
-| **Database** | None (stateless proxy) |
+| **Port** | `3150` |
+| **Schema** | `notification_gateway` |
 | **Dependencies** | All internal microservices |
 
 ### Responsibilities
@@ -125,7 +125,7 @@ The Notification Gateway acts as the Backend-for-Frontend (BFF) and API Gateway 
 **GET** `/api/v1/auth/saml/metadata` — Returns the SAML Service Provider metadata XML document for configuring trust in the Identity Provider.
 
 > **Note:** **Authentication Strategy**
-> The gateway uses a two-tier authentication model. Admin users authenticate via local credentials (email/password) or SAML 2.0 SSO with Azure AD — both methods issue platform-managed JWT tokens (short-lived access tokens with refresh token rotation). External system integrations (OMS, Magento, etc.) authenticate using API keys passed in the `X-API-Key` header. API keys are scoped to specific endpoints and rate-limited independently. All tokens and keys are validated on every request before proxying to internal services. Internal service-to-service calls bypass the gateway and use mutual TLS or shared secrets. See [04 — Authentication & Identity](04-authentication-identity.md) for the complete authentication design.
+> The gateway uses a two-tier authentication model. Admin users authenticate via local credentials (email/password) or SAML 2.0 SSO with Azure AD — both methods issue platform-managed JWT tokens (short-lived access tokens with refresh token rotation). External source system integrations authenticate using API keys passed in the `X-API-Key` header. API keys are scoped to specific endpoints and rate-limited independently. All tokens and keys are validated on every request before proxying to internal services. Internal service-to-service calls bypass the gateway and use mutual TLS or shared secrets. See [04 — Authentication & Identity](04-authentication-identity.md) for the complete authentication design.
 
 ---
 
@@ -133,22 +133,22 @@ The Notification Gateway acts as the Backend-for-Frontend (BFF) and API Gateway 
 
 ### Purpose
 
-The Event Ingestion Service is the universal entry point for all business events that may trigger notifications. It receives events from five distinct source systems — OMS (in-house order management), Magento 2 (eCommerce platform), Mirakl Marketplace, Chat Commerce, and manual triggers — normalizes them into a canonical event schema, and publishes them to the internal RabbitMQ exchange for downstream processing.
+The Event Ingestion Service is the universal entry point for all business events that may trigger notifications. It receives events from any registered source system, normalizes them into a canonical event schema using runtime field mapping configurations, and publishes them to the internal RabbitMQ exchange for downstream processing. Source systems are registered dynamically through the Admin UI — no code changes are required to onboard a new event source.
 
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS with RabbitMQ consumers (amqplib / @golevelup/nestjs-rabbitmq) |
-| **Port** | `3001` |
-| **Database** | PostgreSQL — `event_ingestion_db` |
+| **Port** | `3151` |
+| **Schema** | PostgreSQL — `event_ingestion_service` |
 | **Dependencies** | RabbitMQ, PostgreSQL |
 
 ### Responsibilities
 
-- **RabbitMQ Consumers:** Dedicated consumers for each source system (OMS, Magento 2, Mirakl, Chat Commerce) that listen on source-specific queues. Each consumer understands the schema of its source system and can map it to the canonical format.
-- **REST Webhook Endpoint:** An HTTP endpoint (`POST /webhooks/events`) for external integrations that cannot publish directly to RabbitMQ. Accepts events with a source identifier and processes them through the same normalization pipeline.
-- **Event Schema Validation:** Validates incoming events against registered JSON schemas per source and event type. Invalid events are rejected with detailed error messages and logged for investigation.
-- **Event Normalization:** Transforms source-specific event payloads into the canonical event format. This includes field mapping, data type coercion, timestamp normalization (to ISO-8601 UTC), and enrichment with metadata (correlation IDs, source event IDs).
-- **Publishing Normalized Events:** Publishes validated and normalized events to the `events.normalized` exchange with appropriate routing keys for downstream consumers.
+- **RabbitMQ Consumers:** Dynamic consumers that listen on source-specific queues. Each consumer applies runtime mapping configurations (stored in the `event_mappings` table) to transform source payloads into the canonical format — no hardcoded adapters per source system.
+- **REST Webhook Endpoint:** An HTTP endpoint (`POST /webhooks/events`) for external integrations that cannot publish directly to RabbitMQ. Accepts events with a `sourceId` identifier and processes them through the same normalization pipeline.
+- **Event Mapping Validation:** Validates incoming events against the mapping configuration registered for the given source and event type. Invalid events are rejected with detailed error messages and logged for investigation.
+- **Event Normalization:** Transforms source-specific event payloads into the canonical event format using runtime field mappings. This includes field mapping, data type coercion, timestamp normalization (to ISO-8601 UTC), enrichment with metadata (correlation IDs, source event IDs), and priority assignment from the mapping configuration.
+- **Publishing Normalized Events:** Publishes validated and normalized events to the `events.normalized` exchange with priority-tiered routing keys (`event.{priority}.{eventType}`) for downstream consumers.
 - **Event Persistence:** Stores all raw and normalized events in the database for auditability and replay capabilities.
 
 ### RabbitMQ Configuration
@@ -158,69 +158,75 @@ The Event Ingestion Service is the universal entry point for all business events
 | Exchange | Type | Purpose | Durable |
 |---|---|---|---|
 | `events.incoming` | Topic | Receives raw events from source systems | Yes |
-| `events.normalized` | Topic | Publishes normalized canonical events | Yes |
+| `events.normalized` | Topic | Publishes normalized canonical events with priority-tiered routing keys (`event.{priority}.{eventType}`) | Yes |
 
 #### Queues
 
 | Queue | Bound To | Routing Key | Consumer Concurrency |
 |---|---|---|---|
-| `events.oms` | `events.incoming` | `source.oms.#` | 3 |
-| `events.magento` | `events.incoming` | `source.magento.#` | 3 |
-| `events.mirakl` | `events.incoming` | `source.mirakl.#` | 2 |
-| `events.chat` | `events.incoming` | `source.chat.#` | 2 |
-| `events.webhook` | `events.incoming` | `source.webhook.#` | 2 |
+| `q.events.amqp` | `events.incoming` | `source.*.#` | 3 |
+| `q.events.webhook` | `events.incoming` | `source.webhook.#` | 2 |
 | `q.events.email-ingest` | `events.incoming` | `source.email-ingest.#` | 2 |
 
-### Canonical Event Schema
+### Canonical Event Schema (v2.0 — Flat Format)
 
 ```json
 {
   "eventId": "af47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "source": "oms | magento | mirakl | chat | manual | email-ingest",
-  "eventType": "order.created | order.shipped | order.delivered | order.cancelled | payment.confirmed | return.requested | return.approved | chat.escalated",
+  "sourceId": "oms",
+  "cycleId": "CYC-2026-00451",
+  "eventType": "order.shipped",
   "timestamp": "2026-02-19T14:30:00.000Z",
-  "payload": {
-    "orderId": "ORD-2026-00451",
-    "customerEmail": "customer@example.com",
-    "customerName": "Jane Doe",
-    "customerPhone": "+1234567890",
-    "items": [
-      {
-        "sku": "PROD-001",
-        "name": "Wireless Headphones",
-        "quantity": 1,
-        "price": 79.99
-      }
-    ],
-    "totalAmount": 79.99,
-    "currency": "USD"
-  },
+  "orderId": "ORD-2026-00451",
+  "customerEmail": "customer@example.com",
+  "customerName": "Jane Doe",
+  "customerPhone": "+1234567890",
+  "priority": "normal",
+  "customerId": "CUST-98765",
+  "items": [
+    {
+      "sku": "PROD-001",
+      "name": "Wireless Headphones",
+      "quantity": 1,
+      "price": 79.99
+    }
+  ],
+  "totalAmount": 79.99,
+  "currency": "USD",
   "metadata": {
     "correlationId": "corr-8f14e45f-ceea-467f-a8f5-5f1b39e5c7e2",
     "sourceEventId": "OMS-EVT-78901",
     "receivedAt": "2026-02-19T14:30:00.123Z",
     "normalizedAt": "2026-02-19T14:30:00.456Z",
-    "schemaVersion": "1.0"
+    "schemaVersion": "2.0"
   }
 }
 ```
+
+> **Info:** **Flat Event Schema (v2.0)**
+> The canonical event schema uses a flat structure where business fields (`customerEmail`, `orderId`, `customerId`, `totalAmount`, etc.) are placed at the top level rather than nested under a `payload` object. This simplifies rule conditions, template variable access, and suppression dedup key paths — all field references use direct names (e.g., `customerEmail`) instead of dot-notation paths (e.g., `payload.customerEmail`). The `sourceId` field identifies the registered source system that produced the event.
 
 ### Database Tables
 
 | Table | Description | Key Columns |
 |---|---|---|
-| `events` | Stores all ingested events (raw and normalized) | `id`, `event_id`, `source`, `event_type`, `raw_payload`, `normalized_payload`, `status`, `created_at` |
+| `events` | Stores all ingested events (raw and normalized) | `id`, `event_id`, `source_id`, `cycle_id`, `event_type`, `raw_payload`, `normalized_payload`, `status`, `created_at` |
 | `event_sources` | Registered source system configurations | `id`, `name`, `type`, `connection_config`, `is_active`, `created_at` |
-| `event_schemas` | JSON schemas for validating events per source and type | `id`, `source`, `event_type`, `schema_json`, `version`, `is_active` |
+| `event_mappings` | Runtime field mapping configurations per source and event type | `id` (UUID PK), `source_id` (VARCHAR(50)), `event_type` (VARCHAR(100)), `name` (VARCHAR(255)), `field_mappings` (JSONB), `event_type_mapping` (JSONB), `validation_schema` (JSONB), `priority` (VARCHAR(10) DEFAULT 'normal'), `is_active` (BOOLEAN), `version` (INTEGER), `created_by` (VARCHAR(100)), `updated_by` (VARCHAR(100)), `created_at` (TIMESTAMPTZ), `updated_at` (TIMESTAMPTZ) |
 
 ### Key Endpoints
 
-**POST** `/webhooks/events` — Receive webhook events from external integrations. Expects a JSON body with `source`, `eventType`, and `payload` fields. Returns `202 Accepted` with an `eventId` for tracking. The event is validated, normalized, and published asynchronously.
+**POST** `/webhooks/events` — Receive webhook events from external integrations. Expects a JSON body with `sourceId`, `eventType`, and event fields. Returns `202 Accepted` with an `eventId` for tracking. The event is validated against the runtime mapping configuration for the given `sourceId` and `eventType`, normalized, and published asynchronously.
 
 **GET** `/health` — Health check endpoint. Returns the service status, RabbitMQ connection health, database connectivity, and consumer queue depths.
 
 > **Info:** **Idempotency Handling**
-> Every incoming event is assigned or carries a `sourceEventId` from the originating system. The Event Ingestion Service maintains a deduplication window (configurable, default 24 hours) using a unique constraint on `(source, source_event_id)` in the `events` table. If a duplicate event is received within the window, the service returns `200 OK` with the existing `eventId` and does not re-publish to RabbitMQ. This guarantees at-least-once delivery semantics without producing duplicate notifications downstream.
+> Every incoming event is assigned or carries a `sourceEventId` from the originating system. The Event Ingestion Service maintains a deduplication window (configurable, default 24 hours) using a unique constraint on `(source_id, source_event_id)` in the `events` table. If a duplicate event is received within the window, the service returns `200 OK` with the existing `eventId` and does not re-publish to RabbitMQ. This guarantees at-least-once delivery semantics without producing duplicate notifications downstream.
+
+> **Deep-Dive Available:** For the complete Event Ingestion Service specification — including runtime mapping configuration details, field mappings, the 10-step processing pipeline, RabbitMQ topology diagrams, full REST API contracts, database ERD, mapping validation flow, idempotency edge cases, and sequence diagrams — see [07 — Event Ingestion Service Deep-Dive](07-event-ingestion-service.md).
+
+> **Note:** **Mapping Cache Configuration**
+> The `MAPPING_CACHE_TTL` environment variable (replacing the previous `SCHEMA_CACHE_TTL`) controls how long runtime mapping configurations are cached in memory before being refreshed from the database. Default: `300` seconds (5 minutes). Set to `0` to disable caching during development.
 
 ---
 
@@ -233,24 +239,25 @@ The Notification Engine is the central orchestrator of the platform — the "bra
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS |
-| **Port** | `3002` |
-| **Database** | PostgreSQL — `notification_engine_db` |
+| **Port** | `3152` |
+| **Schema** | PostgreSQL — `notification_engine_service` |
 | **Dependencies** | Event Ingestion (via RabbitMQ), Template Service (HTTP), Channel Router (via RabbitMQ), PostgreSQL |
 
 ### Responsibilities
 
 - **Event Consumption:** Subscribes to the `events.normalized` exchange and processes each normalized event through the rule evaluation pipeline.
 - **Rule Matching:** Evaluates each event against all active notification rules. A rule matches when the event type equals the rule's configured event type and all additional conditions (e.g., source channel, order priority, customer segment) are satisfied.
-- **Recipient Resolution:** Determines the notification recipients based on the rule's `recipientType`. For `customer`, extracts contact details from the event payload. For `group`, resolves the recipient group membership. For `custom`, uses the explicitly defined recipient list.
+- **Recipient Resolution:** Determines the notification recipients based on the rule's `recipientType`. For `customer`, extracts contact details from the flat event fields (e.g., `customerEmail`, `customerPhone`). For `group`, resolves the recipient group membership. For `custom`, uses the explicitly defined recipient list.
 - **Template Rendering Coordination:** Calls the Template Service (HTTP) to render the appropriate template for each channel, passing the event payload as variable data.
 - **Dispatch to Channel Router:** Publishes rendered notifications to the `notifications.deliver` exchange with channel-specific routing keys for the Channel Router to pick up.
 - **Lifecycle Management:** Tracks each notification through its lifecycle states: **[Pending]** **[Processing]** **[Sent]** **[Delivered]** **[Failed]**. Status transitions are logged in the `notification_status_log` table.
 - **Recipient Preferences:** Respects recipient opt-out preferences and channel preferences before dispatching notifications.
 - **Suppression & Deduplication:** Evaluates optional per-rule suppression policies (deduplication windows, max send counts, cooldown periods) after recipient resolution to prevent duplicate or excessive notifications.
+- **Priority Management:** Each notification inherits its priority tier from the originating event (set by the `priority` field in the event mapping configuration). Rules may override this with a `deliveryPriority` field (`normal` or `critical`). When `deliveryPriority` is `null` (the default), the event's priority is used. The effective priority determines the routing key tier when publishing to `notifications.deliver`, ensuring critical notifications are processed ahead of normal traffic during backpressure. Note: `deliveryPriority` (notification urgency) is distinct from the rule's `priority` field (rule matching order).
 
 ### Rule Engine
 
-The rule engine uses a declarative, condition-based matching system. When a normalized event arrives, the engine queries all active rules whose `eventType` matches the event. For each matching rule, it evaluates the `conditions` object against the event payload using a simple expression evaluator. Conditions support equality checks, "in" list checks, and nested property access. When all conditions are satisfied, the rule's `actions` array is executed sequentially — each action specifies a template, a set of channels, and a recipient type.
+The rule engine uses a declarative, condition-based matching system. When a normalized event arrives, the engine queries all active rules whose `eventType` matches the event. For each matching rule, it evaluates the `conditions` object against the flat event fields using a simple expression evaluator. Conditions support equality checks, "in" list checks, and direct field access (e.g., `customerEmail`, `totalAmount`). When all conditions are satisfied, the rule's `actions` array is executed sequentially — each action specifies a template, a set of channels, and a recipient type.
 
 Rules are prioritized by a `priority` field (lower number = higher priority). If multiple rules match a single event, all matching rules are executed unless a rule is marked as `exclusive`, in which case only the highest-priority exclusive rule runs and subsequent matches are skipped.
 
@@ -262,14 +269,14 @@ Each notification rule may include an optional `suppression` configuration (JSON
 
 | Field | Type | Description |
 |---|---|---|
-| `dedupKey` | `string[]` | Array of dot-notation paths resolved against the event context and recipient (e.g., `["eventType", "payload.orderId", "recipient.email"]`). Values are concatenated and SHA-256 hashed into a fixed-length lookup key. |
+| `dedupKey` | `string[]` | Array of field names resolved against the flat event context and recipient (e.g., `["eventType", "orderId", "recipient.email"]`). Values are concatenated and SHA-256 hashed into a fixed-length lookup key. |
 | `modes.dedup` | `{ windowMinutes: number }` | Suppress if any notification with the same dedup key hash was sent within the specified window. |
 | `modes.maxCount` | `{ limit: number, windowMinutes: number }` | Suppress if `limit` or more notifications with the same dedup key hash were sent within the specified window. |
 | `modes.cooldown` | `{ intervalMinutes: number }` | Suppress if the last notification with the same dedup key hash was sent less than `intervalMinutes` ago. |
 
 #### Dedup Key Resolution
 
-At evaluation time, each path in the `dedupKey` array is resolved against the combined event context (event type, source, payload) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the `dedup_key_hash` column. The original resolved values are also stored in `dedup_key_values` (JSONB) for human-readable display in the Admin UI.
+At evaluation time, each field name in the `dedupKey` array is resolved against the flat event context (event type, sourceId, top-level fields) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the `dedup_key_hash` column. The original resolved values are also stored in `dedup_key_values` (JSONB) for human-readable display in the Admin UI.
 
 #### Suppression Evaluation Logic
 
@@ -301,7 +308,7 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
 **Late Delivery — no repeat within 24h:**
 ```json
 "suppression": {
-  "dedupKey": ["eventType", "payload.orderId", "recipient.email"],
+  "dedupKey": ["eventType", "orderId", "recipient.email"],
   "modes": { "dedup": { "windowMinutes": 1440 } }
 }
 ```
@@ -309,7 +316,7 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
 **Order Status — max 5 per order per week:**
 ```json
 "suppression": {
-  "dedupKey": ["payload.orderId", "recipient.email"],
+  "dedupKey": ["orderId", "recipient.email"],
   "modes": { "maxCount": { "limit": 5, "windowMinutes": 10080 } }
 }
 ```
@@ -325,7 +332,7 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
 **Payment Failure — combined dedup + max 3/week + 4h cooldown:**
 ```json
 "suppression": {
-  "dedupKey": ["eventType", "payload.orderId", "payload.paymentAttemptId", "recipient.email"],
+  "dedupKey": ["eventType", "orderId", "paymentAttemptId", "recipient.email"],
   "modes": {
     "dedup": { "windowMinutes": 10080 },
     "maxCount": { "limit": 3, "windowMinutes": 10080 },
@@ -338,15 +345,16 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
 
 | Direction | Exchange / Queue | Routing Key | Purpose |
 |---|---|---|---|
-| Consumes | `events.normalized` / `engine.events` | `event.#` | Receive normalized events for rule evaluation |
+| Consumes | `events.normalized` / `q.engine.events.critical` | `event.critical.#` | Receive critical-priority normalized events (4 consumers) |
+| Consumes | `events.normalized` / `q.engine.events.normal` | `event.normal.#` | Receive normal-priority normalized events (2 consumers) |
 | Publishes | `notifications.render` | `notification.render.{channel}` | Request template rendering (if async rendering is enabled) |
-| Publishes | `notifications.deliver` | `notification.deliver.{channel}` | Dispatch rendered notifications for delivery |
+| Publishes | `notifications.deliver` | `notification.deliver.{priority}.{channel}` | Dispatch rendered notifications for delivery (priority inherited from event or overridden by rule) |
 
 ### Database Tables
 
 | Table | Description | Key Columns |
 |---|---|---|
-| `notification_rules` | Rule definitions with event type, conditions, and actions | `id`, `name`, `event_type`, `conditions`, `actions`, `suppression`, `priority`, `is_exclusive`, `is_active`, `created_at`, `updated_at` |
+| `notification_rules` | Rule definitions with event type, conditions, and actions | `id`, `name`, `event_type`, `conditions`, `actions`, `suppression`, `delivery_priority`, `priority`, `is_exclusive`, `is_active`, `created_at`, `updated_at` |
 | `notifications` | Core notification records | `id`, `event_id`, `rule_id`, `template_id`, `status`, `channels`, `dedup_key_hash`, `dedup_key_values`, `created_at`, `updated_at` |
 | `notification_recipients` | Resolved recipients for each notification | `id`, `notification_id`, `recipient_type`, `email`, `phone`, `device_token`, `status` |
 | `notification_status_log` | Lifecycle status transitions | `id`, `notification_id`, `from_status`, `to_status`, `channel`, `metadata`, `created_at` |
@@ -361,9 +369,9 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
   "name": "Order Shipped Notification",
   "eventType": "order.shipped",
   "conditions": {
-    "source": { "$in": ["oms", "magento"] },
-    "payload.totalAmount": { "$gte": 0 },
-    "payload.customerEmail": { "$exists": true }
+    "sourceId": { "$in": ["oms", "magento"] },
+    "totalAmount": { "$gte": 0 },
+    "customerEmail": { "$exists": true }
   },
   "actions": [
     {
@@ -381,11 +389,12 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
     }
   ],
   "suppression": {
-    "dedupKey": ["eventType", "payload.orderId", "recipient.email"],
+    "dedupKey": ["eventType", "orderId", "recipient.email"],
     "modes": {
       "cooldown": { "intervalMinutes": 1440 }
     }
   },
+  "deliveryPriority": null,
   "priority": 10,
   "isExclusive": false,
   "isActive": true,
@@ -395,7 +404,9 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
 ```
 
 > **Success:** **Decoupled Rule-Based Architecture**
-> The rule-based approach completely decouples event producers from notification logic. Source systems (OMS, Magento, Mirakl, Chat Commerce) publish events without any knowledge of what notifications will be triggered. The operative team can create, modify, enable, or disable notification rules at any time through the Admin UI without requiring code changes or deployments. This empowers the business team to respond rapidly to changing communication requirements — adding a new WhatsApp channel to an existing order confirmation rule, for example, takes seconds rather than a development sprint.
+> The rule-based approach completely decouples event producers from notification logic. Source systems publish events without any knowledge of what notifications will be triggered. The operative team can create, modify, enable, or disable notification rules at any time through the Admin UI without requiring code changes or deployments. This empowers the business team to respond rapidly to changing communication requirements — adding a new WhatsApp channel to an existing order confirmation rule, for example, takes seconds rather than a development sprint.
+
+> **Deep-Dive Available:** For the complete Notification Engine Service specification — including the 9-step processing pipeline, rule engine with condition operators, recipient resolution flows, suppression query optimization, template rendering coordination, RabbitMQ topology diagrams, full REST API contracts, database ERD with FILLFACTOR and VACUUM tuning, notification lifecycle state machine, sequence diagrams, horizontal scalability patterns, rule caching strategy, asynchronous status logging, and performance considerations — see [08 — Notification Engine Service Deep-Dive](08-notification-engine-service.md).
 
 ---
 
@@ -408,8 +419,8 @@ The Template Service manages the full lifecycle of notification message template
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS with Handlebars (handlebars.js) |
-| **Port** | `3003` |
-| **Database** | PostgreSQL — `template_db` |
+| **Port** | `3153` |
+| **Schema** | PostgreSQL — `template_service` |
 | **Dependencies** | PostgreSQL |
 
 ### Responsibilities
@@ -510,8 +521,8 @@ The Channel Router Service is responsible for the last-mile delivery of notifica
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS |
-| **Port** | `3004` |
-| **Database** | PostgreSQL — `channel_router_db` |
+| **Port** | `3154` |
+| **Schema** | PostgreSQL — `channel_router_service` |
 | **Dependencies** | RabbitMQ, External providers (SendGrid, Twilio, Firebase), PostgreSQL |
 
 ### Responsibilities
@@ -537,10 +548,14 @@ The Channel Router Service is responsible for the last-mile delivery of notifica
 
 | Direction | Exchange / Queue | Routing Key | Purpose |
 |---|---|---|---|
-| Consumes | `notifications.deliver` / `router.email` | `notification.deliver.email` | Email delivery queue |
-| Consumes | `notifications.deliver` / `router.sms` | `notification.deliver.sms` | SMS delivery queue |
-| Consumes | `notifications.deliver` / `router.whatsapp` | `notification.deliver.whatsapp` | WhatsApp delivery queue |
-| Consumes | `notifications.deliver` / `router.push` | `notification.deliver.push` | Push notification delivery queue |
+| Consumes | `notifications.deliver` / `q.deliver.email.critical` | `notification.deliver.critical.email` | Critical email delivery (3 consumers) |
+| Consumes | `notifications.deliver` / `q.deliver.email.normal` | `notification.deliver.normal.email` | Normal email delivery (2 consumers) |
+| Consumes | `notifications.deliver` / `q.deliver.sms.critical` | `notification.deliver.critical.sms` | Critical SMS delivery (2 consumers) |
+| Consumes | `notifications.deliver` / `q.deliver.sms.normal` | `notification.deliver.normal.sms` | Normal SMS delivery (1 consumer) |
+| Consumes | `notifications.deliver` / `q.deliver.whatsapp.critical` | `notification.deliver.critical.whatsapp` | Critical WhatsApp delivery (2 consumers) |
+| Consumes | `notifications.deliver` / `q.deliver.whatsapp.normal` | `notification.deliver.normal.whatsapp` | Normal WhatsApp delivery (1 consumer) |
+| Consumes | `notifications.deliver` / `q.deliver.push.critical` | `notification.deliver.critical.push` | Critical push delivery (2 consumers) |
+| Consumes | `notifications.deliver` / `q.deliver.push.normal` | `notification.deliver.normal.push` | Normal push delivery (1 consumer) |
 | Publishes | `notifications.status` | `notification.status.{outcome}` | Delivery status updates |
 | DLQ | `notifications.dlq` | `#` | Dead letter queue for permanently failed deliveries |
 
@@ -580,8 +595,8 @@ The Admin Service provides the backoffice administration layer for the operative
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS |
-| **Port** | `3005` |
-| **Database** | PostgreSQL — `admin_db` |
+| **Port** | `3155` |
+| **Schema** | PostgreSQL — `admin_service` |
 | **Dependencies** | Notification Engine, Template Service, Channel Router, Audit Service |
 
 ### Responsibilities
@@ -628,6 +643,18 @@ The Admin Service provides the backoffice administration layer for the operative
 
 **POST** `/admin/saml/idp` — Register a new SAML Identity Provider by importing IdP metadata XML. Parses entityID, SSO URL, X.509 certificate. Generates SP keypair. **[Super Admin]** only.
 
+**GET** `/api/v1/event-mappings` — List all event mapping configurations with pagination. Supports filters: `sourceId`, `eventType`, `isActive`. Returns mapping summaries.
+
+**POST** `/api/v1/event-mappings` — Create a new event mapping configuration. Requires `sourceId`, `eventType`, `name`, and `fieldMappings`. Validates that the source exists and the mapping configuration is well-formed. Returns the created mapping with its generated ID.
+
+**GET** `/api/v1/event-mappings/:id` — Retrieve full details for a specific event mapping, including field mappings, event type mapping, validation schema, and version history.
+
+**PUT** `/api/v1/event-mappings/:id` — Update an existing event mapping configuration. Increments the `version` field. Changes are audit-logged with the admin user ID and timestamp.
+
+**DELETE** `/api/v1/event-mappings/:id` — Delete an event mapping. Soft-deletes the mapping (sets `is_active` to false) to preserve audit history.
+
+**POST** `/api/v1/event-mappings/:id/test` — Test an event mapping configuration with a sample payload. Accepts a raw source payload in the request body, applies the mapping configuration, and returns the resulting canonical event without persisting or publishing it. Useful for validating mapping configurations before activation.
+
 ---
 
 ## 8. Audit Service
@@ -639,8 +666,8 @@ The Audit Service provides comprehensive logging, tracking, and analytics for th
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS |
-| **Port** | `3006` |
-| **Database** | PostgreSQL — `audit_db` |
+| **Port** | `3156` |
+| **Schema** | PostgreSQL — `audit_service` |
 | **Dependencies** | RabbitMQ (all status exchanges) |
 
 ### Responsibilities
@@ -683,9 +710,9 @@ The Email Ingest Service extends the platform's event ingestion capabilities to 
 | Attribute | Value |
 |---|---|
 | **Technology** | NestJS + `smtp-server` npm package |
-| **REST Port** | `3007` |
+| **REST Port** | `3157` |
 | **SMTP Port** | `2525` |
-| **Database** | PostgreSQL — `email_ingest_db` |
+| **Schema** | PostgreSQL — `email_ingest_service` |
 | **Dependencies** | RabbitMQ, PostgreSQL |
 
 ### Responsibilities
@@ -778,15 +805,15 @@ The Email Ingest Service extends the platform's event ingestion capabilities to 
 
 ### Purpose
 
-The Bulk Upload Service enables the operative team to trigger bulk notifications by uploading XLSX spreadsheet files through the Admin UI. Each row in the spreadsheet is parsed into an event payload and submitted to the Event Ingestion Service via HTTP, preserving Event Ingestion as the single entry point for all events in the platform. This service fills a gap in the current architecture: while OMS, Magento, Mirakl, and Chat Commerce publish events automatically, there was no mechanism for manually triggering bulk notifications from structured data files.
+The Bulk Upload Service enables the operative team to trigger bulk notifications by uploading XLSX spreadsheet files through the Admin UI. Each row in the spreadsheet is parsed into an event payload and submitted to the Event Ingestion Service via HTTP, preserving Event Ingestion as the single entry point for all events in the platform. This service fills a gap in the current architecture: while registered source systems publish events automatically, there was no mechanism for manually triggering bulk notifications from structured data files.
 
 | Attribute | Value |
 |---|---|
 | **Service Name** | `bulk-upload-service` |
-| **Port** | `3008` |
+| **Port** | `3158` |
 | **Technology** | NestJS (TypeScript) + `exceljs` |
-| **Database** | `bulk_upload_db` (PostgreSQL) |
-| **Source Identifier** | `bulk-upload` (used as `source` field in event payloads) |
+| **Schema** | `bulk_upload_service` (PostgreSQL) |
+| **Source Identifier** | `bulk-upload` (used as `sourceId` field in event payloads) |
 | **Communication** | HTTP POST to Event Ingestion Service (`POST /webhooks/events`) |
 | **Admin UI Route** | `/bulk-upload` |
 | **RBAC** | Admin, Operator |
@@ -795,8 +822,8 @@ The Bulk Upload Service enables the operative team to trigger bulk notifications
 
 - Accept XLSX file uploads via multipart/form-data from the Admin UI (through the Gateway)
 - Validate uploaded files: format (`.xlsx` only), size (max 10 MB), row count (max 5,000 rows), and header row presence
-- Parse XLSX rows using a fully flexible column-mapping approach — only `eventType` is required; all other column headers become payload fields dynamically
-- Construct event payloads for each row and submit them to the Event Ingestion Service via HTTP (`POST /webhooks/events`)
+- Parse XLSX rows using a fully flexible column-mapping approach — only `eventType` is required; all other column headers become top-level event fields dynamically
+- Construct flat v2.0 canonical events for each row and submit them to the Event Ingestion Service via HTTP (`POST /webhooks/events`)
 - Track upload progress and per-row processing status in its own database
 - Support retry of failed rows and cancellation of in-progress uploads
 - Provide upload history, status, and error details via REST API
@@ -811,8 +838,8 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 |---|---|
 | **Header Row** | The first row must be the header row (column names) |
 | **`eventType` Column** | Required — determines the event type for each row |
-| **Dynamic Columns** | All other column headers map directly as keys in the `payload` object |
-| **Empty Cells** | Omitted from the payload (not included as null) |
+| **Dynamic Columns** | All other column headers become top-level fields in the flat v2.0 canonical event |
+| **Empty Cells** | Omitted from the event (not included as null) |
 | **JSON Values** | Columns with JSON-parseable values (e.g., `[{"sku":"X"}]`) are parsed as JSON; otherwise treated as strings/numbers |
 | **Numeric Values** | Values that parse as numbers are stored as numbers, not strings |
 
@@ -827,14 +854,12 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 
 ```json
 {
-  "source": "bulk-upload",
+  "sourceId": "bulk-upload",
   "eventType": "order.shipped",
-  "payload": {
-    "customerEmail": "jane@example.com",
-    "customerName": "Jane Doe",
-    "orderId": "ORD-001",
-    "totalAmount": 79.99
-  }
+  "customerEmail": "jane@example.com",
+  "customerName": "Jane Doe",
+  "orderId": "ORD-001",
+  "totalAmount": 79.99
 }
 ```
 
@@ -866,8 +891,8 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 2. Service validates file (format, size, header row present) → returns `202 Accepted` with `uploadId`
 3. Upload record created with status `queued`; background worker picks up the job
 4. Worker parses the XLSX file row-by-row using `exceljs`
-5. For each row: extract `eventType` from the designated column, map all remaining columns to `payload` fields
-6. Events are submitted to Event Ingestion Service (`POST /webhooks/events`) with `source: "bulk-upload"`, configurable concurrency (default: 5 parallel requests, rate limit: max 50 events/second)
+5. For each row: extract `eventType` from the designated column, map all remaining columns to top-level event fields
+6. Events are submitted to Event Ingestion Service (`POST /webhooks/events`) with `sourceId: "bulk-upload"`, configurable concurrency (default: 5 parallel requests, rate limit: max 50 events/second)
 7. Per-row status tracked in `upload_rows` table; aggregate counters updated in `uploads` table
 8. Admin UI polls `GET /uploads/:id` for real-time progress updates
 
@@ -948,8 +973,8 @@ The Notification Admin UI is the Next.js-powered backoffice application used by 
 | Attribute | Value |
 |---|---|
 | **Technology** | Next.js 14 (App Router) with TypeScript |
-| **Port** | `3010` |
-| **Database** | None (all data through API) |
+| **Port** | `3159` |
+| **Schema** | None (all data through API) |
 | **Dependencies** | Notification Gateway (BFF) only |
 
 ### Key Pages & Features
@@ -957,36 +982,38 @@ The Notification Admin UI is the Next.js-powered backoffice application used by 
 | Page | Route | Features |
 |---|---|---|
 | **Dashboard** | `/dashboard` | Real-time notification volume charts, delivery success rate gauges, channel breakdown pie chart, recent failures list, top triggered rules, system health indicators |
-| **Rule Management** | `/rules` | List view with search, filter, and sort. Create/edit rule modal with event type selector, condition builder (visual), template picker, channel selector, recipient configuration, enable/disable toggle |
+| **Rule Management** | `/rules` | List view with search, filter, and sort. Create/edit rule modal with event type selector, condition builder (visual), template picker, channel selector, recipient configuration, delivery priority override, enable/disable toggle |
 | **Template Editor** | `/templates` | List view with template cards. WYSIWYG editor for HTML email templates (based on TipTap/ProseMirror), plain text editor for SMS, WhatsApp message composer, push notification previewer. Live preview panel, variable insertion toolbar, version history sidebar |
 | **Channel Configuration** | `/channels` | Channel cards showing provider status and health. Configuration forms for each provider (SendGrid, Twilio, Firebase). Connection test button, credential rotation workflow |
 | **Notification Logs** | `/logs` | Searchable, filterable log table with expandable rows. Filters: date range, channel, status, recipient, event type. Detail view showing full lifecycle timeline, rendered content, delivery attempts |
 | **User Management** | `/users` | Admin user list, role assignment, invitation workflow, activity log per user. Restricted to Super Admin and Admin roles |
 | **Login** | `/login` | Email/password login form with "Sign in with SSO" button (displayed when a SAML IdP is configured). Forgot password link. See [04 — Auth & Identity §8](04-authentication-identity.md#8-frontend-integration) |
 | **Bulk Upload** | `/bulk-upload` | Drag-and-drop XLSX upload zone, upload progress bar with real-time polling, upload history table (file name, uploaded by, date, status, row counts), error detail panel for failed rows with CSV export, sample template download |
+| **Event Mappings** | `/event-mappings` | List, create, edit, and test runtime field mapping configurations. Visual mapping builder, event type mapping, transform configuration, priority selector, and mapping test panel. |
 | **Identity Provider Settings** | `/settings/identity-providers` | SAML IdP configuration: metadata XML import, attribute mapping, auto-provisioning toggle, SP metadata download, certificate expiry warnings. **[Super Admin]** only |
 
 > **Note:** **BFF Pattern — Frontend Communication**
-> The Notification Admin UI communicates **exclusively** through the Notification Gateway (BFF) on port `3000`. It never calls internal microservices directly. This provides a single security boundary, consistent API surface, and allows the gateway to handle authentication, rate limiting, and response transformation. The frontend uses `fetch` with JWT bearer tokens stored in HTTP-only cookies for secure authentication. Server components in the Next.js App Router fetch data during SSR through the gateway, while client components use SWR for data fetching with automatic revalidation.
+> The Notification Admin UI communicates **exclusively** through the Notification Gateway (BFF) on port `3150`. It never calls internal microservices directly. This provides a single security boundary, consistent API surface, and allows the gateway to handle authentication, rate limiting, and response transformation. The frontend uses `fetch` with JWT bearer tokens stored in HTTP-only cookies for secure authentication. Server components in the Next.js App Router fetch data during SSR through the gateway, while client components use SWR for data fetching with automatic revalidation.
 
 ---
 
-## 12. Database Schema Overview
+## 12. Schema Overview
 
-### Database Summary
+### Schema Summary
 
-Each microservice owns its database, following the database-per-service pattern. This ensures loose coupling, independent schema evolution, and isolated failure domains. Cross-service data access is performed exclusively through APIs, never through shared databases.
+Each microservice owns its schema, following the database-per-service pattern. This ensures loose coupling, independent schema evolution, and isolated failure domains. Cross-service data access is performed exclusively through APIs, never through shared databases.
 
-| Database | Owner Service | Tables | Estimated Size (Year 1) | Growth Rate |
+| Schema | Owner Service | Tables | Estimated Size (Year 1) | Growth Rate |
 |---|---|---|---|---|
-| `event_ingestion_db` | Event Ingestion Service | `events`, `event_sources`, `event_schemas` | ~50 GB | ~5 GB/month |
-| `notification_engine_db` | Notification Engine | `notification_rules`, `notifications`, `notification_recipients`, `notification_status_log`, `recipient_groups`, `recipient_preferences` | ~80 GB | ~8 GB/month |
-| `template_db` | Template Service | `templates`, `template_versions`, `template_channels`, `template_variables` | ~500 MB | Minimal |
-| `channel_router_db` | Channel Router | `channels`, `channel_configs`, `delivery_attempts`, `provider_configs` | ~60 GB | ~6 GB/month |
-| `admin_db` | Admin Service | `admin_users`, `admin_roles`, `admin_permissions`, `system_configs`, `saml_identity_providers`, `user_identity_links`, `saml_sessions` | ~100 MB | Minimal |
-| `audit_db` | Audit Service | `audit_events`, `delivery_receipts`, `notification_analytics` | ~120 GB | ~12 GB/month |
-| `email_ingest_db` | Email Ingest Service | `email_parsing_rules`, `processed_emails`, `email_sources` | ~20 GB | ~2 GB/month |
-| `bulk_upload_db` | Bulk Upload Service | `uploads`, `upload_rows` | ~5 GB | ~500 MB/month |
+| `notification_gateway` | Notification Gateway | `rate_limits`, `api_keys`, `sessions` | ~1 GB | ~100 MB/month |
+| `event_ingestion_service` | Event Ingestion Service | `events`, `event_sources`, `event_mappings` | ~50 GB | ~5 GB/month |
+| `notification_engine_service` | Notification Engine | `notification_rules`, `notifications`, `notification_recipients`, `notification_status_log`, `recipient_groups`, `recipient_preferences` | ~80 GB | ~8 GB/month |
+| `template_service` | Template Service | `templates`, `template_versions`, `template_channels`, `template_variables` | ~500 MB | Minimal |
+| `channel_router_service` | Channel Router | `channels`, `channel_configs`, `delivery_attempts`, `provider_configs` | ~60 GB | ~6 GB/month |
+| `admin_service` | Admin Service | `admin_users`, `admin_roles`, `admin_permissions`, `system_configs`, `saml_identity_providers`, `user_identity_links`, `saml_sessions` | ~100 MB | Minimal |
+| `audit_service` | Audit Service | `audit_events`, `delivery_receipts`, `notification_analytics` | ~120 GB | ~12 GB/month |
+| `email_ingest_service` | Email Ingest Service | `email_parsing_rules`, `processed_emails`, `email_sources` | ~20 GB | ~2 GB/month |
+| `bulk_upload_service` | Bulk Upload Service | `uploads`, `upload_rows` | ~5 GB | ~500 MB/month |
 
 ### Key Relationships
 
@@ -1002,7 +1029,7 @@ While each database is physically isolated, logical relationships exist across s
 
 | Data Category | Retention Period | Purge Strategy | Notes |
 |---|---|---|---|
-| Raw event payloads | 90 days | Automated daily job; payload set to null, metadata retained | Full payload available for debugging within 90 days |
+| Raw event payloads | 90 days | Scheduled `purge_event_payloads()` function NULLs `raw_payload` and `normalized_payload` on rows older than 90 days; event metadata retained | Full payload available for debugging within 90 days; see [07 — Event Ingestion §8](07-event-ingestion-service.md#data-retention) |
 | Notification records | 1 year | Archived to cold storage after 1 year, deleted after 3 years | Metadata and status retained; rendered content purged |
 | Delivery attempts | 6 months | Aggregated into analytics; raw records deleted | Provider responses may contain PII |
 | Audit events | 2 years | Immutable; archived to cold storage after 2 years | Required for regulatory compliance |
@@ -1021,7 +1048,7 @@ The microservices communicate through two patterns: synchronous HTTP/REST for re
 |---|---|---|---|---|
 | Admin UI | Notification Gateway | HTTP/REST | Synchronous | All frontend API calls (CRUD, dashboard, logs) |
 | Notification Gateway | All internal services | HTTP/REST | Synchronous | Request proxying and aggregation |
-| Source Systems (OMS, Magento, etc.) | Event Ingestion | AMQP / HTTP | Asynchronous | Business event delivery |
+| Source Systems (any registered source) | Event Ingestion | AMQP / HTTP | Asynchronous | Business event delivery; runtime mapping applied per source |
 | Event Ingestion | Notification Engine | AMQP | Asynchronous | Normalized event publishing |
 | Notification Engine | Template Service | HTTP/REST | Synchronous | Template rendering requests |
 | Notification Engine | Channel Router | AMQP | Asynchronous | Rendered notification dispatch |
@@ -1029,6 +1056,7 @@ The microservices communicate through two patterns: synchronous HTTP/REST for re
 | Channel Router | Notification Engine | AMQP | Asynchronous | Delivery status updates |
 | All Services | Audit Service | AMQP | Asynchronous | Lifecycle events and status updates |
 | Admin Service | Notification Engine | HTTP/REST | Synchronous | Rule management, notification queries |
+| Admin Service | Event Ingestion | HTTP/REST | Synchronous | Event mapping management (CRUD, test) |
 | Admin Service | Channel Router | HTTP/REST | Synchronous | Channel configuration management |
 | Admin Service | Audit Service | HTTP/REST | Synchronous | Log queries and analytics data |
 | Email Ingest Service | Event Ingestion (via RabbitMQ) | AMQP | Asynchronous | Publish parsed email events to `events.incoming` exchange |

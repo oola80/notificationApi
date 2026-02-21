@@ -66,13 +66,13 @@ Today, customer notifications originate from five independent source systems, ea
 
 ## 3. Proposed Solution
 
-The Notification API is a **unified, event-driven notification platform** that decouples notification logic from source systems and centralizes it into a purpose-built set of microservices. Source systems will publish business events (e.g., "order placed", "shipment dispatched", "payment failed") to a message broker, and the Notification API will handle everything downstream: determining what to send, to whom, through which channel, using which template, and tracking the result.
+The Notification API is a **unified, event-driven notification platform** that decouples notification logic from source systems and centralizes it into a purpose-built set of microservices. Any registered source system integrates via REST webhook or direct AMQP, publishing business events (e.g., "order placed", "shipment dispatched", "payment failed") to the platform. Admin-configured runtime field mappings normalize each source's payload into a canonical format -- no code changes are needed to onboard new sources. The Notification API handles everything downstream: determining what to send, to whom, through which channel, using which template, and tracking the result.
 
 ### 3.1 Core Design Principles
 
 #### Event-Driven Architecture
 
-Source systems publish events to RabbitMQ. The notification platform subscribes to relevant events and processes them asynchronously. This fully decouples producers from consumers, allowing each to evolve independently.
+Any registered source system publishes events to RabbitMQ (direct AMQP) or sends them via REST webhook. The notification platform subscribes to relevant events and processes them asynchronously. This fully decouples producers from consumers, allowing each to evolve independently.
 
 #### Single Point of Configuration
 
@@ -86,7 +86,7 @@ A unified channel routing layer abstracts away provider-specific integrations. A
 
 Every notification is tracked end-to-end: from event ingestion through template rendering, channel routing, provider submission, and delivery receipt. Full audit trails are available for compliance and troubleshooting.
 
-> **Success:** Source systems (OMS, Magento, Mirakl, Chat Commerce) become simple event publishers. All notification intelligence -- what to send, when, to whom, and how -- lives in the Notification API platform, managed through a centralized admin interface.
+> **Success:** Source systems become simple event publishers, integrating via REST webhook or direct AMQP with admin-configured runtime field mappings. All notification intelligence -- what to send, when, to whom, and how -- lives in the Notification API platform, managed through a centralized admin interface. New sources can be onboarded entirely through admin configuration -- no code changes required.
 
 ---
 
@@ -94,7 +94,7 @@ Every notification is tracked end-to-end: from event ingestion through template 
 
 #### Unify Notification Sources
 
-Consolidate notifications from OMS, Magento 2, Mirakl Marketplace, Chat Commerce, and manual processes into a single platform. All systems emit standardized events that the platform consumes uniformly.
+Consolidate notifications from any registered source system into a single platform. Sources integrate via REST webhook or direct AMQP, and admin-configured runtime field mappings normalize their payloads into a canonical format. New sources can be onboarded without code changes.
 
 #### Standardize Messaging
 
@@ -163,8 +163,8 @@ Notification API -- High-Level Flow
 
 ### 5.3 Event Flow Summary
 
-1. **Event Publication:** A source system (OMS, Magento, Mirakl, Chat Commerce) publishes a business event to RabbitMQ or sends it via a REST webhook to the Event Ingestion Service. Closed/legacy systems send emails to the Email Ingest Service, which parses them and generates standardized events.
-2. **Event Normalization:** The Event Ingestion Service validates the incoming event payload, normalizes it into a canonical event schema, and publishes it to the appropriate RabbitMQ exchange.
+1. **Event Publication:** Events arrive from any registered source system via direct AMQP or REST webhook to the Event Ingestion Service. Closed/legacy systems send emails to the Email Ingest Service, which parses them and generates standardized events.
+2. **Event Normalization:** The Event Ingestion Service validates the incoming event payload, applies runtime mapping configuration to normalize it into a flat canonical event format, and publishes it to the appropriate RabbitMQ exchange. The runtime mapping engine handles source-specific field transformations without code changes.
 3. **Orchestration:** The Notification Engine consumes the normalized event, evaluates notification rules (what templates to use, which recipients to notify, which channels to deliver through), and coordinates with the Template Service for message rendering.
 4. **Template Rendering:** The Template Service resolves the appropriate template version, performs variable substitution with event data, and returns rendered content for each target channel.
 5. **Channel Routing:** The Channel Router receives the rendered message and routes it to the appropriate delivery provider (SendGrid for email, Twilio for SMS/WhatsApp, Firebase Cloud Messaging for push notifications). Retry logic and circuit breakers ensure resilient delivery.
@@ -200,13 +200,13 @@ The platform is decomposed into ten microservices, each with a single well-defin
 | Service | Responsibility | Tech | Communication |
 |---|---|---|---|
 | **notification-gateway** | API Gateway and BFF (Backend for Frontend). Exposes REST endpoints for the admin UI, handles authentication and authorization, validates incoming requests, and routes them to the appropriate backend services. | NestJS | REST (inbound), REST (outbound to services) |
-| **event-ingestion-service** | Receives raw business events from all source systems via RabbitMQ consumers and REST webhooks. Validates, normalizes events into a canonical schema, and publishes them for downstream processing. | NestJS | RabbitMQ (inbound/outbound), REST (webhooks) |
+| **event-ingestion-service** | Receives events from any registered source, applies runtime field mappings, normalizes to canonical format, and publishes them for downstream processing. Sources integrate via direct AMQP or REST webhook; new sources are onboarded through admin configuration without code changes. | NestJS | RabbitMQ (inbound/outbound), REST (webhooks) |
 | **notification-engine-service** | Core orchestrator. Consumes normalized events, evaluates notification rules, resolves recipients, coordinates template rendering with the Template Service, and dispatches delivery requests to the Channel Router. | NestJS | RabbitMQ (inbound/outbound), REST (Template Service) |
 | **template-service** | CRUD management for message templates. Supports variable substitution, multi-channel template variants (email HTML, SMS plain text, WhatsApp structured), template versioning, and preview rendering. | NestJS | REST (inbound from Engine and Admin) |
 | **channel-router-service** | Routes rendered notifications to the appropriate delivery channel and provider. Integrates with SendGrid, Twilio, and FCM. Implements retry logic with exponential backoff and circuit breakers for provider resilience. | NestJS | RabbitMQ (inbound), REST (provider APIs) |
 | **admin-service** | Backoffice administration backend. Manages notification rules, channel configuration, template assignments, recipient groups, and system settings. Serves as the data layer for the Admin UI. | NestJS | REST (inbound from Gateway) |
 | **audit-service** | Notification lifecycle tracking. Records delivery attempts, captures provider receipts, stores status updates, and provides data for analytics dashboards and compliance reporting. | NestJS | RabbitMQ (inbound events), REST (query API) |
-| **email-ingest-service** | SMTP ingest for closed/legacy systems. Receives emails on port 2525, parses them against configurable rules, extracts structured data, and generates standardized events for the ingestion layer. Enables any system that can send email to become an event source. | NestJS | SMTP (inbound), RabbitMQ (outbound), REST (admin API on port 3007) |
+| **email-ingest-service** | SMTP ingest for closed/legacy systems. Receives emails on port 2525, parses them against configurable rules, extracts structured data, and generates standardized events for the ingestion layer. Enables any system that can send email to become an event source. | NestJS | SMTP (inbound), RabbitMQ (outbound), REST (admin API on port 3157) |
 | **bulk-upload-service** | Accepts XLSX file uploads from the Admin UI, parses each row into an event payload, and submits events to the Event Ingestion Service via HTTP. Enables the operative team to trigger bulk notifications from spreadsheet files. | NestJS | REST (inbound from Gateway), HTTP (outbound to Event Ingestion) |
 | **notification-admin-ui** | Admin backoffice frontend. Provides dashboards for notification monitoring, template editor, rule configuration, channel management, recipient group management, and audit log viewer. | Next.js | REST (outbound to Gateway) |
 
@@ -253,7 +253,7 @@ The channel abstraction layer allows switching delivery providers (e.g., SendGri
 | Area | Details |
 |---|---|
 | **Notification Channels** | Email (via SendGrid), SMS (via Twilio), WhatsApp (via Twilio), Push Notifications (via Firebase Cloud Messaging) |
-| **Source System Integration** | OMS events (order lifecycle), Magento 2 events (eCommerce transactions), Mirakl Marketplace events (marketplace operations), Closed/legacy system email integration (via Email Ingest Service) |
+| **Source System Integration** | Any registered source system via REST webhook or direct AMQP with admin-configured runtime field mappings. Initial sources include OMS, Magento 2, and Mirakl Marketplace. Closed/legacy system email integration via Email Ingest Service. New sources onboarded via admin configuration -- no code changes required. |
 | **Core Event Types** | Order placed, order confirmed, order shipped, order delivered, payment received, payment failed, refund processed, shipment tracking update |
 | **Admin Backoffice** | Template management (CRUD, versioning, preview), notification rule configuration, channel management, recipient group management, audit log viewer, delivery analytics dashboard |
 | **Platform Infrastructure** | All nine microservices, RabbitMQ message broker setup, PostgreSQL databases (per-service), Docker containerization, API documentation |
@@ -274,7 +274,7 @@ The channel abstraction layer allows switching delivery providers (e.g., SendGri
 | Constraint | Description | Mitigation |
 |---|---|---|
 | **Local Development Environment** | Development and testing will be conducted on local machines using Docker Compose. No dedicated cloud staging environment is available for Phase 1. | Docker Compose configurations will closely mirror production topology. Integration tests will validate service interactions locally. |
-| **Existing Infrastructure Integration** | Source systems (OMS, Magento, Mirakl) have varying API capabilities and event formats. Some may require custom adapters. | The Event Ingestion Service is designed with pluggable adapters to handle diverse input formats and normalize them into a canonical schema. |
+| **Existing Infrastructure Integration** | Source systems have varying API capabilities and event formats. Each source's payload structure may differ significantly. | The Event Ingestion Service uses a runtime mapping engine with admin-configured field mappings to normalize diverse input formats into a canonical schema. New sources can be onboarded via admin configuration without code changes. |
 | **Provider Rate Limits** | SendGrid, Twilio, and FCM impose rate limits on API calls. High-volume notification bursts may be throttled. | The Channel Router implements rate-limiting queues, exponential backoff retry, and circuit breakers to manage provider throughput constraints gracefully. |
 | **Team Capacity** | The engineering team will be working on the Notification API alongside ongoing maintenance of existing systems. | Phased delivery approach with clear milestones. Microservices architecture enables parallel development across service boundaries. |
 | **Data Privacy & Compliance** | Customer contact data (email addresses, phone numbers) must be handled in compliance with data protection regulations. | Data minimization principles applied. Personally identifiable information (PII) is encrypted at rest. Audit logs redact sensitive fields. Access controls enforce least-privilege. |
