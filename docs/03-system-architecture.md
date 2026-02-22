@@ -179,8 +179,8 @@ The system is organized into five distinct layers, each with a specific responsi
 
 | Layer | Responsibility | Components | Scalability |
 |---|---|---|---|
-| **[Edge]** | Client-facing API surface. Authentication, authorization, rate limiting, request validation, and routing. | notification-admin-ui, notification-gateway | Horizontal — stateless, load-balanced |
-| **[Compute]** | Core business logic. Event normalization, rule evaluation, template rendering, channel routing, administration, and audit recording. | event-ingestion, notification-engine, template-service, channel-router, admin-service, audit-service, email-ingest-service, bulk-upload-service | Horizontal — independent per service |
+| **[Edge]** | Client-facing API surface. Authentication, authorization, rate limiting, request validation, and routing. See [15 — Notification Admin UI](15-notification-admin-ui.md) and [13 — Notification Gateway](13-notification-gateway.md) for deep-dives. | notification-admin-ui, notification-gateway | Horizontal — stateless, load-balanced |
+| **[Compute]** | Core business logic. Event normalization, rule evaluation, template rendering, channel routing, administration, and audit recording. See [16 — Audit Service](16-audit-service.md) for the audit deep-dive. | event-ingestion, notification-engine, template-service, channel-router, admin-service, audit-service, email-ingest-service, bulk-upload-service | Horizontal — independent per service |
 | **[Message]** | Asynchronous inter-service communication. Event fan-out, delivery queue management, dead-letter handling. | RabbitMQ (6 exchanges, multiple queues) | Clustered — mirrored queues |
 | **[Data]** | Persistent storage. Each service owns its database with full schema control. | 9 PostgreSQL schemas | Vertical + read replicas |
 | **[External]** | Third-party provider integrations and source system connections. | SendGrid, Mailgun, Braze, Twilio, FCM, registered source systems | Provider-managed |
@@ -337,6 +337,10 @@ The platform follows the **database-per-service** pattern. Each microservice own
 > **Deep-Dive Available:** For the complete template_service database design — including 4 tables (templates, template_versions, template_channels, template_variables), immutable versioning model, compiled template caching, rendering pipeline, and growth estimates — see [10 — Template Service Deep-Dive §10](10-template-service.md#10-database-design).
 
 > **Deep-Dive Available:** For the complete channel_router_service design — including provider strategy pattern with multi-provider support (SendGrid, Mailgun, Braze, Twilio, FCM), dumb-pipe architecture, delivery pipeline, circuit breaker state machine, retry strategy, fallback channels, webhook receivers, Braze profile sync, asynchronous audit logging, database design with 4 tables, and sequence diagrams — see [11 — Channel Router Service Deep-Dive](11-channel-router-service.md).
+
+> **Deep-Dive Available:** For the complete notification_gateway design — including the 7-step request processing pipeline, JWT and API key authentication, RBAC, sliding window rate limiting, service proxy layer with per-service circuit breakers, response envelope transformation, database design with 4 tables (api_keys, sessions, rate_limits, token_blacklist), sequence diagrams, and configuration — see [13 — Notification Gateway Deep-Dive](13-notification-gateway.md).
+
+> **Deep-Dive Available:** For the complete admin_service design — including user management lifecycle, RBAC permission matrix (4 roles with granular resource-action permissions), cross-service rule validation, event mapping management with RabbitMQ cache invalidation, template delegation, channel configuration with credential masking, dashboard data aggregation with graceful degradation, config invalidation topology (xch.config.events exchange), SAML IdP management, database design with 7 tables (admin_users, admin_roles, admin_permissions, system_configs, saml_identity_providers, user_identity_links, saml_sessions), sequence diagrams, and configuration — see [14 — Admin Service Deep-Dive](14-admin-service.md).
 
 ---
 

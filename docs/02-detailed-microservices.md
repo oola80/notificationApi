@@ -129,6 +129,8 @@ The Notification Gateway acts as the Backend-for-Frontend (BFF) and API Gateway 
 > **Note:** **Authentication Strategy**
 > The gateway uses a two-tier authentication model. Admin users authenticate via local credentials (email/password) or SAML 2.0 SSO with Azure AD — both methods issue platform-managed JWT tokens (short-lived access tokens with refresh token rotation). External source system integrations authenticate using API keys passed in the `X-API-Key` header. API keys are scoped to specific endpoints and rate-limited independently. All tokens and keys are validated on every request before proxying to internal services. Internal service-to-service calls bypass the gateway and use mutual TLS or shared secrets. See [04 — Authentication & Identity](04-authentication-identity.md) for the complete authentication design.
 
+> **Deep-Dive Available:** For the complete Notification Gateway specification — including the 7-step request processing pipeline, JWT and API key authentication flows, RBAC endpoint-to-role mapping, sliding window rate limiting, service proxy layer with per-service circuit breakers, request validation strategy, response envelope transformation, CORS configuration, database design with 4 tables (api_keys, sessions, rate_limits, token_blacklist), sequence diagrams (login, proxy, token refresh, API key, circuit breaker), error handling, security considerations, monitoring metrics, and configuration — see [13 — Notification Gateway Deep-Dive](13-notification-gateway.md).
+
 ---
 
 ## 3. Event Ingestion Service
@@ -776,6 +778,8 @@ The Admin Service provides the backoffice administration layer for the operative
 
 **POST** `/api/v1/event-mappings/:id/test` — Test an event mapping configuration with a sample payload. Accepts a raw source payload in the request body, applies the mapping configuration, and returns the resulting canonical event without persisting or publishing it. Useful for validating mapping configurations before activation.
 
+> **Deep-Dive Available:** For the complete Admin Service specification — including user management lifecycle, RBAC permission matrix with 4 roles (Super Admin, Admin, Operator, Viewer) and granular resource-action permissions, cross-service rule validation pipeline, event mapping management with RabbitMQ cache invalidation, template management delegation, channel configuration with credential masking and connectivity dry-run, recipient group management (static and dynamic), system configuration key-value store, dashboard data aggregation with parallel fan-out and graceful degradation, RabbitMQ config invalidation topology (xch.config.events exchange with mapping/rule/override routing keys), SAML IdP management, database design with 7 tables (admin_users, admin_roles, admin_permissions, system_configs, saml_identity_providers, user_identity_links, saml_sessions), 4 sequence diagrams (login, rule creation with cross-service validation, mapping update with cache invalidation, dashboard aggregation), error handling, security considerations, monitoring metrics, and configuration — see [14 — Admin Service Deep-Dive](14-admin-service.md).
+
 ---
 
 ## 8. Audit Service
@@ -856,6 +860,10 @@ The Audit Service provides a unified trace API that aggregates data from across 
 ```
 
 > **Info:** **Provider Webhook Tracing:** When a provider (SendGrid, Twilio) sends a delivery status webhook, the Channel Router maps it back to the notification using the `provider_message_id` stored in the `delivery_attempts` table at send time. The `provider_message_id` column ensures every successful delivery attempt records the provider's tracking ID, enabling reliable webhook-to-notification correlation. If a webhook arrives for an unknown `provider_message_id`, it is logged as an orphaned receipt in the `delivery_receipts` table for investigation.
+
+> **Success:** **Deep-Dive Available**
+>
+> For a comprehensive specification including the event sourcing model, multi-source capture pipeline, delivery receipt correlation, end-to-end trace reconstruction, analytics aggregation, full-text search, DLQ monitoring, data retention and purge strategy, GDPR compliance, database ERD with 4 tables, sequence diagrams, and configuration — see [16 — Audit Service](16-audit-service.md).
 
 ---
 
@@ -1160,6 +1168,8 @@ The Notification Admin UI is the Next.js-powered backoffice application used by 
 
 > **Note:** **BFF Pattern — Frontend Communication**
 > The Notification Admin UI communicates **exclusively** through the Notification Gateway (BFF) on port `3150`. It never calls internal microservices directly. This provides a single security boundary, consistent API surface, and allows the gateway to handle authentication, rate limiting, and response transformation. The frontend uses `fetch` with JWT bearer tokens stored in HTTP-only cookies for secure authentication. Server components in the Next.js App Router fetch data during SSR through the gateway, while client components use SWR for data fetching with automatic revalidation.
+
+> **Deep-Dive Available:** For the complete Notification Admin UI specification — including Next.js 14 App Router architecture, technology stack (TipTap, SWR, Tailwind CSS, Radix UI, React Hook Form, Recharts, Monaco Editor), application folder structure, authentication and session management (in-memory access tokens, proactive refresh, 401 recovery), RBAC UI visibility matrix (4 roles × 20+ UI elements), SWR data fetching with SSR prefetch, 12 page specifications with ASCII wireframes (dashboard, rules, templates, channels, logs, event mappings, bulk upload, users, recipient groups, audit, settings, identity providers), component architecture hierarchy, API integration layer with 60+ Gateway endpoint mappings, routing table with role-based access, flowcharts (rule creation, template save, bulk upload processing, mapping test), sequence diagrams (local login, SSO login, dashboard SSR prefetch, template live preview, token refresh with 401 recovery), UI data model entity relationships, error handling with two-tier form validation, accessibility (WCAG 2.1 AA), responsive design, testing strategy (Jest, Playwright), security considerations (XSS, CSRF, CSP, token storage), monitoring, and deployment (Docker, Docker Compose, build pipeline) — see [15 — Notification Admin UI Deep-Dive](15-notification-admin-ui.md).
 
 ---
 

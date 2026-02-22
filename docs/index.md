@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Version:** | 1.9 |
+| **Version:** | 2.3 |
 | **Date:** | 2026-02-21 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
@@ -134,6 +134,36 @@ Deep-dive into the Channel Router Service — provider strategy pattern with mul
 
 [Read Channel Router Service](11-channel-router-service.md)
 
+### 12 — RabbitMQ Topology
+
+Consolidated RabbitMQ topology reference — exchanges, queues, bindings, routing keys, dead-letter configuration, consumer allocation, retry configuration, and importable definitions file.
+
+[Read RabbitMQ Topology](12-rabbitmq-topology.md)
+
+### 13 — Notification Gateway
+
+Deep-dive into the Notification Gateway (BFF/API Gateway) — 7-step request processing pipeline, JWT and API key authentication, RBAC with endpoint-to-role mapping, sliding window rate limiting, service proxy layer with per-service circuit breakers, request validation, response envelope transformation, CORS configuration, database design with 4 tables (api_keys, sessions, rate_limits, token_blacklist), sequence diagrams (login, proxy, token refresh, API key, circuit breaker), error handling, security considerations, monitoring metrics, and configuration.
+
+[Read Notification Gateway](13-notification-gateway.md)
+
+### 14 — Admin Service
+
+Deep-dive into the Admin Service (Backoffice Administration) — user management lifecycle with RBAC (4 roles: Super Admin, Admin, Operator, Viewer), cross-service notification rule validation pipeline, event mapping management with RabbitMQ cache invalidation, template management delegation, channel configuration with credential masking and connectivity dry-run, recipient group management (static and dynamic), system configuration key-value store, dashboard data aggregation with parallel fan-out and graceful degradation, RabbitMQ config invalidation topology (xch.config.events exchange), SAML 2.0 IdP management, database design with 7 tables, sequence diagrams (login, rule creation, mapping update, dashboard aggregation), error handling, security considerations, and configuration.
+
+[Read Admin Service](14-admin-service.md)
+
+### 15 — Notification Admin UI
+
+Deep-dive into the Notification Admin UI (Next.js Frontend) — Next.js 14 App Router architecture with TypeScript, technology stack (TipTap WYSIWYG, SWR data fetching, Tailwind CSS, Radix UI, React Hook Form, Recharts, Monaco Editor), application folder structure, authentication and session management (in-memory access tokens with proactive refresh and 401 recovery), RBAC UI visibility matrix (4 roles across 20+ UI elements), SWR data fetching with SSR prefetch fallback, 12 page specifications with ASCII wireframes (dashboard, rules, templates, channels, logs, event mappings, bulk upload, users, recipient groups, audit, settings, identity providers), component architecture hierarchy, API integration layer with 60+ Gateway endpoint mappings, routing table with role-based access, flowcharts (rule creation, template save, bulk upload processing, mapping test), sequence diagrams (local login, SSO login, dashboard SSR prefetch, template live preview, token refresh with 401 recovery), UI data model entity relationships, error handling with two-tier form validation, accessibility (WCAG 2.1 AA), responsive design, testing strategy, security considerations, monitoring, and deployment.
+
+[Read Notification Admin UI](15-notification-admin-ui.md)
+
+### 16 — Audit Service
+
+Deep-dive into the Audit Service — event sourcing model with append-only immutable audit trail, multi-source event capture pipeline (5 RabbitMQ consumers with batch insert optimization), delivery receipt correlation via `provider_message_id`, end-to-end notification trace reconstruction, analytics aggregation engine with hourly/daily rollups, full-text search using PostgreSQL `tsvector`/`tsquery`, dead-letter queue monitoring with investigation and reprocessing support, two-tier data retention and purge strategy (90-day payload / 2-year metadata), GDPR compliance (Right to Erasure anonymization, Right of Access export), database design with 4 tables (`audit_events`, `delivery_receipts`, `notification_analytics`, `dlq_entries`), 4 sequence diagrams (full lifecycle accumulation, delivery receipt correlation, analytics aggregation, DLQ capture and reprocessing), error handling with consumer resilience, security considerations, monitoring metrics, and configuration.
+
+[Read Audit Service](16-audit-service.md)
+
 ---
 
-*Notification API Documentation v1.9 -- Architecture Team -- 2026*
+*Notification API Documentation v2.3 -- Architecture Team -- 2026*

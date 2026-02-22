@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Version:** | 2.1 |
+| **Version:** | 2.4 |
 | **Date:** | 2026-02-21 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
@@ -14,6 +14,11 @@
 ## Table of Contents
 
 - [About This Changelog](#about-this-changelog)
+- [Version 3.7](#version-37--2026-02-21) — Audit Service Deep-Dive
+- [Version 3.6](#version-36--2026-02-21) — Notification Admin UI Deep-Dive
+- [Version 3.5](#version-35--2026-02-21) — Admin Service Deep-Dive
+- [Version 3.4](#version-34--2026-02-21) — Notification Gateway Deep-Dive
+- [Version 3.3](#version-33--2026-02-21) — RabbitMQ Topology Reference
 - [Version 3.2](#version-32--2026-02-21) — Channel Router Service Deep-Dive
 - [Version 3.1](#version-31--2026-02-21) — Multi-Item Row Grouping for Bulk Upload Service
 - [Version 3.0](#version-30--2026-02-21) — Canonical Schema "Flat" Terminology Clarification
@@ -47,6 +52,138 @@ This document tracks all notable changes to the Notification API documentation a
 > **Info:** **Change Types**
 >
 > Each entry is categorized using one of the following types: **Added**, **Changed**, **Fixed**, **Removed**, **Deprecated**.
+
+---
+
+## Version 3.7 — 2026-02-21
+
+**Audit Service Deep-Dive**
+
+Adds a comprehensive standalone deep-dive document for the Audit Service. Covers the event sourcing model with append-only immutable audit trail and event type taxonomy (~20 types grouped by lifecycle stage), multi-source event capture pipeline with 5 independent consumer groups (one per RabbitMQ queue) and batch insert optimization (configurable batch size and flush interval), delivery receipt correlation via `provider_message_id` with provider status normalization and orphaned webhook handling, end-to-end notification trace reconstruction (5-step algorithm merging `audit_events` and `delivery_receipts` into chronological timelines), cross-notification tracing via `correlation_id` and `cycle_id`, analytics aggregation engine with hourly/daily rollup jobs using idempotent upsert strategy, full-text search using PostgreSQL `tsvector`/`tsquery` with weighted GIN index, dead-letter queue monitoring with status tracking (pending/investigated/reprocessed/discarded) and manual reprocessing endpoint, RabbitMQ topology (5 consumed queues across 4 exchanges, 9 consumers, no outbound publishing), 12 REST API endpoints across 6 categories (trace, logs, receipts, analytics, DLQ, health), database design with 4 tables (`audit_events` with full-text search vector, `delivery_receipts` with provider correlation, `notification_analytics` with upsert key, `dlq_entries` with status tracking) and 14 indexes, two-tier data retention and purge strategy (90-day payload NULLing / 2-year metadata retention) with `purge_audit_payloads()` PL/pgSQL function and partitioning recommendation, 4 sequence diagrams (full lifecycle audit accumulation, delivery receipt correlation, analytics aggregation job, DLQ capture and reprocessing), error handling with consumer resilience (6 error types, poison message handling, idempotency), GDPR compliance (Right to Erasure anonymization, Right of Access export, CAN-SPAM, consent tracking, data access logging), security considerations (data classification, RBAC per endpoint, PII masking, encryption), 14 monitoring metrics with alerting thresholds, and 20 environment variables. Existing docs updated with cross-reference callouts, index card, and CLAUDE.md listing.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | 16 — Audit Service Deep-Dive document (MD) with 19 sections covering service overview, architecture & integration points, event sourcing model, multi-source event capture pipeline, delivery receipt correlation, end-to-end notification trace, analytics aggregation engine, full-text search, dead-letter queue monitoring, RabbitMQ topology, REST API endpoints (12 endpoints across 6 categories), database design (4 tables, 14 indexes), data retention & purge strategy, sequence diagrams (4), error handling & consumer resilience, GDPR & compliance, security considerations, monitoring & health checks, and configuration | 16-audit-service |
+| **Added** | Event sourcing model with immutability contract, AuditEvent schema, event type taxonomy (~20 types across 7 lifecycle stages), correlation model (notification_id, correlation_id, cycle_id), and notification lifecycle state diagram | 16-audit-service |
+| **Added** | Multi-source event capture pipeline with 5 consumer groups (Events, Deliver, Status, Template, DLQ), batch insert optimization (configurable batch size and flush interval), and fire-and-forget resilience design | 16-audit-service |
+| **Added** | Delivery receipt correlation strategy with provider_message_id, provider status normalization mapping (20 provider-specific statuses across SendGrid, Mailgun, Twilio, FCM, Braze), and orphaned webhook handling | 16-audit-service |
+| **Added** | End-to-end notification trace with 5-step reconstruction algorithm, `GET /audit/trace/:notificationId` full spec, timeline stage table (19 stages), cross-notification tracing via correlation_id/cycle_id, and trace merge diagram | 16-audit-service |
+| **Added** | Analytics aggregation engine with hourly/daily scheduling, 8 metrics, idempotent upsert, and 5 dashboard query patterns | 16-audit-service |
+| **Added** | Full-text search using PostgreSQL tsvector/tsquery with weighted GIN index (4 weight tiers) and compound search API | 16-audit-service |
+| **Added** | Dead-letter queue monitoring with DLQ entry structure, 4 status states (pending, investigated, reprocessed, discarded), and manual reprocessing endpoint | 16-audit-service |
+| **Added** | Database design with 4 tables (audit_events, delivery_receipts, notification_analytics, dlq_entries), 14 indexes, growth estimates (~13.5 GB/year), and ASCII ERD | 16-audit-service |
+| **Added** | Two-tier data retention strategy (90-day payload / 2-year metadata), `purge_audit_payloads()` PL/pgSQL function, DLQ entry retention policy, and partitioning recommendation | 16-audit-service |
+| **Added** | 4 sequence diagrams: full lifecycle audit accumulation, delivery receipt correlation from provider webhook, analytics aggregation job with idempotent upsert, DLQ capture investigation and reprocessing | 16-audit-service |
+| **Added** | GDPR compliance: Right to Erasure anonymization endpoint, Right of Access JSON export, CAN-SPAM unsubscribe tracking, consent change logging, data access audit logging | 16-audit-service |
+| **Added** | 14 monitoring metrics with alerting thresholds and 20 environment variables | 16-audit-service |
+| **Added** | Cross-reference callout added after Audit Service section linking to the new deep-dive document | 02-detailed-microservices |
+| **Added** | Compute Layer description updated with cross-reference to audit service deep-dive document | 03-system-architecture |
+| **Added** | Documentation card for doc 16 added to hub page | index |
+| **Changed** | Index hub page version bumped to 2.3, date updated to 2026-02-21, doc 16 card added | index |
+| **Changed** | CLAUDE.md updated with doc 16 in documentation file listing and audit-service database tables description updated with dlq_entries table | CLAUDE.md |
+
+---
+
+## Version 3.6 — 2026-02-21
+
+**Notification Admin UI Deep-Dive**
+
+Adds a comprehensive standalone deep-dive document for the Notification Admin UI (Next.js Frontend). Covers the Next.js 14 App Router architecture with TypeScript, technology stack (TipTap WYSIWYG editor, SWR data fetching with caching and revalidation, Tailwind CSS, Radix UI accessible primitives, React Hook Form with Zod validation, Recharts for dashboard visualizations, Monaco Editor for JSON payloads), application folder structure with feature-based organization, authentication and session management (in-memory access token storage for XSS prevention, proactive token refresh at 13-minute mark, HTTP-only refresh cookie, 401 interceptor with automatic retry), login page with local credentials and conditional SSO button, RBAC enforcement in the UI (permission check utility with `useRBAC` hook, UI visibility matrix for 4 roles across 20+ UI elements, client-side enforcement as UX optimization with Gateway as security boundary), SWR data fetching strategy (revalidate on focus, deduplication, error retry, configurable polling per resource, SSR prefetch with SWR fallback for zero-loading-state first paint), 12 detailed page specifications with ASCII wireframes (dashboard with metric cards, volume chart, channel breakdown, delivery rates, channel health, top rules, recent failures, and graceful degradation; rule management with condition builder, template picker, channel selector, suppression config, and cross-service validation feedback; template editor with TipTap WYSIWYG for email, plain text for SMS/WhatsApp, structured form for push, live preview with debounced rendering, variable detection, and version history; channel configuration with health cards and provider-specific forms; notification logs with lifecycle timeline, rendered content preview, and delivery attempts; event mapping editor with visual field mapping builder and mapping test panel with Monaco editor; bulk upload with drag-and-drop, real-time progress polling, error detail panel; user management; recipient groups with static/dynamic types; audit log viewer; system configuration; SAML IdP settings), component architecture hierarchy (SessionProvider → AuthGuard → RBACProvider → SidebarLayout → PageContent), shared component library (DataTable, StatusBadge, ConfirmDialog, EmptyState, Pagination, SearchInput, DateRangePicker), API integration layer with fetch wrapper (base URL, auth headers, response parsing, token refresh interceptor), 60+ Gateway endpoint mappings across 12 feature areas, routing table with 30+ routes and role-based access requirements, sidebar navigation with role-conditional sections, 4 flowcharts (rule creation end-to-end, template save with versioning, bulk upload processing with polling, mapping test), 5 sequence diagrams (local login, SSO login with SAML redirect, dashboard SSR prefetch with SWR fallback, template live preview with debounced rendering, token refresh with 401 recovery), UI data model entity relationships (NotificationRule, Template, TemplateVersion, Notification, Channel, EventMapping, BulkUpload, RecipientGroup, DashboardStats), error handling with two-tier validation (client-side Zod + server-side API errors mapped to form fields), toast notification system (success/error/warning/info), accessibility standards (WCAG 2.1 AA, keyboard navigation, screen reader support, color contrast, focus indicators, reduced motion), responsive breakpoints (desktop/tablet/mobile with desktop as primary target), testing strategy (Jest unit tests for hooks and utilities, React Testing Library for components, Playwright E2E for 7 critical flows), security considerations (XSS prevention, CSRF protection, CSP headers, token storage strategy, clickjacking prevention, dependency auditing), client-side monitoring (page load time, API latency, error rate, auth refresh tracking), deployment (multi-stage Docker build with standalone output, Docker Compose entry, build pipeline with lint/typecheck/test/build/deploy stages, performance optimization including code splitting, lazy loading, and SWR caching), and 14 environment variables. Existing docs updated with cross-reference callouts, index card, and CLAUDE.md listing.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | 15 — Notification Admin UI Deep-Dive document (MD) with 21 sections covering service overview, architecture & integration points, technology stack & libraries, application structure, authentication & session management, RBAC in the UI, data fetching & state management, page specifications (12 pages with ASCII wireframes), component architecture, API integration layer (60+ endpoint mappings), routing & navigation, flowcharts (4), sequence diagrams (5), entity relationship UI data model, error handling & user feedback, accessibility & responsive design, testing strategy, security considerations, monitoring & observability, configuration (14 environment variables), and deployment | 15-notification-admin-ui |
+| **Added** | Dashboard page specification with ASCII wireframe layout, 7 data source widgets with polling intervals, and graceful degradation behavior | 15-notification-admin-ui |
+| **Added** | Rule management page specification with ASCII wireframe for create/edit form including condition builder, template picker, channel selector, suppression configuration, and cross-service validation feedback | 15-notification-admin-ui |
+| **Added** | Template editor page specification with ASCII wireframe showing TipTap WYSIWYG editor, live preview panel, variable detection, and channel-specific editors (email HTML, SMS 160-char, WhatsApp 4096-char, push structured form) | 15-notification-admin-ui |
+| **Added** | Event mapping editor page specification with ASCII wireframe showing field mapping table, test panel with Monaco editor for JSON input, and normalized output display | 15-notification-admin-ui |
+| **Added** | Bulk upload page specification with ASCII wireframe for drag-and-drop upload zone, progress bar with real-time polling, and upload history table | 15-notification-admin-ui |
+| **Added** | Notification detail page specification with ASCII wireframe showing lifecycle timeline, rendered content preview, and delivery attempt history | 15-notification-admin-ui |
+| **Added** | Authentication flow diagram with token refresh mechanism (proactive refresh at 13-minute mark, 401 interceptor with single retry, replay detection handling) | 15-notification-admin-ui |
+| **Added** | RBAC UI visibility matrix: 4 roles (Super Admin, Admin, Operator, Viewer) × 20+ UI elements with Show/Hidden/Read-only states | 15-notification-admin-ui |
+| **Added** | SWR data fetching architecture diagram with SSR prefetch pattern (server components fetch during SSR, serialize as SWR fallback, client hydrates instantly) | 15-notification-admin-ui |
+| **Added** | 4 flowcharts: rule creation end-to-end (client validation → API call → server validation → success/error), template save with version creation, bulk upload processing with polling loop, mapping test with JSON validation | 15-notification-admin-ui |
+| **Added** | 5 sequence diagrams: local login (form → Gateway → Admin Service → JWT), SSO login (SSO button → Gateway redirect → Azure AD → SAML callback → JWT), dashboard SSR prefetch (server component → refresh token → fetch → HTML with fallback → client hydration → SWR polling), template live preview (debounced editor → API → Template Service render → preview update), token refresh with 401 recovery (expired request → 401 → refresh → retry → success) | 15-notification-admin-ui |
+| **Added** | UI data model entity relationship diagram showing logical relationships between NotificationRule, Template, TemplateVersion, Notification, Channel, EventMapping, BulkUpload, RecipientGroup, and DashboardStats | 15-notification-admin-ui |
+| **Added** | Cross-reference callout added after Notification Admin UI section linking to the new deep-dive document | 02-detailed-microservices |
+| **Added** | Edge Layer description updated with cross-reference to new deep-dive document | 03-system-architecture |
+| **Added** | Documentation card for doc 15 added to hub page | index |
+| **Changed** | Index hub page version bumped to 2.2, date updated to 2026-02-21, doc 15 card added | index |
+| **Changed** | CLAUDE.md updated with doc 15 in documentation file listing | CLAUDE.md |
+
+---
+
+## Version 3.5 — 2026-02-21
+
+**Admin Service Deep-Dive**
+
+Adds a comprehensive standalone deep-dive document for the Admin Service (Backoffice Administration). Covers the user management lifecycle with 4-state state machine (Active, Locked, Deactivated, Password Reset Pending), password policy enforcement (bcrypt cost 12, 12+ char complexity, history of 5, 90-day max age, 5-attempt lockout), RBAC permission matrix with 4 predefined roles (Super Admin, Admin, Operator, Viewer) across 16 resource-action categories, cross-service notification rule validation pipeline (event type existence via Event Ingestion, template existence via Template Service, channel availability via Channel Router, suppression config structural validation), event mapping management with RabbitMQ cache invalidation via `xch.config.events` exchange (`config.mapping.*` routing keys), template management delegation (transparent proxy to Template Service), channel configuration management with credential masking and optional connectivity dry-run, recipient group management (static member lists and dynamic criteria-based groups), system configuration key-value store (retention, feature flags, rate limits, provider defaults), dashboard data aggregation with parallel fan-out queries to 4 downstream services and graceful degradation (partial results with `degraded` flag), RabbitMQ config invalidation topology with 9 routing keys across 3 categories (mapping, rule, override), SAML 2.0 Identity Provider management (metadata XML import, attribute mapping, auto-provisioning, SP keypair generation), comprehensive REST API documentation across 10 categories (users, rules, event mappings, channels, recipient groups, dashboard, system config, SAML IdP, audit logs, health), database design with 7 tables (admin_users with password history and lockout, admin_roles with permission JSONB and hierarchy level, admin_permissions as resource-action catalog, system_configs with value type hints, saml_identity_providers with encrypted SP private keys, user_identity_links with cascading delete, saml_sessions for SLO support), ERD diagram, growth estimates (~100 MB max projected), 4 sequence diagrams (admin login with bcrypt validation, rule creation with cross-service validation fan-out, mapping update with RabbitMQ cache invalidation, dashboard aggregation with parallel fan-out), error handling with downstream failure strategies, security considerations (authentication boundary, SAML security, credential encryption at rest with AES-256-GCM, audit logging, input validation), 14 monitoring metrics, and 20+ environment variables. Existing docs updated with cross-reference callouts, index card, and CLAUDE.md listing.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | 14 — Admin Service Deep-Dive document (MD) with 19 sections covering service overview, architecture & integration points, user management, RBAC, notification rule management, event mapping management, template management delegation, channel configuration management, recipient group management, system configuration, dashboard data aggregation, RabbitMQ config invalidation topology, REST API endpoints (10 categories), database design (7 tables), sequence diagrams (4), error handling, security considerations, monitoring & health checks, and configuration | 14-admin-service |
+| **Added** | User management lifecycle flowchart with 6-step creation pipeline and 4-state state machine (Active, Locked, Deactivated, Password Reset Pending) | 14-admin-service |
+| **Added** | RBAC permission matrix with 4 roles × 16 resource-action categories and permission enforcement pipeline flowchart | 14-admin-service |
+| **Added** | Cross-service rule validation pipeline flowchart: event type check (Event Ingestion) → template check (Template Service) → channel check (Channel Router) → suppression validation → forward to Notification Engine → publish cache invalidation | 14-admin-service |
+| **Added** | Event mapping CRUD with cache invalidation flowchart and mapping test endpoint dry-run flow | 14-admin-service |
+| **Added** | Channel configuration management with credential masking patterns and optional connectivity dry-run | 14-admin-service |
+| **Added** | Recipient group management with static (explicit member lists) and dynamic (criteria-based) group types | 14-admin-service |
+| **Added** | Dashboard data aggregation with parallel fan-out flow and graceful degradation (partial results with `degraded` flag and `unavailableServices` list) | 14-admin-service |
+| **Added** | RabbitMQ config invalidation topology: `xch.config.events` exchange with 9 routing keys across 3 categories (`config.mapping.*`, `config.rule.*`, `config.override.*`) consumed by Event Ingestion and Notification Engine caches | 14-admin-service |
+| **Added** | Database design with 7 tables: `admin_users` (with password_history JSONB, failed_login_attempts, locked_until), `admin_roles` (with permissions JSONB and hierarchy level), `admin_permissions` (resource-action catalog), `system_configs` (key-value with value_type hints), `saml_identity_providers` (with encrypted sp_private_key, auto_provision, default_role_id), `user_identity_links` (with CASCADE delete), `saml_sessions` (for SLO support) | 14-admin-service |
+| **Added** | ERD diagram showing relationships between admin_users → admin_roles, admin_users → user_identity_links → saml_identity_providers, admin_users → saml_sessions → saml_identity_providers | 14-admin-service |
+| **Added** | 4 sequence diagrams: admin login (local auth with bcrypt validation, JWT issuance), rule creation (cross-service validation with 4 downstream checks, cache invalidation), mapping update (forward to Event Ingestion, RabbitMQ cache invalidation, consumer reload), dashboard aggregation (parallel fan-out to 4 services, response assembly) | 14-admin-service |
+| **Added** | 14 monitoring metrics: login totals/failures, account lockouts, CRUD operations, downstream errors/latency, dashboard latency/degradation, config publish totals/failures, active users, SAML assertions, DB pool | 14-admin-service |
+| **Added** | 20+ environment variables covering port, database, RabbitMQ, JWT, bcrypt, password policy, lockout, downstream timeouts, SAML, config invalidation, logging, health checks, credential encryption | 14-admin-service |
+| **Added** | Cross-reference callout added after Admin Service section linking to the new deep-dive document | 02-detailed-microservices |
+| **Added** | Cross-reference callout added after entity relationships section linking to admin_service design | 03-system-architecture |
+| **Added** | Documentation card for doc 14 added to hub page | index |
+| **Changed** | Index hub page version bumped to 2.1, date updated to 2026-02-21, doc 14 card added | index |
+| **Changed** | CLAUDE.md updated with doc 14 in documentation file listing | CLAUDE.md |
+
+---
+
+## Version 3.4 — 2026-02-21
+
+**Notification Gateway Deep-Dive**
+
+Adds a comprehensive standalone deep-dive document for the Notification Gateway (BFF/API Gateway). Covers the 7-step request processing pipeline (CORS, correlation ID, authentication, authorization, rate limiting, validation, proxy & transform), two-tier authentication model (JWT bearer tokens for admin users with RS256 signature verification and refresh token rotation with replay detection; API key authentication for external integrations with SHA-256 hashing, endpoint scoping, and key rotation with grace periods), role-based access control with declarative endpoint-to-role mapping for all 4 roles (Super Admin, Admin, Operator, Viewer) plus API key scoping, URL-based API versioning (`/api/v1/`) with deprecation headers, service proxy layer with per-service circuit breakers (configurable failure threshold, cooldown, half-open test), Axios-based HTTP forwarding with header propagation (`X-Correlation-ID`, `X-User-ID`, `X-User-Role`, `X-Service-Signature`), multipart streaming for bulk upload, multi-layer sliding window rate limiting (global per-IP, per-user, per-API-key, per-endpoint overrides with Redis upgrade path), request validation using NestJS class-validator DTOs with field-level error responses, response envelope transformation (`{ data, meta, errors }`) with consistent HTTP status code mapping, CORS configuration with credentials support and explicit origin allowlist, comprehensive REST API endpoint documentation across 13 categories (auth, SAML SSO, notifications, templates, rules, channels, event mappings, bulk upload, email ingest, audit/dashboard, user management, API key management, health), database design with 4 tables (`api_keys`, `sessions`, `rate_limits`, `token_blacklist`) including indexes and growth estimates, 5 sequence diagrams (admin login, authenticated proxy, token refresh with replay detection, API key request, downstream circuit breaker trip and recovery), error handling with centralized exception filters and structured logging, security considerations (JWT key security, timing-safe API key comparison, header injection prevention, request smuggling protection), 14 monitoring metrics, and 35+ environment variables. Existing docs updated with cross-reference callouts, index card, and CLAUDE.md listing.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | 13 — Notification Gateway Deep-Dive document (MD) with 17 sections covering service overview, architecture & integration points, request processing pipeline, authentication & authorization (JWT + API key), API versioning & routing, service proxy layer, rate limiting, request validation, response transformation, CORS configuration, REST API endpoints (13 categories), database design (4 tables), sequence diagrams (5), error handling, security considerations, monitoring & health checks, and configuration | 13-notification-gateway |
+| **Added** | 7-step request processing pipeline flowchart: CORS → Correlation ID → Authentication → Authorization → Rate Limiting → Validation → Proxy & Transform | 13-notification-gateway |
+| **Added** | JWT validation flow diagram with RS256 signature verification, expiry check, issuer validation, and token blacklist lookup | 13-notification-gateway |
+| **Added** | API key validation flow diagram with SHA-256 hash lookup, active/expiry check, and endpoint scope verification | 13-notification-gateway |
+| **Added** | RBAC endpoint-to-role mapping table covering all gateway endpoints across 4 roles + API key scoping | 13-notification-gateway |
+| **Added** | Service proxy layer with per-service circuit breaker state machine (CLOSED → OPEN → HALF_OPEN) and configuration | 13-notification-gateway |
+| **Added** | Multi-layer rate limiting architecture: global per-IP, per-user, per-API-key, per-endpoint overrides with sliding window counter algorithm | 13-notification-gateway |
+| **Added** | Response envelope transformation (`{ data, meta, errors }`) with HTTP status code mapping table (14 scenarios) | 13-notification-gateway |
+| **Added** | Database design with 4 tables: `api_keys` (external API key management with SHA-256 hashing and endpoint scoping), `sessions` (refresh token sessions with token family rotation tracking), `rate_limits` (sliding window counters), `token_blacklist` (revoked JWT tracking with automatic cleanup) | 13-notification-gateway |
+| **Added** | 5 sequence diagrams: admin login flow (local auth), authenticated API request proxy, token refresh with replay detection, API key external integration request, downstream service failure with circuit breaker trip and recovery | 13-notification-gateway |
+| **Added** | API key management endpoints: list, create, update, revoke, rotate with grace period | 13-notification-gateway |
+| **Added** | 14 monitoring metrics: request counters, duration histograms, auth failures, rate limit hits, circuit breaker state/trips, active sessions, API keys, proxy retries/timeouts, token refresh, replay detection | 13-notification-gateway |
+| **Added** | 35+ environment variables covering port, JWT, CORS, rate limiting, proxy, circuit breaker, service URLs, SAML, and logging | 13-notification-gateway |
+| **Added** | Cross-reference callout added after Notification Gateway section linking to the new deep-dive document | 02-detailed-microservices |
+| **Added** | Cross-reference callout added after database architecture section linking to notification_gateway deep-dive | 03-system-architecture |
+| **Added** | Documentation card for doc 13 added to hub page | index |
+| **Added** | Documentation card for doc 12 added to hub page (previously missing) | index |
+| **Changed** | Index hub page version bumped to 2.0, date updated to 2026-02-21, doc 13 card added | index |
+| **Changed** | CLAUDE.md updated with doc 13 in documentation file listing | CLAUDE.md |
+
+---
+
+## Version 3.3 — 2026-02-21
+
+**RabbitMQ Topology Reference**
+
+Adds a consolidated, authoritative RabbitMQ topology reference document and an importable RabbitMQ definitions JSON file. The Markdown document covers all 6 exchanges, 23 queues (22 service queues + 1 central DLQ), 24 bindings, routing key patterns, dead-letter configuration, consumer allocation summaries, retry configuration per service, and a system-wide ASCII message flow diagram — all scoped to vhost `vhnotificationapi`. The definitions JSON (`rabbitmq/definitions.json`) is importable via the RabbitMQ Management UI, `rabbitmqadmin`, or `management.load_definitions` config. Previously this topology was spread across docs 02, 03, 07, 08, 09, 10, and 11; this document consolidates it into a single source of truth.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | 12 — RabbitMQ Topology reference document (MD) with 12 sections covering overview, vhost, exchanges (6), queues (23), bindings (24), routing key reference, dead-letter configuration, consumer allocation summary, retry configuration per service, system-wide message flow diagram, importable definitions file reference, and topology counts summary | 12-rabbitmq-topology |
+| **Added** | `rabbitmq/definitions.json` — importable RabbitMQ definitions file with vhost `vhnotificationapi`, 6 exchanges, 23 queues (with DLX arguments), and 24 bindings | rabbitmq/definitions.json |
+| **Added** | Documentation card for doc 12 added to CLAUDE.md docs listing | CLAUDE.md |
 
 ---
 
@@ -536,4 +673,4 @@ First release of the Notification API design documentation. Establishes the foun
 
 ---
 
-*Notification API Documentation v3.2 -- Architecture Team -- 2026*
+*Notification API Documentation v3.6 -- Architecture Team -- 2026*
