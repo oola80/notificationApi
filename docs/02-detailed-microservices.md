@@ -42,7 +42,7 @@ The following table provides a high-level summary of every service in the ecosys
 | **Event Ingestion** | `3151` | `event_ingestion_service` | Receive & normalize events from source systems | RabbitMQ |
 | **Notification Engine** | `3152` | `notification_engine_service` | Rule matching, orchestration, lifecycle management | Event Ingestion, Template Service, Channel Router, RabbitMQ |
 | **Template Service** | `3153` | `template_service` | Template CRUD, rendering with Handlebars | PostgreSQL |
-| **Channel Router** | `3154` | `channel_router_service` | Route to delivery providers (SendGrid, Twilio, Firebase) | External providers, RabbitMQ |
+| **Channel Router** | `3154` | `channel_router_service` | Route to delivery providers (SendGrid, Mailgun, Braze, Twilio, FCM) via provider strategy pattern; dumb pipe architecture | External providers, RabbitMQ |
 | **Admin Service** | `3155` | `admin_service` | Backoffice administration, user & rule management | Notification Engine, Template Service, Channel Router |
 | **Audit Service** | `3156` | `audit_service` | Event sourcing, delivery tracking, compliance logging | RabbitMQ (all status exchanges) |
 | **Email Ingest** | `3157` / `2525` | `email_ingest_service` | SMTP ingest — receive emails, parse against rules, generate events | RabbitMQ, PostgreSQL |
@@ -116,6 +116,8 @@ The Notification Gateway acts as the Backend-for-Frontend (BFF) and API Gateway 
 
 **GET** `/api/v1/audit/logs` — Retrieve audit logs with comprehensive filtering. Supports query parameters: `action`, `userId`, `resourceType`, `dateFrom`, `dateTo`, `page`, `limit`.
 
+**GET** `/api/v1/notifications/:id/trace` — End-to-end notification trace. Returns the complete lifecycle timeline for a notification aggregated from all services — event ingestion, rule matching, template rendering, delivery attempts, and provider-confirmed delivery status. Proxied to the Audit Service (`GET /audit/trace/:notificationId`).
+
 **GET** `/api/v1/dashboard/stats` — Dashboard statistics endpoint. Returns aggregated metrics including total notifications sent (by channel, by status), delivery success rates, average delivery latency, and trend data for configurable time windows.
 
 **POST** `/api/v1/auth/login` — Local authentication endpoint. Validates email/password credentials and issues JWT access token + refresh token cookie. Rate limited: 5 failed attempts per account per 15 minutes.
@@ -148,7 +150,7 @@ The Event Ingestion Service is the universal entry point for all business events
 - **REST Webhook Endpoint:** An HTTP endpoint (`POST /webhooks/events`) for external integrations that cannot publish directly to RabbitMQ. Accepts events with a `sourceId` identifier and processes them through the same normalization pipeline.
 - **Event Mapping Validation:** Validates incoming events against the mapping configuration registered for the given source and event type. Invalid events are rejected with detailed error messages and logged for investigation.
 - **Event Normalization:** Transforms source-specific event payloads into the canonical event format using runtime field mappings. This includes field mapping, data type coercion, timestamp normalization (to ISO-8601 UTC), enrichment with metadata (correlation IDs, source event IDs), and priority assignment from the mapping configuration.
-- **Publishing Normalized Events:** Publishes validated and normalized events to the `events.normalized` exchange with priority-tiered routing keys (`event.{priority}.{eventType}`) for downstream consumers.
+- **Publishing Normalized Events:** Publishes validated and normalized events to the `xch.events.normalized` exchange with priority-tiered routing keys (`event.{priority}.{eventType}`) for downstream consumers.
 - **Event Persistence:** Stores all raw and normalized events in the database for auditability and replay capabilities.
 
 ### RabbitMQ Configuration
@@ -157,16 +159,16 @@ The Event Ingestion Service is the universal entry point for all business events
 
 | Exchange | Type | Purpose | Durable |
 |---|---|---|---|
-| `events.incoming` | Topic | Receives raw events from source systems | Yes |
-| `events.normalized` | Topic | Publishes normalized canonical events with priority-tiered routing keys (`event.{priority}.{eventType}`) | Yes |
+| `xch.events.incoming` | Topic | Receives raw events from source systems | Yes |
+| `xch.events.normalized` | Topic | Publishes normalized canonical events with priority-tiered routing keys (`event.{priority}.{eventType}`) | Yes |
 
 #### Queues
 
 | Queue | Bound To | Routing Key | Consumer Concurrency |
 |---|---|---|---|
-| `q.events.amqp` | `events.incoming` | `source.*.#` | 3 |
-| `q.events.webhook` | `events.incoming` | `source.webhook.#` | 2 |
-| `q.events.email-ingest` | `events.incoming` | `source.email-ingest.#` | 2 |
+| `q.events.amqp` | `xch.events.incoming` | `source.*.#` | 3 |
+| `q.events.webhook` | `xch.events.incoming` | `source.webhook.#` | 2 |
+| `q.events.email-ingest` | `xch.events.incoming` | `source.email-ingest.#` | 2 |
 
 ### Canonical Event Schema (v2.0 — Flat Format)
 
@@ -193,6 +195,14 @@ The Event Ingestion Service is the universal entry point for all business events
   ],
   "totalAmount": 79.99,
   "currency": "USD",
+  "media": [
+    {
+      "type": "image",
+      "url": "https://cdn.store.com/products/headphones-200x200.jpg",
+      "alt": "Wireless Headphones",
+      "context": "inline"
+    }
+  ],
   "metadata": {
     "correlationId": "corr-8f14e45f-ceea-467f-a8f5-5f1b39e5c7e2",
     "sourceEventId": "OMS-EVT-78901",
@@ -203,8 +213,8 @@ The Event Ingestion Service is the universal entry point for all business events
 }
 ```
 
-> **Info:** **Flat Event Schema (v2.0)**
-> The canonical event schema uses a flat structure where business fields (`customerEmail`, `orderId`, `customerId`, `totalAmount`, etc.) are placed at the top level rather than nested under a `payload` object. This simplifies rule conditions, template variable access, and suppression dedup key paths — all field references use direct names (e.g., `customerEmail`) instead of dot-notation paths (e.g., `payload.customerEmail`). The `sourceId` field identifies the registered source system that produced the event.
+> **Info:** **Flat Top-Level Namespace (v2.0)**
+> The canonical event schema uses a flat top-level namespace — business fields (`customerEmail`, `orderId`, `customerId`, `totalAmount`, etc.) are placed as direct keys on the root object rather than nested under a `payload` wrapper. This simplifies rule conditions, template variable access, and suppression dedup key paths — all field references use direct names (e.g., `customerEmail`) instead of dot-notation paths (e.g., `payload.customerEmail`). Top-level field values may themselves be structured types (arrays of objects like `items`, or nested objects like `additionalData`). Template authors can use Handlebars dot-path access and iteration against these structured values; rule conditions and dedup key paths resolve against top-level field names only. See [07 — Event Ingestion Service §7](07-event-ingestion-service.md#7-canonical-event-schema) for the full schema definition.
 
 ### Database Tables
 
@@ -226,7 +236,7 @@ The Event Ingestion Service is the universal entry point for all business events
 > **Deep-Dive Available:** For the complete Event Ingestion Service specification — including runtime mapping configuration details, field mappings, the 10-step processing pipeline, RabbitMQ topology diagrams, full REST API contracts, database ERD, mapping validation flow, idempotency edge cases, and sequence diagrams — see [07 — Event Ingestion Service Deep-Dive](07-event-ingestion-service.md).
 
 > **Note:** **Mapping Cache Configuration**
-> The `MAPPING_CACHE_TTL` environment variable (replacing the previous `SCHEMA_CACHE_TTL`) controls how long runtime mapping configurations are cached in memory before being refreshed from the database. Default: `300` seconds (5 minutes). Set to `0` to disable caching during development.
+> The `MAPPING_CACHE_ENABLED` environment variable (default `false`) enables an eager in-memory mapping cache with event-driven invalidation via the `xch.config.events` exchange. When enabled, all active mappings are loaded at startup and kept in sync via RabbitMQ invalidation events published by the Admin Service — eliminating database queries from the hot path. Leave disabled during development for simplicity. See [07 — Event Ingestion Service §3](07-event-ingestion-service.md#33-mapping-cache-strategy) for details.
 
 ---
 
@@ -245,19 +255,19 @@ The Notification Engine is the central orchestrator of the platform — the "bra
 
 ### Responsibilities
 
-- **Event Consumption:** Subscribes to the `events.normalized` exchange and processes each normalized event through the rule evaluation pipeline.
+- **Event Consumption:** Subscribes to the `xch.events.normalized` exchange and processes each normalized event through the rule evaluation pipeline.
 - **Rule Matching:** Evaluates each event against all active notification rules. A rule matches when the event type equals the rule's configured event type and all additional conditions (e.g., source channel, order priority, customer segment) are satisfied.
-- **Recipient Resolution:** Determines the notification recipients based on the rule's `recipientType`. For `customer`, extracts contact details from the flat event fields (e.g., `customerEmail`, `customerPhone`). For `group`, resolves the recipient group membership. For `custom`, uses the explicitly defined recipient list.
+- **Recipient Resolution:** Determines the notification recipients based on the rule's `recipientType`. For `customer`, extracts contact details from the event's top-level fields (e.g., `customerEmail`, `customerPhone`). For `group`, resolves the recipient group membership. For `custom`, uses the explicitly defined recipient list.
 - **Template Rendering Coordination:** Calls the Template Service (HTTP) to render the appropriate template for each channel, passing the event payload as variable data.
-- **Dispatch to Channel Router:** Publishes rendered notifications to the `notifications.deliver` exchange with channel-specific routing keys for the Channel Router to pick up.
+- **Dispatch to Channel Router:** Publishes rendered notifications to the `xch.notifications.deliver` exchange with channel-specific routing keys for the Channel Router to pick up.
 - **Lifecycle Management:** Tracks each notification through its lifecycle states: **[Pending]** **[Processing]** **[Sent]** **[Delivered]** **[Failed]**. Status transitions are logged in the `notification_status_log` table.
 - **Recipient Preferences:** Respects recipient opt-out preferences and channel preferences before dispatching notifications.
 - **Suppression & Deduplication:** Evaluates optional per-rule suppression policies (deduplication windows, max send counts, cooldown periods) after recipient resolution to prevent duplicate or excessive notifications.
-- **Priority Management:** Each notification inherits its priority tier from the originating event (set by the `priority` field in the event mapping configuration). Rules may override this with a `deliveryPriority` field (`normal` or `critical`). When `deliveryPriority` is `null` (the default), the event's priority is used. The effective priority determines the routing key tier when publishing to `notifications.deliver`, ensuring critical notifications are processed ahead of normal traffic during backpressure. Note: `deliveryPriority` (notification urgency) is distinct from the rule's `priority` field (rule matching order).
+- **Priority Management:** Each notification inherits its priority tier from the originating event (set by the `priority` field in the event mapping configuration). Rules may override this with a `deliveryPriority` field (`normal` or `critical`). When `deliveryPriority` is `null` (the default), the event's priority is used. The effective priority determines the routing key tier when publishing to `xch.notifications.deliver`, ensuring critical notifications are processed ahead of normal traffic during backpressure. Note: `deliveryPriority` (notification urgency) is distinct from the rule's `priority` field (rule matching order).
 
 ### Rule Engine
 
-The rule engine uses a declarative, condition-based matching system. When a normalized event arrives, the engine queries all active rules whose `eventType` matches the event. For each matching rule, it evaluates the `conditions` object against the flat event fields using a simple expression evaluator. Conditions support equality checks, "in" list checks, and direct field access (e.g., `customerEmail`, `totalAmount`). When all conditions are satisfied, the rule's `actions` array is executed sequentially — each action specifies a template, a set of channels, and a recipient type.
+The rule engine uses a declarative, condition-based matching system. When a normalized event arrives, the engine queries all active rules whose `eventType` matches the event. For each matching rule, it evaluates the `conditions` object against the event's top-level fields using a simple expression evaluator. Conditions support equality checks, "in" list checks, and direct field access (e.g., `customerEmail`, `totalAmount`). When all conditions are satisfied, the rule's `actions` array is executed sequentially — each action specifies a template, a set of channels, and a recipient type.
 
 Rules are prioritized by a `priority` field (lower number = higher priority). If multiple rules match a single event, all matching rules are executed unless a rule is marked as `exclusive`, in which case only the highest-priority exclusive rule runs and subsequent matches are skipped.
 
@@ -269,14 +279,14 @@ Each notification rule may include an optional `suppression` configuration (JSON
 
 | Field | Type | Description |
 |---|---|---|
-| `dedupKey` | `string[]` | Array of field names resolved against the flat event context and recipient (e.g., `["eventType", "orderId", "recipient.email"]`). Values are concatenated and SHA-256 hashed into a fixed-length lookup key. |
+| `dedupKey` | `string[]` | Array of field names resolved against the event's top-level fields and recipient (e.g., `["eventType", "orderId", "recipient.email"]`). Values are concatenated and SHA-256 hashed into a fixed-length lookup key. |
 | `modes.dedup` | `{ windowMinutes: number }` | Suppress if any notification with the same dedup key hash was sent within the specified window. |
 | `modes.maxCount` | `{ limit: number, windowMinutes: number }` | Suppress if `limit` or more notifications with the same dedup key hash were sent within the specified window. |
 | `modes.cooldown` | `{ intervalMinutes: number }` | Suppress if the last notification with the same dedup key hash was sent less than `intervalMinutes` ago. |
 
 #### Dedup Key Resolution
 
-At evaluation time, each field name in the `dedupKey` array is resolved against the flat event context (event type, sourceId, top-level fields) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the `dedup_key_hash` column. The original resolved values are also stored in `dedup_key_values` (JSONB) for human-readable display in the Admin UI.
+At evaluation time, each field name in the `dedupKey` array is resolved against the event's top-level fields (event type, sourceId, etc.) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the `dedup_key_hash` column. The original resolved values are also stored in `dedup_key_values` (JSONB) for human-readable display in the Admin UI.
 
 #### Suppression Evaluation Logic
 
@@ -345,10 +355,10 @@ Notifications with `FAILED` status are excluded from suppression queries (`WHERE
 
 | Direction | Exchange / Queue | Routing Key | Purpose |
 |---|---|---|---|
-| Consumes | `events.normalized` / `q.engine.events.critical` | `event.critical.#` | Receive critical-priority normalized events (4 consumers) |
-| Consumes | `events.normalized` / `q.engine.events.normal` | `event.normal.#` | Receive normal-priority normalized events (2 consumers) |
-| Publishes | `notifications.render` | `notification.render.{channel}` | Request template rendering (if async rendering is enabled) |
-| Publishes | `notifications.deliver` | `notification.deliver.{priority}.{channel}` | Dispatch rendered notifications for delivery (priority inherited from event or overridden by rule) |
+| Consumes | `xch.events.normalized` / `q.engine.events.critical` | `event.critical.#` | Receive critical-priority normalized events (4 consumers) |
+| Consumes | `xch.events.normalized` / `q.engine.events.normal` | `event.normal.#` | Receive normal-priority normalized events (2 consumers) |
+| Publishes | `xch.notifications.render` | `notification.render.{channel}` | Request template rendering (if async rendering is enabled) |
+| Publishes | `xch.notifications.deliver` | `notification.deliver.{priority}.{channel}` | Dispatch rendered notifications for delivery (priority inherited from event or overridden by rule) |
 
 ### Database Tables
 
@@ -510,6 +520,92 @@ The Template Service manages the full lifecycle of notification message template
 > **Info:** **Handlebars Template Engine**
 > The Template Service uses [Handlebars.js](https://handlebarsjs.com/) as its rendering engine. Handlebars provides logic-less templates with a simple `{{variable}}` syntax, conditional blocks (`{{#if}}`, `{{#unless}}`), iteration (`{{#each}}`), and partials. The service registers custom helpers for common formatting needs: `{{formatCurrency amount code}}` for locale-aware currency formatting, `{{formatDate date pattern}}` for date formatting, `{{uppercase text}}` and `{{lowercase text}}` for text transformation, and `{{truncate text length}}` for safe text truncation. Templates are pre-compiled and cached in memory for high-performance rendering.
 
+### Media & Attachments
+
+The platform supports **URL-referenced media** — source systems host images and documents on their own CDNs, and the event payload carries references via the optional `media` array. No internal media storage service is required. The Template Service renders inline media references (e.g., product images in email), while the Channel Router handles channel-specific media delivery (attachments, rich messages).
+
+#### Media Reference Schema
+
+The `media` array is an optional top-level field on the canonical event schema. Each entry describes a single media asset:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | `string` | Yes | Media type: `image`, `document`, `video` |
+| `url` | `string` | Yes | HTTPS URL to the media asset (hosted by source system CDN) |
+| `alt` | `string` | No | Alt text for images (used in email `<img>` tags and accessibility) |
+| `filename` | `string` | No | Display filename for document attachments (e.g., `invoice.pdf`) |
+| `mimeType` | `string` | No | MIME type hint (e.g., `application/pdf`, `image/jpeg`). Validated by Channel Router before delivery. |
+| `context` | `string` | Yes | Rendering context: `inline` (embedded in template body) or `attachment` (sent as file attachment) |
+
+#### Example Event with Media
+
+```json
+{
+  "eventType": "order.shipped",
+  "customerEmail": "jane@example.com",
+  "orderNumber": "ORD-2026-00451",
+  "items": [
+    {
+      "name": "Wireless Headphones",
+      "imageUrl": "https://cdn.store.com/products/headphones-200x200.jpg",
+      "quantity": 1
+    }
+  ],
+  "media": [
+    {
+      "type": "image",
+      "url": "https://cdn.store.com/products/headphones-200x200.jpg",
+      "alt": "Wireless Headphones",
+      "context": "inline"
+    },
+    {
+      "type": "document",
+      "url": "https://docs.store.com/invoices/INV-2026-00451.pdf",
+      "filename": "invoice-ORD-2026-00451.pdf",
+      "mimeType": "application/pdf",
+      "context": "attachment"
+    }
+  ]
+}
+```
+
+#### Channel-Specific Media Handling
+
+| Channel | Inline Images | Attachments | Implementation |
+|---|---|---|---|
+| **Email** | `<img src="{{url}}">` tags in HTML body | File attachments via SendGrid API `attachments[]` parameter | Channel Router downloads `context: "attachment"` files from URL and includes as Base64-encoded MIME attachments |
+| **WhatsApp** | Native image messages via Twilio `MediaUrl` parameter | Document messages (PDF, XLSX) via Twilio `MediaUrl` | Channel Router sends WhatsApp media message type when `media` array contains entries |
+| **SMS** | Not supported (text only) | Not supported | `media` array ignored; optionally append a shortened link for online viewing |
+| **Push** | Thumbnail via FCM `notification.image` field | Not supported | Channel Router maps first `type: "image"` media entry to FCM `notification.image` |
+
+#### Template Usage
+
+Templates reference inline media through the event's business fields (e.g., `items[].imageUrl`), not through the `media` array directly. The `media` array is consumed by the Channel Router for attachment handling.
+
+```handlebars
+{{!-- Email template with product images --}}
+<table>
+  {{#each items}}
+  <tr>
+    <td>{{#if imageUrl}}<img src="{{imageUrl}}" alt="{{name}}" width="80">{{/if}}</td>
+    <td>{{name}} x{{quantity}}</td>
+  </tr>
+  {{/each}}
+</table>
+```
+
+#### Size Limits
+
+| Channel | Max per Attachment | Max Total | Notes |
+|---|---|---|---|
+| Email (SendGrid) | 10 MB | 30 MB | SendGrid enforces 30 MB total including message body |
+| WhatsApp (Twilio) | 16 MB | 16 MB | Single media per message; multiple media require multiple messages |
+| Push (FCM) | 1 MB | 1 MB | Image URL only; FCM fetches from URL |
+
+> **Warning:** **Media Download Resilience:** If the Channel Router fails to download a media asset from the source URL (timeout, 404, size exceeded), the notification is sent **without the attachment** rather than failing entirely. The failure is logged with the media URL and error details in the `delivery_attempts` metadata for audit purposes.
+
+> **Deep-Dive Available:** For the complete Template Service specification — including the 9-step rendering pipeline, immutable versioning model, compiled template caching strategy, custom Handlebars helpers, variable auto-detection, performance evaluation (PostgreSQL vs NoSQL), fire-and-forget audit logging via RabbitMQ, full REST API contracts, database ERD with 4 tables, multi-channel content specifications, sequence diagrams, security considerations (HTML escaping, XSS prevention, RBAC), and configuration — see [10 — Template Service Deep-Dive](10-template-service.md).
+
 ---
 
 ## 6. Channel Router Service
@@ -523,7 +619,7 @@ The Channel Router Service is responsible for the last-mile delivery of notifica
 | **Technology** | NestJS |
 | **Port** | `3154` |
 | **Schema** | PostgreSQL — `channel_router_service` |
-| **Dependencies** | RabbitMQ, External providers (SendGrid, Twilio, Firebase), PostgreSQL |
+| **Dependencies** | RabbitMQ, External providers (SendGrid, Mailgun, Braze, Twilio, Firebase), PostgreSQL |
 
 ### Responsibilities
 
@@ -531,7 +627,7 @@ The Channel Router Service is responsible for the last-mile delivery of notifica
 - **Provider Integration:** Maintains dedicated adapter modules for each external provider — SendGrid for transactional email, Twilio for SMS and WhatsApp messaging, and Firebase Cloud Messaging (FCM) for push notifications.
 - **Retry Logic with Exponential Backoff:** Failed deliveries are retried with configurable exponential backoff delays. Each channel has its own retry policy (max attempts, base delay, backoff multiplier). After exhausting retries, the notification is moved to the dead letter queue.
 - **Circuit Breaker Pattern:** Implements a circuit breaker for each provider. If a provider exceeds a failure threshold within a time window, the circuit opens and subsequent requests are immediately failed (fast-fail) until the provider recovers. This prevents cascading failures and resource exhaustion.
-- **Delivery Status Tracking:** Publishes delivery status updates (sent, delivered, bounced, failed) to the `notifications.status` exchange for consumption by the Audit Service and Notification Engine.
+- **Delivery Status Tracking:** Publishes delivery status updates (sent, delivered, bounced, failed) to the `xch.notifications.status` exchange for consumption by the Audit Service and Notification Engine.
 - **Fallback Channel Support:** When a primary channel fails after all retries, the service can optionally trigger a fallback channel (e.g., if SMS delivery fails, attempt email delivery) based on the notification's fallback configuration.
 - **Webhook Receivers:** Exposes webhook endpoints for delivery status callbacks from providers (SendGrid delivery events, Twilio status callbacks).
 
@@ -541,32 +637,37 @@ The Channel Router Service is responsible for the last-mile delivery of notifica
 |---|---|---|
 | `channels` | Channel definitions (email, sms, whatsapp, push) | `id`, `name`, `type`, `is_active`, `provider_id`, `created_at` |
 | `channel_configs` | Channel-level settings (sender identity, limits) | `id`, `channel_id`, `config_key`, `config_value`, `is_encrypted` |
-| `delivery_attempts` | Record of each delivery attempt per notification per channel | `id`, `notification_id`, `channel`, `attempt_number`, `status`, `provider_response`, `error_message`, `attempted_at` |
+| `delivery_attempts` | Record of each delivery attempt per notification per channel | `id`, `notification_id`, `correlation_id`, `channel`, `attempt_number`, `status`, `provider_response`, `provider_message_id`, `error_message`, `attempted_at` |
 | `provider_configs` | External provider credentials and settings | `id`, `provider_name`, `config_json`, `is_active`, `circuit_breaker_state`, `last_health_check` |
 
 ### RabbitMQ Configuration
 
 | Direction | Exchange / Queue | Routing Key | Purpose |
 |---|---|---|---|
-| Consumes | `notifications.deliver` / `q.deliver.email.critical` | `notification.deliver.critical.email` | Critical email delivery (3 consumers) |
-| Consumes | `notifications.deliver` / `q.deliver.email.normal` | `notification.deliver.normal.email` | Normal email delivery (2 consumers) |
-| Consumes | `notifications.deliver` / `q.deliver.sms.critical` | `notification.deliver.critical.sms` | Critical SMS delivery (2 consumers) |
-| Consumes | `notifications.deliver` / `q.deliver.sms.normal` | `notification.deliver.normal.sms` | Normal SMS delivery (1 consumer) |
-| Consumes | `notifications.deliver` / `q.deliver.whatsapp.critical` | `notification.deliver.critical.whatsapp` | Critical WhatsApp delivery (2 consumers) |
-| Consumes | `notifications.deliver` / `q.deliver.whatsapp.normal` | `notification.deliver.normal.whatsapp` | Normal WhatsApp delivery (1 consumer) |
-| Consumes | `notifications.deliver` / `q.deliver.push.critical` | `notification.deliver.critical.push` | Critical push delivery (2 consumers) |
-| Consumes | `notifications.deliver` / `q.deliver.push.normal` | `notification.deliver.normal.push` | Normal push delivery (1 consumer) |
-| Publishes | `notifications.status` | `notification.status.{outcome}` | Delivery status updates |
-| DLQ | `notifications.dlq` | `#` | Dead letter queue for permanently failed deliveries |
+| Consumes | `xch.notifications.deliver` / `q.deliver.email.critical` | `notification.deliver.critical.email` | Critical email delivery (3 consumers) |
+| Consumes | `xch.notifications.deliver` / `q.deliver.email.normal` | `notification.deliver.normal.email` | Normal email delivery (2 consumers) |
+| Consumes | `xch.notifications.deliver` / `q.deliver.sms.critical` | `notification.deliver.critical.sms` | Critical SMS delivery (2 consumers) |
+| Consumes | `xch.notifications.deliver` / `q.deliver.sms.normal` | `notification.deliver.normal.sms` | Normal SMS delivery (1 consumer) |
+| Consumes | `xch.notifications.deliver` / `q.deliver.whatsapp.critical` | `notification.deliver.critical.whatsapp` | Critical WhatsApp delivery (2 consumers) |
+| Consumes | `xch.notifications.deliver` / `q.deliver.whatsapp.normal` | `notification.deliver.normal.whatsapp` | Normal WhatsApp delivery (1 consumer) |
+| Consumes | `xch.notifications.deliver` / `q.deliver.push.critical` | `notification.deliver.critical.push` | Critical push delivery (2 consumers) |
+| Consumes | `xch.notifications.deliver` / `q.deliver.push.normal` | `notification.deliver.normal.push` | Normal push delivery (1 consumer) |
+| Publishes | `xch.notifications.status` | `notification.status.{outcome}` | Delivery status updates |
+| DLQ | `xch.notifications.dlq` | `#` | Dead letter queue for permanently failed deliveries |
 
 ### Provider Configuration
 
 | Channel | Provider | Config Keys | Rate Limit |
 |---|---|---|---|
 | **[Email]** | SendGrid | `apiKey`, `fromAddress`, `fromName`, `replyToAddress` | 100 emails/sec |
+| **[Email]** | Mailgun | `apiKey`, `domain`, `webhookSigningKey`, `fromAddress`, `fromName`, `region` | Plan-dependent (auto-throttled) |
+| **[Email]** | Braze | `apiKey`, `instanceUrl`, `fromAddress`, `fromName` | 250K req/hour (shared) |
 | **[SMS]** | Twilio | `accountSid`, `authToken`, `fromNumber`, `messagingServiceSid` | 30 SMS/sec |
+| **[SMS]** | Braze | `apiKey`, `instanceUrl`, `subscriptionGroupId` | 250K req/hour (shared) |
 | **[WhatsApp]** | Twilio / Meta Business | `accountSid`, `authToken`, `businessNumber`, `templateNamespace` | 80 messages/sec |
+| **[WhatsApp]** | Braze | `apiKey`, `instanceUrl` | 250K req/hour (shared) |
 | **[Push]** | Firebase Cloud Messaging | `projectId`, `serviceAccountKey`, `defaultTopic` | 500 messages/sec |
+| **[Push]** | Braze | `apiKey`, `instanceUrl` | 250K req/hour (shared) |
 
 ### Retry Strategy
 
@@ -581,8 +682,28 @@ The Channel Router Service is responsible for the last-mile delivery of notifica
 
 SMS has a maximum of 3 retry attempts due to the higher per-message cost and the time-sensitive nature of SMS content. Email allows up to 5 retries because delivery delays are more tolerable. Push notifications allow 4 retries. Retry delays use exponential backoff with jitter to avoid thundering herd effects.
 
+### Media & Attachment Handling
+
+When the dispatch message from the Notification Engine includes a `media` array (see [Section 5 — Media & Attachments](#media--attachments) for the schema), the Channel Router processes media entries according to channel-specific rules:
+
+| Channel | `context: "inline"` | `context: "attachment"` | Implementation |
+|---|---|---|---|
+| **Email** | No action (inline images already rendered as `<img>` tags by Template Service) | Download file from URL → Base64-encode → include in SendGrid `attachments[]` parameter | Enforce 10 MB per file, 30 MB total |
+| **WhatsApp** | Send as Twilio media message using `MediaUrl` parameter (Twilio fetches from URL) | Send as Twilio document message using `MediaUrl` parameter | Enforce 16 MB per message |
+| **SMS** | Ignored (text only) | Ignored (text only) | `media` array skipped entirely |
+| **Push** | Map first `type: "image"` entry to FCM `notification.image` field | Ignored (push does not support attachments) | Enforce 1 MB image size |
+
+**Media processing rules:**
+
+1. **URL validation:** Before downloading or referencing, verify the URL is HTTPS and responds with the expected `Content-Type` header.
+2. **Size enforcement:** Reject media assets exceeding the per-channel size limits. Log the rejection and proceed without the attachment.
+3. **Download timeout:** Media downloads for email attachments are subject to a 10-second timeout. On timeout, the notification is sent without the attachment.
+4. **Graceful degradation:** If any media asset fails (download error, size exceeded, invalid URL), the notification is sent **without that attachment** rather than failing the entire delivery. The failure is logged in `delivery_attempts` metadata for audit.
+
 > **Warning:** **Rate Limiting & Provider Quotas**
 > Each external provider enforces its own rate limits and quotas. The Channel Router implements a token bucket rate limiter per provider to ensure outbound request rates stay within contractual limits. Exceeding provider quotas can result in temporary bans, throttling, or financial penalties. Monitor the `provider_configs.circuit_breaker_state` field and the dashboard metrics for early warning signs. SendGrid free-tier accounts are limited to 100 emails/day — ensure production accounts have adequate provisioning. Twilio SMS rates vary by destination country; international SMS may incur significantly higher costs and stricter rate limits.
+
+> **Deep-Dive Available:** For the complete Channel Router Service design — including provider strategy pattern with multi-provider support (SendGrid, Mailgun, Braze, Twilio, FCM), dumb-pipe integration architecture, delivery pipeline, token bucket rate limiting, circuit breaker state machine, retry strategy with exponential backoff and jitter, fallback channel logic, media processing, webhook receivers with signature verification, Braze user profile synchronization, asynchronous audit logging via RabbitMQ fire-and-forget, database design, sequence diagrams, and configuration — see [11 — Channel Router Service Deep-Dive](11-channel-router-service.md).
 
 ---
 
@@ -683,8 +804,8 @@ The Audit Service provides comprehensive logging, tracking, and analytics for th
 
 | Table | Description | Key Columns |
 |---|---|---|
-| `audit_events` | Immutable event log for all notification lifecycle transitions | `id`, `notification_id`, `event_type`, `actor`, `metadata`, `payload_snapshot`, `created_at` |
-| `delivery_receipts` | Provider-reported delivery outcomes | `id`, `notification_id`, `channel`, `provider`, `status`, `provider_message_id`, `raw_response`, `received_at` |
+| `audit_events` | Immutable event log for all notification lifecycle transitions | `id`, `notification_id`, `correlation_id`, `cycle_id`, `event_type`, `actor`, `metadata`, `payload_snapshot`, `created_at` |
+| `delivery_receipts` | Provider-reported delivery outcomes | `id`, `notification_id`, `correlation_id`, `cycle_id`, `channel`, `provider`, `status`, `provider_message_id`, `raw_response`, `received_at` |
 | `notification_analytics` | Pre-aggregated analytics data (hourly/daily rollups) | `id`, `period`, `period_start`, `channel`, `total_sent`, `total_delivered`, `total_failed`, `total_opened`, `total_clicked`, `avg_latency_ms` |
 
 ### RabbitMQ Configuration
@@ -693,11 +814,48 @@ The Audit Service subscribes to multiple exchanges to capture the complete notif
 
 | Exchange | Queue | Routing Key | Events Captured |
 |---|---|---|---|
-| `events.normalized` | `audit.events` | `event.#` | Event ingestion and normalization |
-| `notifications.render` | `audit.render` | `notification.render.#` | Template rendering requests |
-| `notifications.deliver` | `audit.deliver` | `notification.deliver.#` | Delivery dispatch events |
-| `notifications.status` | `audit.status` | `notification.status.#` | Delivery status updates (sent, delivered, failed, bounced) |
-| `notifications.dlq` | `audit.dlq` | `#` | Permanently failed notifications |
+| `xch.events.normalized` | `audit.events` | `event.#` | Event ingestion and normalization |
+| `xch.notifications.render` | `audit.render` | `notification.render.#` | Template rendering requests |
+| `xch.notifications.deliver` | `audit.deliver` | `notification.deliver.#` | Delivery dispatch events |
+| `xch.notifications.status` | `audit.status` | `notification.status.#` | Delivery status updates (sent, delivered, failed, bounced) |
+| `xch.notifications.dlq` | `audit.dlq` | `#` | Permanently failed notifications |
+
+### End-to-End Notification Trace
+
+The Audit Service provides a unified trace API that aggregates data from across the platform to reconstruct the full lifecycle of a notification — from event ingestion through delivery confirmation.
+
+**GET** `/audit/trace/:notificationId` — Returns the complete end-to-end timeline for a notification, aggregated from all services. The response includes:
+
+| Section | Source | Data |
+|---|---|---|
+| **Event** | `audit_events` (event ingestion lifecycle entries) | Source system, event type, cycle ID, ingestion timestamp, normalization status |
+| **Rule Match** | `audit_events` (rule matching entries) | Matched rule ID and name, conditions evaluated, suppression result |
+| **Rendering** | `audit_events` (rendering entries) | Template ID and version, channels rendered, rendering duration |
+| **Delivery Attempts** | `audit_events` + `delivery_receipts` | Per-channel delivery attempts with attempt number, provider response, timestamps |
+| **Final Status** | `delivery_receipts` | Provider-confirmed status (delivered, bounced, opened, clicked), provider message ID |
+
+**Response structure:**
+
+```json
+{
+  "notificationId": "notif-456",
+  "correlationId": "corr-abc-123",
+  "cycleId": "CYC-2026-00451",
+  "eventId": "evt-123",
+  "sourceId": "oms",
+  "eventType": "order.shipped",
+  "timeline": [
+    { "timestamp": "2026-02-20T10:15:30.000Z", "stage": "EVENT_INGESTED", "actor": "event-ingestion-service", "details": {} },
+    { "timestamp": "2026-02-20T10:15:30.200Z", "stage": "RULE_MATCHED", "actor": "notification-engine-service", "details": { "ruleId": "r-550e", "ruleName": "Order Shipped" } },
+    { "timestamp": "2026-02-20T10:15:30.350Z", "stage": "TEMPLATE_RENDERED", "actor": "notification-engine-service", "details": { "templateId": "tpl-order-shipped", "channel": "email" } },
+    { "timestamp": "2026-02-20T10:15:30.500Z", "stage": "DELIVERY_ATTEMPTED", "actor": "channel-router-service", "details": { "channel": "email", "attempt": 1, "provider": "sendgrid" } },
+    { "timestamp": "2026-02-20T10:15:31.200Z", "stage": "PROVIDER_ACCEPTED", "actor": "channel-router-service", "details": { "providerMessageId": "sg-msg-789" } },
+    { "timestamp": "2026-02-20T10:16:05.000Z", "stage": "DELIVERED", "actor": "audit-service", "details": { "channel": "email", "providerMessageId": "sg-msg-789" } }
+  ]
+}
+```
+
+> **Info:** **Provider Webhook Tracing:** When a provider (SendGrid, Twilio) sends a delivery status webhook, the Channel Router maps it back to the notification using the `provider_message_id` stored in the `delivery_attempts` table at send time. The `provider_message_id` column ensures every successful delivery attempt records the provider's tracking ID, enabling reliable webhook-to-notification correlation. If a webhook arrives for an unknown `provider_message_id`, it is logged as an orphaned receipt in the `delivery_receipts` table for investigation.
 
 ---
 
@@ -720,7 +878,7 @@ The Email Ingest Service extends the platform's event ingestion capabilities to 
 - **SMTP Server:** Runs an embedded SMTP server on port `2525` using the `smtp-server` npm package. Accepts inbound emails from whitelisted source systems and processes them through the parsing pipeline.
 - **Sender Whitelisting:** Maintains a registry of authorized email sources (`email_sources` table). Only emails from registered sender patterns are accepted; all others are rejected at the SMTP level.
 - **Email Parsing:** Applies configurable parsing rules to extract structured data from incoming emails. Rules match on sender patterns, subject line regex, and body content extraction using regular expressions.
-- **Event Generation:** Transforms parsed email data into canonical events using configurable payload templates. Generated events are published to the `events.incoming` RabbitMQ exchange with routing key `source.email-ingest.{eventType}`.
+- **Event Generation:** Transforms parsed email data into canonical events using configurable payload templates. Generated events are published to the `xch.events.incoming` RabbitMQ exchange with routing key `source.email-ingest.{eventType}`.
 - **Parsing Rule Management:** Exposes REST API endpoints for CRUD operations on email parsing rules, allowing the operative team to configure how emails are parsed and mapped to events via the Admin UI.
 - **Audit Trail:** Stores all received emails and their processing results in the `processed_emails` table for debugging, auditing, and reprocessing capabilities.
 
@@ -791,7 +949,7 @@ The Email Ingest Service extends the platform's event ingestion capabilities to 
 
 | Direction | Exchange | Routing Key | Purpose |
 |---|---|---|---|
-| Publishes | `events.incoming` | `source.email-ingest.{eventType}` | Publish parsed email events for downstream processing by Event Ingestion Service |
+| Publishes | `xch.events.incoming` | `source.email-ingest.{eventType}` | Publish parsed email events for downstream processing by Event Ingestion Service |
 
 > **Info:** **SMTP Security**
 > The Email Ingest Service implements multiple security layers: sender whitelisting ensures only registered source systems can submit emails, STARTTLS provides encryption for inbound SMTP connections, optional SMTP AUTH adds per-source authentication, and all incoming emails are size-limited and rate-limited to prevent abuse. Emails from unknown senders are rejected at the SMTP handshake level before any content is accepted.
@@ -822,8 +980,8 @@ The Bulk Upload Service enables the operative team to trigger bulk notifications
 
 - Accept XLSX file uploads via multipart/form-data from the Admin UI (through the Gateway)
 - Validate uploaded files: format (`.xlsx` only), size (max 10 MB), row count (max 5,000 rows), and header row presence
-- Parse XLSX rows using a fully flexible column-mapping approach — only `eventType` is required; all other column headers become top-level event fields dynamically
-- Construct flat v2.0 canonical events for each row and submit them to the Event Ingestion Service via HTTP (`POST /webhooks/events`)
+- Parse XLSX rows using a fully flexible column-mapping approach — only `eventType` is required; all other column headers become top-level event fields dynamically. When columns with an `item.*` prefix are detected, the service activates group mode — rows sharing the same group key are consolidated into a single event with an `items[]` array.
+- Construct v2.0 canonical events (flat top-level namespace) for each row and submit them to the Event Ingestion Service via HTTP (`POST /webhooks/events`)
 - Track upload progress and per-row processing status in its own database
 - Support retry of failed rows and cancellation of in-progress uploads
 - Provide upload history, status, and error details via REST API
@@ -838,10 +996,12 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 |---|---|
 | **Header Row** | The first row must be the header row (column names) |
 | **`eventType` Column** | Required — determines the event type for each row |
-| **Dynamic Columns** | All other column headers become top-level fields in the flat v2.0 canonical event |
+| **Dynamic Columns** | All other column headers become top-level fields in the v2.0 canonical event |
 | **Empty Cells** | Omitted from the event (not included as null) |
 | **JSON Values** | Columns with JSON-parseable values (e.g., `[{"sku":"X"}]`) are parsed as JSON; otherwise treated as strings/numbers |
 | **Numeric Values** | Values that parse as numbers are stored as numbers, not strings |
+| **`item.*` Prefix** | Columns with an `item.` prefix activate group mode — values are collected into an `items[]` array with the prefix stripped |
+| **Group Key Column** | In group mode, a configurable column (default `orderId`) combined with `eventType` forms the composite group key for row consolidation |
 
 **Example XLSX:**
 
@@ -891,7 +1051,7 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 2. Service validates file (format, size, header row present) → returns `202 Accepted` with `uploadId`
 3. Upload record created with status `queued`; background worker picks up the job
 4. Worker parses the XLSX file row-by-row using `exceljs`
-5. For each row: extract `eventType` from the designated column, map all remaining columns to top-level event fields
+5. For each row (standard mode) or group of rows (group mode): construct the event payload — in standard mode, each row maps to one event; in group mode, rows sharing the same group key (`eventType` + group key column) are consolidated into a single event with an `items[]` array built from `item.*` columns. All rows in a group share the same `event_id` and status.
 6. Events are submitted to Event Ingestion Service (`POST /webhooks/events`) with `sourceId: "bulk-upload"`, configurable concurrency (default: 5 parallel requests, rate limit: max 50 events/second)
 7. Per-row status tracked in `upload_rows` table; aggregate counters updated in `uploads` table
 8. Admin UI polls `GET /uploads/:id` for real-time progress updates
@@ -906,6 +1066,7 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 | `file_name` | VARCHAR | Original uploaded file name |
 | `file_size` | INTEGER | File size in bytes |
 | `total_rows` | INTEGER | Total data rows in the XLSX (excluding header) |
+| `total_events` | INTEGER (nullable) | Total events to submit — equals `total_rows` in standard mode, or unique group count in group mode |
 | `processed_rows` | INTEGER | Number of rows processed so far |
 | `succeeded_rows` | INTEGER | Number of rows successfully submitted |
 | `failed_rows` | INTEGER | Number of rows that failed submission |
@@ -923,6 +1084,7 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 | `id` | UUID (PK) | Unique row record identifier |
 | `upload_id` | UUID (FK) | Reference to parent upload |
 | `row_number` | INTEGER | Row number in the XLSX file |
+| `group_key` | VARCHAR(500) (nullable) | Composite group key (`{eventType}:{groupKeyValue}`) — null in standard mode, populated in group mode |
 | `raw_data` | JSONB | Original row data as parsed from the XLSX |
 | `mapped_payload` | JSONB | Constructed event payload sent to Event Ingestion |
 | `event_id` | UUID (nullable) | Event ID returned by Event Ingestion Service |
@@ -961,6 +1123,10 @@ The Bulk Upload Service uses a **fully flexible column-mapping** approach — th
 
 > **Info:** **Why HTTP Instead of Direct RabbitMQ?**
 > The Bulk Upload Service submits events via HTTP to the Event Ingestion Service rather than publishing directly to RabbitMQ. This preserves Event Ingestion as the single entry point for all events — ensuring consistent validation, normalization, schema enforcement, and source tracking regardless of origin. While direct RabbitMQ publishing would offer slightly lower latency, the HTTP approach maintains architectural consistency and avoids duplicating event validation logic.
+
+> **Success:** **Deep-Dive Available**
+>
+> For a comprehensive specification including the asynchronous processing pipeline, result file generation, three-endpoint upload lifecycle, RabbitMQ fire-and-forget audit logging, circuit breaker, database DDL, sequence diagrams, and configuration — see [09 — Bulk Upload Service](09-bulk-upload-service.md).
 
 ---
 
@@ -1021,8 +1187,8 @@ While each database is physically isolated, logical relationships exist across s
 
 - **Event --> Notification:** The `notifications.event_id` column in the Notification Engine DB references the `events.event_id` from the Event Ingestion DB. This link is maintained by passing the event ID through RabbitMQ messages.
 - **Notification --> Template:** The `notifications.template_id` references a template in the Template DB. The Notification Engine resolves this by calling the Template Service API at render time.
-- **Notification --> Delivery Attempts:** The `delivery_attempts.notification_id` in the Channel Router DB corresponds to the `notifications.id` in the Notification Engine DB. This is propagated via RabbitMQ message headers.
-- **Notification --> Audit Events:** The `audit_events.notification_id` in the Audit DB references notifications across all services. The audit service reconstructs the full lifecycle by correlating events with the same notification ID.
+- **Notification --> Delivery Attempts:** The `delivery_attempts.notification_id` in the Channel Router DB corresponds to the `notifications.id` in the Notification Engine DB. This is propagated via RabbitMQ message headers. The `correlation_id` and `provider_message_id` columns enable end-to-end tracing and provider webhook correlation.
+- **Notification --> Audit Events:** The `audit_events.notification_id` in the Audit DB references notifications across all services. The `correlation_id` and `cycle_id` columns are propagated from the originating event, enabling end-to-end tracing and business cycle grouping. The audit service reconstructs the full lifecycle by correlating events with the same notification ID via the `GET /audit/trace/:notificationId` endpoint.
 - **Rule --> Template:** The `notification_rules.actions[].templateId` references a template. This is validated at rule creation time by calling the Template Service.
 
 ### Data Retention Policies
@@ -1059,7 +1225,7 @@ The microservices communicate through two patterns: synchronous HTTP/REST for re
 | Admin Service | Event Ingestion | HTTP/REST | Synchronous | Event mapping management (CRUD, test) |
 | Admin Service | Channel Router | HTTP/REST | Synchronous | Channel configuration management |
 | Admin Service | Audit Service | HTTP/REST | Synchronous | Log queries and analytics data |
-| Email Ingest Service | Event Ingestion (via RabbitMQ) | AMQP | Asynchronous | Publish parsed email events to `events.incoming` exchange |
+| Email Ingest Service | Event Ingestion (via RabbitMQ) | AMQP | Asynchronous | Publish parsed email events to `xch.events.incoming` exchange |
 | Notification Gateway | Email Ingest Service | HTTP/REST | Synchronous | Email parsing rule management, processed email queries |
 | Notification Gateway | Bulk Upload Service | HTTP/REST | Synchronous | Upload proxying, upload status queries, error retrieval |
 | Bulk Upload Service | Event Ingestion Service | HTTP/REST | Synchronous | Submit parsed XLSX row payloads as events (`POST /webhooks/events`) |

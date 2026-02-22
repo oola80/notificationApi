@@ -48,12 +48,12 @@ The Notification Engine Service is the central orchestrator of the platform — 
 
 ### Responsibilities
 
-1. **Event Consumption:** Subscribes to the `events.normalized` exchange via priority-tiered queues (`q.engine.events.critical` and `q.engine.events.normal`) and processes each normalized event through the rule evaluation pipeline.
-2. **Rule Matching:** Evaluates each event against all active notification rules using a declarative condition-based system. Supports equality, range, list, and existence operators against flat event fields.
+1. **Event Consumption:** Subscribes to the `xch.events.normalized` exchange via priority-tiered queues (`q.engine.events.critical` and `q.engine.events.normal`) and processes each normalized event through the rule evaluation pipeline.
+2. **Rule Matching:** Evaluates each event against all active notification rules using a declarative condition-based system. Supports equality, range, list, and existence operators against top-level event fields.
 3. **Recipient Resolution:** Determines notification recipients based on the rule's `recipientType` — customer (from event fields), group (from `recipient_groups` table), or custom (explicit list in rule config).
 4. **Suppression & Deduplication:** Evaluates optional per-rule suppression policies (dedup windows, cooldown periods, max send counts) after recipient resolution to prevent duplicate or excessive notifications.
-5. **Template Rendering Coordination:** Calls the Template Service (HTTP) to render the appropriate template for each channel, passing the flat event payload as variable data.
-6. **Dispatch to Channel Router:** Publishes rendered notifications to the `notifications.deliver` exchange with priority-tiered, channel-specific routing keys.
+5. **Template Rendering Coordination:** Calls the Template Service (HTTP) to render the appropriate template for each channel, passing the full event payload (including structured field values) as variable data.
+6. **Dispatch to Channel Router:** Publishes rendered notifications to the `xch.notifications.deliver` exchange with priority-tiered, channel-specific routing keys.
 7. **Lifecycle Management:** Tracks each notification through its lifecycle states: **PENDING** → **PROCESSING** → **RENDERING** → **DELIVERING** → **SENT** → **DELIVERED** or **FAILED** (with **SUPPRESSED** as an early terminal state).
 8. **Customer Channel Preferences & Critical Overrides:** Resolves per-customer channel opt-in/opt-out preferences (keyed by `customer_id`) and evaluates configurable critical channel override rules (keyed by `event_type`). Customer preferences are managed via webhook endpoints for external system integration; critical overrides force specific channels regardless of preferences. Both are cached for performance — preferences use TTL-based read-through cache (LRU), overrides use eager in-memory cache with event-driven invalidation.
 9. **Priority Management:** Inherits priority tier from the originating event; rules may override with `deliveryPriority`. The effective priority determines queue routing for downstream processing.
@@ -73,12 +73,12 @@ The Notification Engine sits at the center of the notification pipeline — betw
 
 | Direction | System | Protocol | Description |
 |---|---|---|---|
-| **Upstream** | Event Ingestion Service | RabbitMQ (AMQP) | Consumes normalized events from `events.normalized` exchange via priority-tiered queues |
+| **Upstream** | Event Ingestion Service | RabbitMQ (AMQP) | Consumes normalized events from `xch.events.normalized` exchange via priority-tiered queues |
 | **Downstream** | Template Service | HTTP/REST (sync) | Calls `POST /templates/:id/render` to render template per channel with event payload as variable data |
-| **Downstream** | Channel Router | RabbitMQ (AMQP) | Publishes rendered notifications to `notifications.deliver` exchange with routing key `notification.deliver.{priority}.{channel}` |
-| **Downstream** | Audit Service | RabbitMQ (AMQP) | Publishes notification status transitions to `notifications.status` exchange (fire-and-forget) |
+| **Downstream** | Channel Router | RabbitMQ (AMQP) | Publishes rendered notifications to `xch.notifications.deliver` exchange with routing key `notification.deliver.{priority}.{channel}` |
+| **Downstream** | Audit Service | RabbitMQ (AMQP) | Publishes notification status transitions to `xch.notifications.status` exchange (fire-and-forget) |
 | **Inbound** | Admin Service | HTTP/REST (sync) | Receives rule CRUD operations, notification queries, and dashboard data requests proxied through the Gateway |
-| **Inbound** | Channel Router | RabbitMQ (AMQP) | Receives delivery status updates (SENT, DELIVERED, FAILED) from `notifications.status` exchange to update notification records |
+| **Inbound** | Channel Router | RabbitMQ (AMQP) | Receives delivery status updates (SENT, DELIVERED, FAILED) from `xch.notifications.status` exchange to update notification records |
 
 ### Figure 2.1 — Integration Context
 
@@ -92,25 +92,25 @@ The Notification Engine sits at the center of the notification pipeline — betw
                                                                │ HTTP POST
                                                                │ /templates/:id/render
                                                                │
-┌──────────────────────┐      ┌─────────────────────────────────────────────────────┐      ┌───────────────────────┐
-│ events.normalized    │      │            Notification Engine Service               │      │ notifications.deliver │
-│ (Topic Exchange)     │─────▶│            :3152                                    │─────▶│ (Topic Exchange)      │
-│                      │      │                                                     │      │                       │
-│ q.engine.events.     │      │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │      │ q.deliver.{channel}.  │
-│   critical (4 cons)  │      │  │  Rule    │  │Recipient │  │  Suppression    │  │      │   {priority}          │
-│ q.engine.events.     │      │  │  Engine  │→│Resolution│→│  Check          │  │      │                       │
-│   normal (2 cons)    │      │  └──────────┘  └──────────┘  └──────────────────┘  │      └───────────┬───────────┘
-└──────────────────────┘      │                                                     │                  │
+┌──────────────────────────┐      ┌─────────────────────────────────────────────────────┐      ┌───────────────────────────┐
+│ xch.events.normalized    │      │            Notification Engine Service               │      │ xch.notifications.deliver │
+│ (Topic Exchange)         │─────▶│            :3152                                    │─────▶│ (Topic Exchange)          │
+│                          │      │                                                     │      │                           │
+│ q.engine.events.         │      │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │      │ q.deliver.{channel}.      │
+│   critical (4 cons)      │      │  │  Rule    │  │Recipient │  │  Suppression    │  │      │   {priority}              │
+│ q.engine.events.         │      │  │  Engine  │→│Resolution│→│  Check          │  │      │                           │
+│   normal (2 cons)        │      │  └──────────┘  └──────────┘  └──────────────────┘  │      └─────────────┬─────────────┘
+└──────────────────────────┘      │                                                     │                  │
                               │  PostgreSQL: notification_engine_service             │                  ▼
                               └─────────────────────────────────────────────────────┘      ┌───────────────────────┐
                                            │                                              │   Channel Router      │
                                            │ Status transitions                           │   :3154               │
                                            ▼                                              │   Route & Deliver     │
-                              ┌─────────────────────────┐                                 └───────────────────────┘
-                              │ notifications.status     │
-                              │ (Topic Exchange)         │
-                              │                          │──────────────────────────▶ Audit Service :3156
-                              └─────────────────────────┘
+                              ┌───────────────────────────┐                              └───────────────────────┘
+                              │ xch.notifications.status  │
+                              │ (Topic Exchange)          │
+                              │                           │──────────────────────▶ Audit Service :3156
+                              └───────────────────────────┘
 
                               ┌─────────────────────────┐
                               │ Admin Service :3155      │──── HTTP/REST ────▶ Notification Engine :3152
@@ -122,17 +122,17 @@ The Notification Engine sits at the center of the notification pipeline — betw
 
 ## 3. Event Processing Pipeline
 
-Every normalized event consumed from the `events.normalized` exchange passes through a 9-step processing pipeline. This pipeline is executed per-event and may produce zero, one, or many notifications depending on how many rules match and how many recipients each rule resolves.
+Every normalized event consumed from the `xch.events.normalized` exchange passes through a 9-step processing pipeline. This pipeline is executed per-event and may produce zero, one, or many notifications depending on how many rules match and how many recipients each rule resolves.
 
 1. **Consume Event:** Receive normalized event from the priority-tiered RabbitMQ queue (`q.engine.events.critical` or `q.engine.events.normal`).
 2. **Rule Lookup:** Query all active notification rules whose `eventType` matches the incoming event type. By default, rules are fetched directly from PostgreSQL. When `RULE_CACHE_ENABLED=true`, rules are resolved from an in-memory cache with event-driven invalidation (see [Section 4.3 — Rule Cache Strategy](#43-rule-cache-strategy)).
-3. **Evaluate Conditions:** For each matching rule, evaluate the `conditions` object against the flat event fields using the expression evaluator. Rules that pass all conditions proceed; others are skipped.
+3. **Evaluate Conditions:** For each matching rule, evaluate the `conditions` object against the event's top-level fields using the expression evaluator. Rules that pass all conditions proceed; others are skipped.
 4. **Priority Resolution:** Determine the effective priority for each rule's notifications — use the rule's `deliveryPriority` if set, otherwise inherit the event's `priority` field.
 5. **Execute Actions:** For each matched rule, iterate through its `actions` array. Each action specifies a template, channels, and recipient type.
 6. **Resolve Recipients & Channel Preferences:** For each action, resolve the recipient list based on `recipientType` (customer, group, or custom). Then perform 3-part channel resolution: (1) lookup customer channel preferences by `customer_id` from cache or DB, (2) check critical channel overrides by `event_type` from cache, (3) compute effective channels — combining rule-defined channels filtered by preferences with any override-forced channels.
 7. **Evaluate Suppression:** For each recipient, evaluate the rule's `suppression` configuration (if any). Suppressed notifications are logged with a SUPPRESSED terminal status via RabbitMQ (fire-and-forget) — they are not persisted as full `notifications` rows.
-8. **Render Template:** Call the Template Service (HTTP `POST /templates/:id/render`) for each channel variant. Pass the flat event payload as template variable data. On failure, mark the notification as FAILED.
-9. **Dispatch & ACK:** Publish rendered notifications to `notifications.deliver` exchange with routing key `notification.deliver.{priority}.{channel}`. Publish status transitions to `notifications.status` exchange asynchronously. ACK the RabbitMQ message.
+8. **Render Template:** Call the Template Service (HTTP `POST /templates/:id/render`) for each channel variant. Pass the full event payload (including structured field values such as arrays and nested objects) as template variable data. On failure, mark the notification as FAILED.
+9. **Dispatch & ACK:** Publish rendered notifications to `xch.notifications.deliver` exchange with routing key `notification.deliver.{priority}.{channel}`. Publish status transitions to `xch.notifications.status` exchange asynchronously. ACK the RabbitMQ message.
 
 ### Figure 3.1 — Event Processing Pipeline
 
@@ -180,7 +180,7 @@ Every normalized event consumed from the `events.normalized` exchange passes thr
              │
              ▼
     ┌──────────────────────────┐
-    │  9. Dispatch & ACK        │  ◄── Publish to notifications.deliver
+    │  9. Dispatch & ACK        │  ◄── Publish to xch.notifications.deliver
     └──────────────────────────┘      Publish status async, ACK message
 ```
 
@@ -196,7 +196,7 @@ When a normalized event arrives, the engine evaluates it against rules in two ph
 
 **Phase 1 — Event Type Filter:** Query all active rules whose `event_type` matches the event's `eventType`. This is the primary filter and uses an indexed lookup.
 
-**Phase 2 — Condition Evaluation:** For each event-type-matched rule, evaluate the `conditions` JSONB object against the flat event fields using a simple expression evaluator.
+**Phase 2 — Condition Evaluation:** For each event-type-matched rule, evaluate the `conditions` JSONB object against the event's top-level fields using a simple expression evaluator.
 
 #### Supported Condition Operators
 
@@ -291,7 +291,7 @@ Without Rule B (exclusive), Rules A, C, and D would all execute.
 | `name` | string | Yes | Human-readable rule name |
 | `description` | string | No | Detailed description of the rule's purpose |
 | `eventType` | string | Yes | Dot-notation event type to match (e.g., `order.shipped`) |
-| `conditions` | object | No | JSONB condition expressions evaluated against flat event fields. If null/empty, matches all events of this type. |
+| `conditions` | object | No | JSONB condition expressions evaluated against top-level event fields. If null/empty, matches all events of this type. |
 | `actions` | array | Yes | Ordered array of actions to execute when the rule matches |
 | `actions[].templateId` | string | Yes | Template ID to render for this action |
 | `actions[].channels` | string[] | Yes | Target channels (`email`, `sms`, `whatsapp`, `push`) |
@@ -323,7 +323,7 @@ All rows are loaded into an in-memory `Map<eventType, Rule[]>` grouped by event 
 
 **Phase 2 — Event-Driven Invalidation**
 
-Whenever a rule is created, updated, or deactivated via the Admin Service, the Admin Service publishes an invalidation event to the `config.events` exchange with routing key `config.rule.changed`. The event payload contains the rule `id` and the `updated_at` timestamp.
+Whenever a rule is created, updated, or deactivated via the Admin Service, the Admin Service publishes an invalidation event to the `xch.config.events` exchange with routing key `config.rule.changed`. The event payload contains the rule `id` and the `updated_at` timestamp.
 
 The Notification Engine subscribes via the `q.config.rule-cache` queue. On receiving an invalidation event, it:
 
@@ -338,7 +338,7 @@ The Notification Engine subscribes via the `q.config.rule-cache` queue. On recei
        │  Rule updated                │                                │
        │  (via Admin UI)              │                                │
        │                              │                                │
-       │  Publish to config.events    │                                │
+       │  Publish to xch.config.events│                                │
        │  key: config.rule.changed    │                                │
        │─────────────────────────────▶│                                │
        │                              │  Deliver to                    │
@@ -370,7 +370,7 @@ For each matched rule action, the engine resolves recipients based on the `recip
 
 #### Customer
 
-Extracts contact details directly from the flat event fields:
+Extracts contact details directly from the event's top-level fields:
 
 | Event Field | Contact Type | Usage |
 |---|---|---|
@@ -519,14 +519,14 @@ Each notification rule may include an optional `suppression` configuration (JSON
 
 | Field | Type | Description |
 |---|---|---|
-| `dedupKey` | `string[]` | Array of field names resolved against the flat event context and recipient (e.g., `["eventType", "orderId", "recipient.email"]`). Values are concatenated and SHA-256 hashed into a fixed-length lookup key. |
+| `dedupKey` | `string[]` | Array of field names resolved against the event's top-level fields and recipient (e.g., `["eventType", "orderId", "recipient.email"]`). Values are concatenated and SHA-256 hashed into a fixed-length lookup key. |
 | `modes.dedup` | `{ windowMinutes: number }` | Suppress if any notification with the same dedup key hash was sent within the specified window. |
 | `modes.maxCount` | `{ limit: number, windowMinutes: number }` | Suppress if `limit` or more notifications with the same dedup key hash were sent within the specified window. |
 | `modes.cooldown` | `{ intervalMinutes: number }` | Suppress if the last notification with the same dedup key hash was sent less than `intervalMinutes` ago. |
 
 ### 6.2 Dedup Key Resolution
 
-At evaluation time, each field name in the `dedupKey` array is resolved against the flat event context (event type, sourceId, top-level fields) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the `dedup_key_hash` column. The original resolved values are also stored in `dedup_key_values` (JSONB) for human-readable display in the Admin UI.
+At evaluation time, each field name in the `dedupKey` array is resolved against the event's top-level fields (event type, sourceId, etc.) and the current recipient. The resolved values are concatenated with a pipe delimiter and hashed using SHA-256 to produce a fixed 64-character hex string stored in the `dedup_key_hash` column. The original resolved values are also stored in `dedup_key_values` (JSONB) for human-readable display in the Admin UI.
 
 **Example:** For `dedupKey: ["eventType", "orderId", "recipient.email"]` with an event `{ eventType: "order.shipped", orderId: "ORD-001" }` and recipient `jane@example.com`:
 
@@ -687,11 +687,11 @@ When an action targets multiple channels (e.g., `["email", "sms", "push"]`), the
 
 ## 8. Notification Dispatch
 
-After template rendering, the engine publishes each rendered notification to the `notifications.deliver` RabbitMQ exchange for the Channel Router to consume and deliver to external providers.
+After template rendering, the engine publishes each rendered notification to the `xch.notifications.deliver` RabbitMQ exchange for the Channel Router to consume and deliver to external providers.
 
 ### 8.1 Dispatch Message Schema
 
-Each message published to `notifications.deliver` contains the full context needed for delivery:
+Each message published to `xch.notifications.deliver` contains the full context needed for delivery:
 
 ```json
 {
@@ -712,6 +712,21 @@ Each message published to `notifications.deliver` contains the full context need
     "templateId": "tpl-order-shipped",
     "templateVersion": 3
   },
+  "media": [
+    {
+      "type": "image",
+      "url": "https://cdn.store.com/products/headphones-200x200.jpg",
+      "alt": "Wireless Headphones",
+      "context": "inline"
+    },
+    {
+      "type": "document",
+      "url": "https://docs.store.com/invoices/INV-2026-00451.pdf",
+      "filename": "invoice-ORD-2026-00451.pdf",
+      "mimeType": "application/pdf",
+      "context": "attachment"
+    }
+  ],
   "metadata": {
     "correlationId": "corr-8f14e45f-ceea-467f-a8f5-5f1b39e5c7e2",
     "sourceId": "oms",
@@ -721,6 +736,8 @@ Each message published to `notifications.deliver` contains the full context need
   }
 }
 ```
+
+> **Info:** **Media Pass-Through:** The `media` array is passed through from the canonical event to the dispatch message without modification. The Notification Engine does not download or process media assets — it forwards the URL references to the Channel Router, which handles channel-specific media delivery (email attachments via SendGrid, WhatsApp media via Twilio `MediaUrl`, push thumbnails via FCM `notification.image`). If the event has no `media` array, the field is omitted from the dispatch message. See [02 — Detailed Microservices](02-detailed-microservices.md) for channel-specific handling, size limits, and resilience policy.
 
 ### 8.2 Routing Key Strategy
 
@@ -787,21 +804,21 @@ During backpressure, the 2:1 consumer ratio ensures critical events are consumed
 
 | Exchange | Type | Purpose | Durable |
 |---|---|---|---|
-| `events.normalized` | Topic | Receives normalized events from Event Ingestion (consumed by Engine) | Yes |
-| `notifications.deliver` | Topic | Dispatches rendered notifications to Channel Router | Yes |
-| `notifications.status` | Topic | Publishes notification lifecycle status transitions | Yes |
-| `notifications.dlq` | Fanout | Dead-letter exchange for failed messages | Yes |
-| `config.events` | Topic | Receives rule configuration change events (used when `RULE_CACHE_ENABLED=true`) | Yes |
+| `xch.events.normalized` | Topic | Receives normalized events from Event Ingestion (consumed by Engine) | Yes |
+| `xch.notifications.deliver` | Topic | Dispatches rendered notifications to Channel Router | Yes |
+| `xch.notifications.status` | Topic | Publishes notification lifecycle status transitions | Yes |
+| `xch.notifications.dlq` | Fanout | Dead-letter exchange for failed messages | Yes |
+| `xch.config.events` | Topic | Receives rule configuration change events (used when `RULE_CACHE_ENABLED=true`) | Yes |
 
 ### Queues
 
 | Queue | Bound To | Routing Key | Concurrency | Prefetch | DLQ |
 |---|---|---|---|---|---|
-| `q.engine.events.critical` | `events.normalized` | `event.critical.#` | 4 | 5 | Yes |
-| `q.engine.events.normal` | `events.normalized` | `event.normal.#` | 2 | 10 | Yes |
-| `q.config.rule-cache` | `config.events` | `config.rule.changed` | 1 | 1 | No |
-| `q.config.override-cache` | `config.events` | `config.override.changed` | 1 | 1 | No |
-| `q.engine.status.inbound` | `notifications.status` | `notification.status.delivered`, `notification.status.failed` | 2 | 10 | Yes |
+| `q.engine.events.critical` | `xch.events.normalized` | `event.critical.#` | 4 | 5 | Yes |
+| `q.engine.events.normal` | `xch.events.normalized` | `event.normal.#` | 2 | 10 | Yes |
+| `q.config.rule-cache` | `xch.config.events` | `config.rule.changed` | 1 | 1 | No |
+| `q.config.override-cache` | `xch.config.events` | `config.override.changed` | 1 | 1 | No |
+| `q.engine.status.inbound` | `xch.notifications.status` | `notification.status.delivered`, `notification.status.failed` | 2 | 10 | Yes |
 
 ### Routing Key Formats
 
@@ -816,13 +833,13 @@ During backpressure, the 2:1 consumer ratio ensures critical events are consumed
 ### Figure 10.1 — RabbitMQ Topology
 
 ```
-                              ┌─────────────────────┐
-                              │  events.normalized   │
-                              │  (Topic Exchange)    │
-                              └──┬────────────────┬──┘
-                                 │                │
-              event.critical.#   │                │   event.normal.#
-                                 ▼                ▼
+                              ┌──────────────────────────┐
+                              │  xch.events.normalized   │
+                              │  (Topic Exchange)        │
+                              └──┬─────────────────────┬─┘
+                                 │                     │
+              event.critical.#   │                     │   event.normal.#
+                                 ▼                     ▼
               ┌───────────────────┐  ┌───────────────────┐
               │q.engine.events.   │  │q.engine.events.   │
               │  critical         │  │  normal            │
@@ -838,15 +855,15 @@ During backpressure, the 2:1 consumer ratio ensures critical events are consumed
                     └──────┬────────────┬──────────┘
                            │            │
                            ▼            ▼
-            ┌──────────────────┐  ┌──────────────────────┐
-            │notifications.    │  │notifications.status   │
-            │  deliver         │  │  (Topic Exchange)     │
-            │(Topic Exchange)  │  │                       │
-            │                  │  │  Fire-and-forget      │
-            │  Per-channel,    │  │  status transitions   │
-            │  per-priority    │  └───────────┬───────────┘
-            │  queues          │              │
-            └──────────────────┘              ▼
+            ┌──────────────────────┐  ┌───────────────────────────┐
+            │xch.notifications.    │  │xch.notifications.status   │
+            │  deliver             │  │  (Topic Exchange)         │
+            │(Topic Exchange)      │  │                           │
+            │                      │  │  Fire-and-forget          │
+            │  Per-channel,        │  │  status transitions       │
+            │  per-priority        │  └─────────────┬─────────────┘
+            │  queues              │                │
+            └──────────────────────┘                ▼
                                   ┌──────────────────────┐
                                   │  Audit Service       │
                                   │  + Engine status     │
@@ -929,7 +946,7 @@ Retrieve full rule details including conditions, actions, suppression config, an
 
 ### PUT /rules/:id
 
-Update an existing rule. Supports partial updates. Setting `suppression: null` removes suppression. Changes are audit-logged. If `RULE_CACHE_ENABLED=true`, publishes an invalidation event to `config.events` exchange.
+Update an existing rule. Supports partial updates. Setting `suppression: null` removes suppression. Changes are audit-logged. If `RULE_CACHE_ENABLED=true`, publishes an invalidation event to `xch.config.events` exchange.
 
 ### DELETE /rules/:id
 
@@ -1093,7 +1110,7 @@ Create a new critical channel override.
 }
 ```
 
-After creation, publishes an invalidation event to `config.events` exchange with routing key `config.override.changed` to refresh the in-memory cache across all engine instances.
+After creation, publishes an invalidation event to `xch.config.events` exchange with routing key `config.override.changed` to refresh the in-memory cache across all engine instances.
 
 ### GET /critical-channel-overrides/:id
 
@@ -1101,11 +1118,11 @@ Retrieve a specific critical channel override by ID.
 
 ### PUT /critical-channel-overrides/:id
 
-Update an existing critical channel override. Supports partial updates. Changes are audit-logged. Publishes an invalidation event to `config.events` exchange with routing key `config.override.changed`.
+Update an existing critical channel override. Supports partial updates. Changes are audit-logged. Publishes an invalidation event to `xch.config.events` exchange with routing key `config.override.changed`.
 
 ### DELETE /critical-channel-overrides/:id
 
-Soft-delete a critical channel override (sets `is_active = false`). Publishes an invalidation event to `config.events` exchange with routing key `config.override.changed`.
+Soft-delete a critical channel override (sets `is_active = false`). Publishes an invalidation event to `xch.config.events` exchange with routing key `config.override.changed`.
 
 ### GET /health
 
@@ -1233,7 +1250,7 @@ Append-only log of all notification status transitions. **This is the second-lar
 
 > **Info:** **Asynchronous Status Log Writes**
 >
-> Status transitions are **not** written to the `notification_status_log` table synchronously during the notification processing pipeline. Instead, the engine publishes each status transition as a message to the `notifications.status` RabbitMQ exchange (fire-and-forget). A dedicated lightweight consumer within the engine service (or the Audit Service) persists these log entries asynchronously. This ensures that logging never blocks the critical notification path — even if the database experiences momentary latency spikes, notification processing continues unimpeded. The trade-off is that the status log is eventually consistent (typically within milliseconds).
+> Status transitions are **not** written to the `notification_status_log` table synchronously during the notification processing pipeline. Instead, the engine publishes each status transition as a message to the `xch.notifications.status` RabbitMQ exchange (fire-and-forget). A dedicated lightweight consumer within the engine service (or the Audit Service) persists these log entries asynchronously. This ensures that logging never blocks the critical notification path — even if the database experiences momentary latency spikes, notification processing continues unimpeded. The trade-off is that the status log is eventually consistent (typically within milliseconds).
 
 ### notification_recipients Table
 
@@ -1550,7 +1567,7 @@ Each notification passes through a well-defined set of states from creation to f
 
 ### Status Update Flow (Asynchronous)
 
-All status transitions are published to the `notifications.status` RabbitMQ exchange as fire-and-forget messages:
+All status transitions are published to the `xch.notifications.status` RabbitMQ exchange as fire-and-forget messages:
 
 ```json
 {
@@ -1575,7 +1592,7 @@ The engine also updates the `status` column on the `notifications` row synchrono
 Event Ingestion      RabbitMQ         Notification Engine       Template Service     Channel Router     Audit Service
      │                  │                     │                        │                    │                  │
      │  Publish to      │                     │                        │                    │                  │
-     │  events.         │                     │                        │                    │                  │
+     │  xch.events.     │                     │                        │                    │                  │
      │  normalized      │                     │                        │                    │                  │
      │─────────────────▶│                     │                        │                    │                  │
      │                  │  Deliver to          │                        │                    │                  │
@@ -1619,7 +1636,7 @@ Event Ingestion      RabbitMQ         Notification Engine       Template Service
      │                  │                     │◄─────┘                  │                    │                  │
      │                  │                     │                        │                    │                  │
      │                  │  Publish to          │                        │                    │                  │
-     │                  │  notifications.      │                        │                    │                  │
+     │                  │  xch.notifications.  │                        │                    │                  │
      │                  │  deliver             │                        │                    │                  │
      │                  │◄────────────────────│                        │                    │                  │
      │                  │                     │                        │                    │                  │
@@ -1702,7 +1719,7 @@ Results for order.shipped event (totalAmount=750):
 
   Rule A, Action 1:
     → Render tpl-shipped for [email, sms, push]     (3 parallel render calls)
-    → Dispatch 3 messages to notifications.deliver:
+    → Dispatch 3 messages to xch.notifications.deliver:
         notification.deliver.normal.email
         notification.deliver.normal.sms
         notification.deliver.normal.push
@@ -1711,13 +1728,13 @@ Results for order.shipped event (totalAmount=750):
     → Scheduled for 5 minutes later
     → Resolve ops-team group (4 members)
     → Render tpl-shipped-ops for [email]             (1 render call)
-    → Dispatch 4 messages to notifications.deliver:
+    → Dispatch 4 messages to xch.notifications.deliver:
         notification.deliver.normal.email (x4, one per group member)
 
   Rule B, Action 1:
     → Resolve vip-team group (2 members)
     → Render tpl-vip-alert for [email]               (1 render call)
-    → Dispatch 2 messages to notifications.deliver:
+    → Dispatch 2 messages to xch.notifications.deliver:
         notification.deliver.normal.email (x2, one per group member)
 
   Total: 9 notification messages dispatched
@@ -1732,10 +1749,10 @@ Results for order.shipped event (totalAmount=750):
 The Notification Engine is designed as a stateless service that can be horizontally scaled by running multiple instances behind a load balancer. Each instance consumes from the same RabbitMQ queues using the **competing consumers** pattern — RabbitMQ distributes messages in round-robin across connected consumers.
 
 ```
-                    ┌─────────────────────┐
-                    │  events.normalized  │
-                    │  (Topic Exchange)   │
-                    └──┬──────────────────┘
+                    ┌─────────────────────────┐
+                    │  xch.events.normalized  │
+                    │  (Topic Exchange)       │
+                    └──┬──────────────────────┘
                        │
               ┌────────┴────────┐
               ▼                 ▼
@@ -1910,7 +1927,7 @@ Critical overrides use an eager in-memory cache loaded at startup. The dataset i
 **Cache behavior:**
 
 - **Eager load:** On startup, query all rows from `critical_channel_overrides WHERE is_active = true` and build an in-memory `Map<eventType, channel[]>`.
-- **Event-driven invalidation:** When overrides are created, updated, or deleted via the REST API, the engine publishes an invalidation event to `config.events` exchange with routing key `config.override.changed`. All engine instances consume this event via `q.config.override-cache` queue and reload the full override set from the database.
+- **Event-driven invalidation:** When overrides are created, updated, or deleted via the REST API, the engine publishes an invalidation event to `xch.config.events` exchange with routing key `config.override.changed`. All engine instances consume this event via `q.config.override-cache` queue and reload the full override set from the database.
 - **Lookup:** O(1) map lookup by `eventType` — returns an array of forced channels or empty array if no overrides exist.
 
 ---
@@ -1934,8 +1951,8 @@ Critical overrides use an eager in-memory cache loaded at startup. The dataset i
 
 ### Dead-Letter Queue Strategy
 
-- **DLQ Exchange:** `notifications.dlq` (fanout)
-- **Configuration:** Both engine queues declare `x-dead-letter-exchange: notifications.dlq`
+- **DLQ Exchange:** `xch.notifications.dlq` (fanout)
+- **Configuration:** Both engine queues declare `x-dead-letter-exchange: xch.notifications.dlq`
 - **Trigger:** Messages are dead-lettered after 3 failed delivery attempts (tracked via `x-death` headers)
 - **Monitoring:** DLQ depth is exposed in the `/health` endpoint and as a Prometheus metric
 

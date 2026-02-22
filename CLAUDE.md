@@ -13,7 +13,7 @@ Design documentation phase. Service folders and database scripts scaffolded — 
 - **Message Broker:** RabbitMQ (AMQP, topic exchanges, dead-letter queues)
 - **Database:** PostgreSQL (schema-per-service pattern, single database with separate schemas)
 - **Containerization:** Docker / Docker Compose
-- **Notification Providers:** SendGrid (email), Twilio (SMS/WhatsApp), Firebase Cloud Messaging (push)
+- **Notification Providers:** SendGrid (email), Mailgun (email), Braze (email/SMS/WhatsApp/push — unified multi-channel, dumb pipe pattern), Twilio (SMS/WhatsApp), Firebase Cloud Messaging (push)
 
 ## Microservices
 
@@ -23,11 +23,11 @@ Design documentation phase. Service folders and database scripts scaffolded — 
 | event-ingestion-service | 3151 | Receives and normalizes events from source systems via runtime field mappings; assigns priority tier (normal/critical) per mapping config |
 | notification-engine-service | 3152 | Core orchestrator — rules, recipients, lifecycle; priority-aware processing via tiered queues |
 | template-service | 3153 | Template CRUD, Handlebars rendering, versioning |
-| channel-router-service | 3154 | Routes to delivery providers, retry/circuit breaker; priority-tiered delivery queues per channel |
+| channel-router-service | 3154 | Routes to delivery providers (SendGrid, Mailgun, Braze, Twilio, FCM) via provider strategy pattern; all providers are dumb pipes (pre-rendered content); retry/circuit breaker; priority-tiered delivery queues per channel; fire-and-forget audit logging |
 | admin-service | 3155 | Backoffice administration |
 | audit-service | 3156 | Notification tracking, delivery receipts, analytics |
 | email-ingest-service | 3157/2525 | SMTP ingest — receives emails, parses, generates events |
-| bulk-upload-service | 3158 | XLSX bulk upload — parses spreadsheets, submits events |
+| bulk-upload-service | 3158 | XLSX bulk upload — async file processing, result file with per-row status, fire-and-forget audit logging |
 | notification-admin-ui | 3159 | Next.js admin frontend |
 
 ### Service Folders
@@ -49,7 +49,7 @@ notification-admin-ui/          # Next.js — port 3159
 
 ### Database Scripts
 
-Each backend service (all except `notification-admin-ui`) contains a `dbscripts/` subfolder with a PostgreSQL schema creation script following the naming convention `schema-{service-name}.sql`. Each script creates the schema, role, user, and grants all necessary privileges (schema-per-service pattern). Schema/role/user names use snake_case derived from the folder name. The `event-ingestion-service` script also creates the `event_mappings` table for runtime field mapping configuration (keyed by `source_id` + `event_type`) with a `priority` column (`normal`/`critical`, default `normal`), the `event_sources` table for registered source system configurations, and the `events` table for storing all ingested events (raw and normalized) with a required `cycle_id` column for business cycle tracking. A `purge_event_payloads()` PL/pgSQL function NULLs out `raw_payload` and `normalized_payload` on rows older than a configurable threshold (default 90 days) for scheduled retention. The `notification-engine-service` script also creates the `customer_channel_preferences` table for per-customer per-channel opt-in/opt-out preferences (keyed by `customer_id`, FILLFACTOR 90, with autovacuum tuning) and the `critical_channel_overrides` table for configurable forced-channel rules per event type (UUID PK, partial index on active overrides).
+Each backend service (all except `notification-admin-ui`) contains a `dbscripts/` subfolder with a PostgreSQL schema creation script following the naming convention `schema-{service-name}.sql`. Each script creates the schema, role, user, and grants all necessary privileges (schema-per-service pattern). Schema/role/user names use snake_case derived from the folder name. The `event-ingestion-service` script also creates the `event_mappings` table for runtime field mapping configuration (keyed by `source_id` + `event_type`) with a `priority` column (`normal`/`critical`, default `normal`), the `event_sources` table for registered source system configurations, and the `events` table for storing all ingested events (raw and normalized) with a required `cycle_id` column for business cycle tracking. A `purge_event_payloads()` PL/pgSQL function NULLs out `raw_payload` and `normalized_payload` on rows older than a configurable threshold (default 90 days) for scheduled retention. The `notification-engine-service` script also creates the `customer_channel_preferences` table for per-customer per-channel opt-in/opt-out preferences (keyed by `customer_id`, FILLFACTOR 90, with autovacuum tuning) and the `critical_channel_overrides` table for configurable forced-channel rules per event type (UUID PK, partial index on active overrides). The `bulk-upload-service` script also creates the `uploads` table for tracking XLSX file uploads (UUID PK, status state machine, aggregate row counters, `total_events` for group mode event count, result file path), the `upload_rows` table for per-row processing tracking (FK to uploads with ON DELETE CASCADE, raw data, mapped payload, event ID, status, `group_key` for multi-item row grouping with partial index), and a `purge_old_uploads()` PL/pgSQL function that deletes terminal-state uploads and cascading rows older than a configurable threshold (default 90 days). The `template-service` script also creates the `templates` table for master template records (UUID PK, unique slug, current version pointer), the `template_versions` table for immutable version snapshots (FK to templates, unique version number per template), the `template_channels` table for channel-specific content per version (FK to template_versions, unique channel per version, Handlebars body), and the `template_variables` table for auto-detected template variables (FK to templates, unique variable name per template, optional defaults and required flag).
 
 | Service Folder | Schema | Role | User |
 |---|---|---|---|
@@ -65,40 +65,31 @@ Each backend service (all except `notification-admin-ui`) contains a `dbscripts/
 
 ## Documentation
 
-All design docs live in `docs/`. Each document exists in both HTML (styled, with SVG diagrams) and Markdown formats.
+All design docs live in `docs/` as Markdown files.
 
 ```
 docs/
-  css/styles.css                    # Shared stylesheet (521 lines, all design tokens)
-  index.html / index.md             # Documentation hub page
-  01-executive-summary.html / .md   # Project overview, problem, solution, scope
-  02-detailed-microservices.html / .md  # Service specs, APIs, schemas, RabbitMQ config
-  03-system-architecture.html / .md # Architecture diagrams, layers, flows, security
-  04-authentication-identity.html / .md  # Auth flows, SAML SSO, JWT sessions, account linking
-  05-testing-strategy.html / .md    # Jest, Playwright, Allure reporting, CI/CD gates
-  06-changelog.html / .md           # Documentation & feature change log
-  07-event-ingestion-service.html / .md  # Event Ingestion Service detailed spec
-  08-notification-engine-service.md      # Notification Engine Service detailed spec
+  css/styles.css                    # Legacy shared stylesheet (unused — HTML docs removed)
+  index.md                          # Documentation hub page
+  01-executive-summary.md           # Project overview, problem, solution, scope
+  02-detailed-microservices.md      # Service specs, APIs, schemas, RabbitMQ config
+  03-system-architecture.md         # Architecture diagrams, layers, flows, security
+  04-authentication-identity.md     # Auth flows, SAML SSO, JWT sessions, account linking
+  05-testing-strategy.md            # Jest, Playwright, Allure reporting, CI/CD gates
+  06-changelog.md                   # Documentation & feature change log
+  07-event-ingestion-service.md     # Event Ingestion Service detailed spec
+  08-notification-engine-service.md # Notification Engine Service detailed spec
+  09-bulk-upload-service.md         # Bulk Upload Service detailed spec
+  10-template-service.md            # Template Service detailed spec
+  11-channel-router-service.md      # Channel Router Service detailed spec
 ```
-
-### HTML docs
-
-- Standalone — no JS, no build step, open directly in browser
-- Single shared `css/styles.css` with Confluence-like styling
-- Inline SVG diagrams (high-level architecture, layer diagram, event flow, ER diagram, state machine)
-- Components: callout boxes, API endpoint blocks, status badges, feature cards, tables
 
 ### Markdown docs
 
-- Equivalent content to HTML counterparts
-- SVG diagrams replaced with ASCII art
+- ASCII art diagrams
 - Callout boxes use blockquote syntax (`> **Info:** ...`)
 
 ## Conventions
 
-- Documentation filenames: `NN-kebab-case-name.html` / `.md` (numbered, lowercase)
-- CSS color palette primary: #0052CC, text: #172B4D, success: #00875A, warning: #FF991F, error: #FF5630
-- All HTML docs include nav bar with active page highlighted; index.html has no nav
-- Tables use blue headers (#0052CC bg, white text)
-- Every documentation or feature change must include a corresponding entry in `docs/06-changelog.md` (and `docs/06-changelog.html` only when HTML updates are explicitly requested)
-- **Only modify `.md` files** when making documentation changes. Do NOT modify `.html` files unless explicitly asked to do so.
+- Documentation filenames: `NN-kebab-case-name.md` (numbered, lowercase)
+- Every documentation or feature change must include a corresponding entry in `docs/06-changelog.md`

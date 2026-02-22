@@ -32,7 +32,7 @@
 
 ## 1. Service Overview
 
-The Event Ingestion Service is the universal entry point for all business events that may trigger notifications within the platform. It receives events from any registered source system, applies admin-configured runtime field mappings to normalize them into a flat canonical event format, and publishes them to the internal RabbitMQ exchange for downstream processing by the Notification Engine.
+The Event Ingestion Service is the universal entry point for all business events that may trigger notifications within the platform. It receives events from any registered source system, applies admin-configured runtime field mappings to normalize them into the canonical event format (flat top-level namespace; values may be structured types), and publishes them to the internal RabbitMQ exchange for downstream processing by the Notification Engine.
 
 | Attribute | Value |
 |---|---|
@@ -44,11 +44,11 @@ The Event Ingestion Service is the universal entry point for all business events
 
 ### Responsibilities
 
-1. **RabbitMQ Consumers:** Generic consumers on the `q.events.amqp` and `q.events.email-ingest` queues that accept events from any source system publishing to the `events.incoming` exchange.
+1. **RabbitMQ Consumers:** Generic consumers on the `q.events.amqp` and `q.events.email-ingest` queues that accept events from any source system publishing to the `xch.events.incoming` exchange.
 2. **REST Webhook Endpoint:** An HTTP endpoint (`POST /webhooks/events`) for external integrations that cannot publish directly to RabbitMQ — including webhook-capable source systems, Bulk Upload Service submissions, and manual triggers via the Gateway.
 3. **Runtime Mapping Configuration:** Admin-driven field mapping keyed by `(sourceId, eventType)` — no code changes required to onboard a new source system. Mapping configurations define field extraction paths, transformations, event type resolution, and optional validation schemas.
-4. **Event Normalization:** Transforms source-specific payloads into the flat canonical event format using the runtime mapping engine — field extraction, transform functions, timestamp normalization (ISO-8601 UTC), and metadata enrichment.
-5. **Publishing Normalized Events:** Publishes validated and normalized events to the `events.normalized` exchange with routing keys for downstream consumers.
+4. **Event Normalization:** Transforms source-specific payloads into the canonical event format (flat top-level namespace) using the runtime mapping engine — field extraction, transform functions, timestamp normalization (ISO-8601 UTC), and metadata enrichment.
+5. **Publishing Normalized Events:** Publishes validated and normalized events to the `xch.events.normalized` exchange with routing keys for downstream consumers.
 6. **Event Persistence:** Stores all raw and normalized events in PostgreSQL for auditability and replay capabilities.
 7. **Idempotency & Deduplication:** Maintains a deduplication window using composite keys to prevent duplicate event processing.
 
@@ -66,12 +66,12 @@ The Event Ingestion Service sits between the external source systems and the int
 
 | Direction | System | Protocol | Description |
 |---|---|---|---|
-| **Upstream** | Any Source (AMQP) | RabbitMQ (AMQP) | Publishes events to `events.incoming` exchange with routing key `source.{sourceId}.{eventType}` |
+| **Upstream** | Any Source (AMQP) | RabbitMQ (AMQP) | Publishes events to `xch.events.incoming` exchange with routing key `source.{sourceId}.{eventType}` |
 | **Upstream** | Any Source (Webhook) | REST Webhook | Sends HTTP POST with authentication (API key, HMAC, or bearer token) to `/webhooks/events` |
-| **Upstream** | Email Ingest Service | RabbitMQ (AMQP) | Publishes parsed email events to `events.incoming` exchange |
+| **Upstream** | Email Ingest Service | RabbitMQ (AMQP) | Publishes parsed email events to `xch.events.incoming` exchange |
 | **Upstream** | Bulk Upload Service | REST (HTTP) | Submits parsed XLSX rows as events via `POST /webhooks/events` |
 | **Upstream** | Manual Trigger | REST via Gateway | Admin users trigger events through Gateway → `POST /webhooks/events` |
-| **Downstream** | Notification Engine | RabbitMQ (AMQP) | Consumes normalized events from `events.normalized` exchange |
+| **Downstream** | Notification Engine | RabbitMQ (AMQP) | Consumes normalized events from `xch.events.normalized` exchange |
 | **Downstream** | Audit Service | RabbitMQ (AMQP) | Consumes event lifecycle updates for audit trail |
 
 ### Figure 2.1 — Integration Context
@@ -81,10 +81,10 @@ The Event Ingestion Service sits between the external source systems and the int
 │ Source A (RabbitMQ)   │──┐
 ├──────────────────────┤  │
 │ Source B (Webhook)    │──┤
-├──────────────────────┤  │      ┌─────────────────────────────┐      ┌───────────────────────┐
-│ Source C (Webhook)    │──┼─────▶│   Event Ingestion Service   │─────▶│   events.normalized   │
-├──────────────────────┤  │      │   :3151                     │      │   (Topic Exchange)    │
-│ Email Ingest (AMQP)  │──┤      │   Map · Validate · Normalize│      └───────────┬───────────┘
+├──────────────────────┤  │      ┌─────────────────────────────┐      ┌───────────────────────────┐
+│ Source C (Webhook)    │──┼─────▶│   Event Ingestion Service   │─────▶│   xch.events.normalized   │
+├──────────────────────┤  │      │   :3151                     │      │   (Topic Exchange)        │
+│ Email Ingest (AMQP)  │──┤      │   Map · Validate · Normalize│      └─────────────┬─────────────┘
 ├──────────────────────┤  │      │   PostgreSQL                │                  │
 │  Bulk Upload (HTTP)  │──┤      └─────────────────────────────┘          ┌────────┴────────┐
 ├──────────────────────┤  │                                               │                 │
@@ -104,11 +104,11 @@ Source systems integrate with the Event Ingestion Service through one of two pat
 
 #### Pattern A — Direct AMQP
 
-Source systems that can publish directly to RabbitMQ send messages to the `events.incoming` topic exchange with routing key `source.{sourceId}.{eventType}`. The Event Ingestion Service consumes these from the `q.events.amqp` generic queue.
+Source systems that can publish directly to RabbitMQ send messages to the `xch.events.incoming` topic exchange with routing key `source.{sourceId}.{eventType}`. The Event Ingestion Service consumes these from the `q.events.amqp` generic queue.
 
 | Attribute | Value |
 |---|---|
-| **Exchange** | `events.incoming` (topic) |
+| **Exchange** | `xch.events.incoming` (topic) |
 | **Queue** | `q.events.amqp` |
 | **Routing Key** | `source.{sourceId}.{eventType}` (e.g., `source.erp-system-1.order.shipped`) |
 | **Concurrency** | Configurable (default: 3 consumers) |
@@ -125,11 +125,11 @@ Source systems that integrate via HTTP send a POST request to `/webhooks/events`
 | **Source Identifier** | `sourceId` field in request body |
 | **Rate Limit** | Per-source, configured in `event_sources` table |
 
-> **Info:** **Email Ingest Service** — The Email Ingest Service (port 3157/2525) receives emails from closed/legacy systems that cannot integrate via API or RabbitMQ. It parses the email content using configurable rules, extracts structured data, and publishes normalized events to the `events.incoming` exchange with routing key `source.email-ingest.{eventType}`. The Event Ingestion Service consumes these from the dedicated `q.events.email-ingest` queue and processes them identically to any other source.
+> **Info:** **Email Ingest Service** — The Email Ingest Service (port 3157/2525) receives emails from closed/legacy systems that cannot integrate via API or RabbitMQ. It parses the email content using configurable rules, extracts structured data, and publishes normalized events to the `xch.events.incoming` exchange with routing key `source.email-ingest.{eventType}`. The Event Ingestion Service consumes these from the dedicated `q.events.email-ingest` queue and processes them identically to any other source.
 
 ### 3.2 Runtime Mapping Configuration
 
-Each source system's events are normalized using admin-configured mapping rules stored in the `event_mappings` table. Mappings are keyed by `(sourceId, eventType)` and define how to extract and transform fields from the source payload into the flat canonical event format.
+Each source system's events are normalized using admin-configured mapping rules stored in the `event_mappings` table. Mappings are keyed by `(sourceId, eventType)` and define how to extract and transform fields from the source payload into the canonical event format (flat top-level namespace).
 
 #### Mapping Configuration Table
 
@@ -145,7 +145,7 @@ Each source system's events are normalized using admin-configured mapping rules 
 | `timestamp_format` | VARCHAR(50) | Timestamp format (`iso8601`, `epoch_ms`, `epoch_s`, custom) |
 | `source_event_id_field` | VARCHAR(255) | Dot-path to source deduplication ID |
 | `validation_schema` | JSONB | Optional JSON Schema for incoming payload validation |
-| `priority` | VARCHAR(10) | Event priority tier: `normal` (default) or `critical`. Determines the routing key segment when publishing to `events.normalized`. |
+| `priority` | VARCHAR(10) | Event priority tier: `normal` (default) or `critical`. Determines the routing key segment when publishing to `xch.events.normalized`. |
 | `is_active` | BOOLEAN | Only active mappings are used |
 | `version` | INTEGER | Configuration version for audit trail |
 
@@ -173,6 +173,11 @@ Each key in `field_mappings` is a canonical field name. The value defines how to
     "transform": "concatenate",
     "options": { "separator": " " }
   },
+  "currency": {
+    "source": "currency_code",
+    "transform": "direct",
+    "default": "USD"
+  },
   "items": {
     "source": "line_items",
     "transform": "arrayMap",
@@ -180,6 +185,16 @@ Each key in `field_mappings` is a canonical field name. The value defines how to
   }
 }
 ```
+
+#### Field Mapping Rule Properties
+
+| Property | Type | Required | Description |
+|---|---|---|---|
+| `source` | string \| string[] | Yes (except `static`) | Dot-path to the value in the source payload (e.g., `"customer.id"`). Use an array for transforms that combine multiple fields (e.g., `concatenate`). Ignored when transform is `static`. |
+| `transform` | string | No (default: `direct`) | Transform function to apply to the extracted value. See Supported Transforms below. |
+| `options` | object | Conditional | Transform-specific options (e.g., `{ "prefix": "ERP-" }`). Required by some transforms, ignored by others. |
+| `required` | boolean | No (default: `false`) | If `true`, the field must be present and non-null in the source payload (after applying `default`). A missing required field causes the event to be rejected. |
+| `default` | any | No | Fallback value used when the source path resolves to `null`, `undefined`, or is missing from the payload. The default is applied **before** the transform — meaning the transform function receives the default value as input. If a field has both `required: true` and a `default`, the default satisfies the required check. Not applicable when transform is `static` (use `options.value` instead). |
 
 #### Supported Transforms
 
@@ -220,8 +235,8 @@ The `event_type_mapping` field maps source-specific event type values to canonic
 4. **Fallback:** If no exact match, try wildcard `(sourceId, '*')`.
 5. **Not found:** Reject with `422 Unprocessable Entity` and error `"No mapping configuration found for source '{sourceId}' and event type '{eventType}'"`.
 6. If the mapping has a `validationSchema`, validate the incoming payload against it using `ajv`.
-7. Apply field mapping rules using the mapping engine → produce flat canonical event.
-8. Validate that all required canonical fields are present.
+7. Apply field mapping rules using the mapping engine — for each field, extract the source value; if the value is missing/null and a `default` is configured, substitute the default before applying the transform → produce canonical event (flat top-level namespace; values may be structured types).
+8. Validate that all required canonical fields are present (fields with a `default` that was applied satisfy the required check).
 
 #### Mapping Cache Strategy
 
@@ -241,7 +256,7 @@ All rows are loaded into an in-memory `Map<sourceId:eventType, MappingConfig>`. 
 
 **Phase 2 — Event-Driven Invalidation**
 
-Whenever a mapping is created, updated, or deactivated via the Admin Service, the Admin Service publishes an invalidation event to the `config.events` exchange with routing key `config.mapping.changed`. The event payload contains the mapping `id` and the new `version` number.
+Whenever a mapping is created, updated, or deactivated via the Admin Service, the Admin Service publishes an invalidation event to the `xch.config.events` exchange with routing key `config.mapping.changed`. The event payload contains the mapping `id` and the new `version` number.
 
 The Event Ingestion Service subscribes via the `q.config.mapping-cache` queue. On receiving an invalidation event, it:
 
@@ -256,7 +271,7 @@ The Event Ingestion Service subscribes via the `q.config.mapping-cache` queue. O
        │  Mapping updated             │                                │
        │  (via Admin UI)              │                                │
        │                              │                                │
-       │  Publish to config.events    │                                │
+       │  Publish to xch.config.events │                                │
        │  key: config.mapping.changed │                                │
        │─────────────────────────────▶│                                │
        │                              │  Deliver to                    │
@@ -321,7 +336,7 @@ This example shows how to onboard an ERP system that publishes order events via 
 }
 ```
 
-**Step 3:** The ERP publishes to `events.incoming` with routing key `source.erp-system-1.order.shipped`. The Event Ingestion Service consumes, applies the mapping, and produces a canonical event — no code changes required.
+**Step 3:** The ERP publishes to `xch.events.incoming` with routing key `source.erp-system-1.order.shipped`. The Event Ingestion Service consumes, applies the mapping, and produces a canonical event — no code changes required.
 
 ---
 
@@ -335,10 +350,10 @@ Every event — whether received via RabbitMQ consumer or REST webhook — passe
 4. **Mapping Lookup:** Find the active `event_mappings` row for `(sourceId, eventType)`. By default, mapping configs are fetched directly from PostgreSQL. When `MAPPING_CACHE_ENABLED=true`, mappings are resolved from an in-memory cache with event-driven invalidation (see [Mapping Cache Strategy](#mapping-cache-strategy)). Fallback to wildcard `(sourceId, '*')` if no exact match.
 5. **Validate (optional):** If the mapping configuration includes a `validationSchema`, validate the incoming payload against it using `ajv`. On failure, reject with detailed errors.
 6. **Deduplication Check:** Extract the source event ID using the `sourceEventIdField` path from the mapping config. Check the `(source_id, source_event_id)` composite key against the events table. If a match exists within the dedup window, return the existing event ID.
-7. **Normalize:** Apply the runtime mapping engine — extract fields using dot-path notation, apply configured transforms, resolve event types, normalize timestamps to ISO-8601 UTC, assign the `priority` from the mapping configuration (default: `normal`), and assemble the flat canonical event.
+7. **Normalize:** Apply the runtime mapping engine — extract fields using dot-path notation, apply `default` values for missing or null fields, apply configured transforms, resolve event types, normalize timestamps to ISO-8601 UTC, assign the `priority` from the mapping configuration (default: `normal`), and assemble the canonical event (flat top-level namespace).
 8. **Enrich Metadata:** Add `eventId` (UUID v4), `correlationId`, `receivedAt`, `normalizedAt`, `schemaVersion` ("2.0"), and `mappingConfigId` to the metadata object.
 9. **Persist:** Insert the event record (raw + normalized) into the `events` table with status `received`. Update status to `published` after successful publish.
-10. **Publish & ACK:** Publish the normalized event to the `events.normalized` exchange with routing key `event.{priority}.{eventType}` (e.g., `event.critical.order.delayed` or `event.normal.order.shipped`). Acknowledge the RabbitMQ message (or return `202 Accepted` for webhook requests).
+10. **Publish & ACK:** Publish the normalized event to the `xch.events.normalized` exchange with routing key `event.{priority}.{eventType}` (e.g., `event.critical.order.delayed` or `event.normal.order.shipped`). Acknowledge the RabbitMQ message (or return `202 Accepted` for webhook requests).
 
 ### Figure 4.1 — Event Processing Pipeline
 
@@ -392,33 +407,33 @@ Every event — whether received via RabbitMQ consumer or REST webhook — passe
 
 | Exchange | Type | Purpose | Durable |
 |---|---|---|---|
-| `events.incoming` | Topic | Receives raw events from source systems | Yes |
-| `events.normalized` | Topic | Publishes normalized canonical events with priority-tiered routing keys | Yes |
-| `notifications.dlq` | Fanout | Dead-letter exchange for failed messages | Yes |
-| `config.events` | Topic | Publishes mapping configuration change events (used when `MAPPING_CACHE_ENABLED=true`) | Yes |
+| `xch.events.incoming` | Topic | Receives raw events from source systems | Yes |
+| `xch.events.normalized` | Topic | Publishes normalized canonical events with priority-tiered routing keys | Yes |
+| `xch.notifications.dlq` | Fanout | Dead-letter exchange for failed messages | Yes |
+| `xch.config.events` | Topic | Publishes mapping configuration change events (used when `MAPPING_CACHE_ENABLED=true`) | Yes |
 
 ### Queues
 
 | Queue | Bound To | Routing Key | Concurrency | Prefetch | DLQ |
 |---|---|---|---|---|---|
-| `q.events.amqp` | `events.incoming` | `source.*.#` | 3 | 10 | Yes |
-| `q.events.webhook` | `events.incoming` | `source.webhook.#` | 2 | 10 | Yes |
-| `q.events.email-ingest` | `events.incoming` | `source.email-ingest.#` | 2 | 10 | Yes |
-| `q.config.mapping-cache` | `config.events` | `config.mapping.changed` | 1 | 1 | No |
+| `q.events.amqp` | `xch.events.incoming` | `source.*.#` | 3 | 10 | Yes |
+| `q.events.webhook` | `xch.events.incoming` | `source.webhook.#` | 2 | 10 | Yes |
+| `q.events.email-ingest` | `xch.events.incoming` | `source.email-ingest.#` | 2 | 10 | Yes |
+| `q.config.mapping-cache` | `xch.config.events` | `config.mapping.changed` | 1 | 1 | No |
 
 ### Routing Key Format
 
 **Incoming events** follow the pattern `source.{sourceId}.{eventType}`, where `sourceId` identifies the registered source system and `eventType` uses dot-notation for the business event (e.g., `source.erp-system-1.order.shipped`). The `q.events.amqp` queue uses `source.*.#` to consume all events from all AMQP sources. The `q.events.email-ingest` queue is dedicated to the Email Ingest Service for operational isolation.
 
-**Normalized events** are published to the `events.normalized` exchange with routing key `event.{priority}.{eventType}` (e.g., `event.critical.order.delayed` or `event.normal.order.shipped`). The priority tier is determined by the `priority` field in the event mapping configuration (default: `normal`). Downstream consumers bind to priority-specific queues for differentiated processing — see [02 — Detailed Microservices](02-detailed-microservices.md) for the Notification Engine and Channel Router queue topology.
+**Normalized events** are published to the `xch.events.normalized` exchange with routing key `event.{priority}.{eventType}` (e.g., `event.critical.order.delayed` or `event.normal.order.shipped`). The priority tier is determined by the `priority` field in the event mapping configuration (default: `normal`). Downstream consumers bind to priority-specific queues for differentiated processing — see [02 — Detailed Microservices](02-detailed-microservices.md) for the Notification Engine and Channel Router queue topology.
 
 ### Figure 5.1 — RabbitMQ Topology
 
 ```
-                    ┌──────────────────┐
-                    │  events.incoming  │
-                    │  (Topic Exchange) │
-                    └──┬──────┬──────┬─┘
+                    ┌──────────────────────┐
+                    │  xch.events.incoming  │
+                    │  (Topic Exchange)     │
+                    └──┬──────┬──────┬─────┘
                        │      │      │
         ┌──────────────┘      │      └──────────────┐
         ▼                     ▼                      ▼
@@ -437,14 +452,14 @@ Every event — whether received via RabbitMQ consumer or REST webhook — passe
                    └──────────┬──────────┘
                               │
                               ▼
-                   ┌─────────────────────┐       ┌─────────────────┐
-                   │ events.normalized   │       │ notifications.  │
-                   │ (Topic Exchange)    │       │ dlq (DLQ)       │
-                   │                     │       └─────────────────┘
-                   │ Routing keys:       │
-                   │ event.critical.{t}  │
-                   │ event.normal.{t}    │
-                   └─────────────────────┘
+                   ┌─────────────────────────┐       ┌─────────────────────┐
+                   │ xch.events.normalized   │       │ xch.notifications.  │
+                   │ (Topic Exchange)        │       │ dlq (DLQ)           │
+                   │                         │       └─────────────────────┘
+                   │ Routing keys:           │
+                   │ event.critical.{t}      │
+                   │ event.normal.{t}        │
+                   └─────────────────────────┘
 ```
 
 ---
@@ -606,7 +621,11 @@ Internal list/filter endpoint — returns paginated events with optional filters
 
 ## 7. Canonical Event Schema
 
-All events — regardless of source — are normalized into this flat canonical format (v2.0) before publishing to the `events.normalized` exchange. This guarantees that downstream consumers (Notification Engine, Audit Service) work with a single, predictable schema.
+All events — regardless of source — are normalized into the canonical format (v2.0) before publishing to the `xch.events.normalized` exchange. This guarantees that downstream consumers (Notification Engine, Audit Service) work with a single, predictable schema.
+
+> **Info:** **Flat Top-Level Namespace**
+>
+> The canonical schema uses a **flat top-level namespace** — all business fields are placed as direct keys on the root object (e.g., `customerEmail`, `orderId`, `totalAmount`) rather than nested under a `payload` wrapper. However, the **values** of those top-level keys may themselves be structured types: arrays of objects (e.g., `items`, `media`) or nested objects (e.g., `additionalData`). "Flat" refers to the single-level key namespace, not to the shape of individual field values. This means template authors can use Handlebars dot-path access (`{{additionalData.carrier}}`), iteration over arrays (`{{#each items}}{{sku}}{{/each}}`), and nested iteration (`{{#each orders}}{{#each items}}{{sku}}{{/each}}{{/each}}`) against structured field values. Rule engine conditions and dedup key paths resolve against top-level field names only.
 
 ### Required Fields (top-level)
 
@@ -631,7 +650,23 @@ All events — regardless of source — are normalized into this flat canonical 
 | `items` | array | Array of order line items |
 | `totalAmount` | number | Total order amount |
 | `currency` | string | ISO-4217 currency code |
+| `media` | array | URL-referenced media assets (images, documents) for channel-specific rendering and attachment handling. See [Media Reference Schema](#media-reference-schema) below. |
 | `additionalData` | object | Extra source-specific fields not covered by canonical schema |
+
+### Media Reference Schema
+
+The `media` array is an optional top-level field on the canonical event. Each entry describes a single media asset hosted externally by the source system (no internal media storage required). The Template Service renders inline media references (e.g., product images in email `<img>` tags), while the Channel Router handles channel-specific attachment delivery. See [02 — Detailed Microservices](02-detailed-microservices.md) for channel-specific media handling, size limits, and download resilience policy.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | string | Yes | Media type: `image`, `document`, `video` |
+| `url` | string | Yes | HTTPS URL to the media asset (hosted by source system CDN) |
+| `alt` | string | No | Alt text for images (used in email `<img>` tags and accessibility) |
+| `filename` | string | No | Display filename for document attachments (e.g., `invoice.pdf`) |
+| `mimeType` | string | No | MIME type hint (e.g., `application/pdf`, `image/jpeg`). Validated by Channel Router before delivery. |
+| `context` | string | Yes | Rendering context: `inline` (embedded in template body) or `attachment` (sent as file attachment) |
+
+> **Info:** **URL-Referenced Media** — Source systems host images and documents on their own CDNs. The notification platform carries HTTPS references only — no binary payloads traverse the event pipeline. If the Channel Router fails to download a media asset at delivery time (timeout, 404, size exceeded), the notification is sent **without the attachment** rather than failing entirely.
 
 ### System Metadata (`metadata` object)
 
@@ -671,6 +706,21 @@ Auto-generated by the ingestion service — not populated from source data.
   ],
   "totalAmount": 79.99,
   "currency": "USD",
+  "media": [
+    {
+      "type": "image",
+      "url": "https://cdn.store.com/products/headphones-200x200.jpg",
+      "alt": "Wireless Headphones",
+      "context": "inline"
+    },
+    {
+      "type": "document",
+      "url": "https://docs.store.com/invoices/INV-2026-00451.pdf",
+      "filename": "invoice-ORD-2026-00451.pdf",
+      "mimeType": "application/pdf",
+      "context": "attachment"
+    }
+  ],
   "additionalData": {
     "trackingNumber": "794644790132",
     "carrier": "FedEx"
@@ -695,6 +745,8 @@ Auto-generated by the ingestion service — not populated from source data.
 - **DB Script:** `event-ingestion-service/dbscripts/schema-event-ingestion-service.sql`
 
 ### events Table
+
+Immutable record of all ingested events. Each row stores the original source payload and the normalized canonical output, along with processing status and traceability metadata (`event_id`, `correlation_id`, `cycle_id`). This is the **dominant growth table** in the schema (~5 GB/month, ~50 GB/year), with a scheduled payload purge (`purge_event_payloads()`) that NULLs out large JSONB columns after 90 days while preserving event metadata indefinitely for audit and tracing.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
@@ -729,11 +781,13 @@ Auto-generated by the ingestion service — not populated from source data.
 | `received` | Event received and persisted, awaiting normalization |
 | `validated` | Payload validation passed (if `validationSchema` was configured) |
 | `normalized` | Normalization completed |
-| `published` | Successfully published to `events.normalized` exchange |
+| `published` | Successfully published to `xch.events.normalized` exchange |
 | `failed` | Processing failed (see `error_message`) |
 | `duplicate` | Identified as duplicate, not re-processed |
 
 ### event_sources Table
+
+Registry of authorized external source systems. Each row represents a registered integration point — either a RabbitMQ consumer or webhook endpoint — with its authentication credentials (hashed API keys and signing secrets), connection configuration, and optional per-source rate limiting. This is a low-volume reference table (~tens of rows) that is looked up on every incoming event to validate the source and apply rate limits.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
@@ -750,6 +804,8 @@ Auto-generated by the ingestion service — not populated from source data.
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` | Last update timestamp |
 
 ### event_mappings Table
+
+Admin-configured field mapping rules that define how source-specific event payloads are transformed into the canonical event format (flat top-level namespace). Each mapping is keyed by `(source_id, event_type)` and specifies field extraction paths, transform functions (13 types including `direct`, `concatenate`, `template`, `dateFormat`, etc.), timestamp normalization, optional JSON Schema validation, and priority tier (`normal`/`critical`). This is a low-volume configuration table (~100-500 rows) that is accessed on every event during normalization — an optional eager cache with event-driven invalidation can be enabled for high-throughput deployments.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
@@ -993,7 +1049,7 @@ Source System          Gateway           Event Ingestion         PostgreSQL / Ra
      │                    │                     │  Confirm                │
      │                    │                     │◄────────────────────────│
      │                    │                     │  Publish to             │
-     │                    │                     │  events.normalized      │
+     │                    │                     │  xch.events.normalized  │
      │                    │                     │────────────────────────▶│
      │                    │  202 Accepted        │                         │
      │                    │◄────────────────────│                         │
@@ -1004,36 +1060,36 @@ Source System          Gateway           Event Ingestion         PostgreSQL / Ra
 ### 11.2 RabbitMQ Consumer Flow
 
 ```
-Source System     events.incoming      Consumer           PostgreSQL / events.normalized
-     │              Exchange              │                         │
-     │                 │                  │                         │
-     │  Publish msg    │                  │                         │
-     │  source.{id}.*  │                  │                         │
-     │────────────────▶│                  │                         │
-     │                 │  Deliver to       │                         │
-     │                 │  q.events.amqp   │                         │
-     │                 │─────────────────▶│                         │
-     │                 │                  │  Lookup mapping         │
-     │                 │                  │────────────────────────▶│
-     │                 │                  │  Mapping config         │
-     │                 │                  │◄────────────────────────│
-     │                 │                  │  Validate (optional)    │
-     │                 │                  │  Check dedup            │
-     │                 │                  │────────────────────────▶│
-     │                 │                  │  Dedup result           │
-     │                 │                  │◄────────────────────────│
-     │                 │                  │  Normalize (mapping)    │
-     │                 │                  │  INSERT event           │
-     │                 │                  │────────────────────────▶│
-     │                 │                  │  Publish to normalized  │
-     │                 │                  │────────────────────────▶│
-     │                 │  ACK message     │                         │
-     │                 │◄─────────────────│                         │
-     │                 │                  │                         │
-     │                 │    ┌─────────────────────────────┐         │
-     │                 │    │ ALT: Failure                 │         │
-     │                 │    │  NACK → DLQ after 3 retries  │         │
-     │                 │    └─────────────────────────────┘         │
+Source System     xch.events.incoming          Consumer           PostgreSQL / xch.events.normalized
+     │                 Exchange                    │                         │
+     │                    │                        │                         │
+     │  Publish msg       │                        │                         │
+     │  source.{id}.*    │                        │                         │
+     │───────────────────▶│                        │                         │
+     │                    │  Deliver to             │                         │
+     │                    │  q.events.amqp         │                         │
+     │                    │───────────────────────▶│                         │
+     │                    │                        │  Lookup mapping         │
+     │                    │                        │────────────────────────▶│
+     │                    │                        │  Mapping config         │
+     │                    │                        │◄────────────────────────│
+     │                    │                        │  Validate (optional)    │
+     │                    │                        │  Check dedup            │
+     │                    │                        │────────────────────────▶│
+     │                    │                        │  Dedup result           │
+     │                    │                        │◄────────────────────────│
+     │                    │                        │  Normalize (mapping)    │
+     │                    │                        │  INSERT event           │
+     │                    │                        │────────────────────────▶│
+     │                    │                        │  Publish to normalized  │
+     │                    │                        │────────────────────────▶│
+     │                    │  ACK message           │                         │
+     │                    │◄───────────────────────│                         │
+     │                    │                        │                         │
+     │                    │    ┌─────────────────────────────┐               │
+     │                    │    │ ALT: Failure                 │               │
+     │                    │    │  NACK → DLQ after 3 retries  │               │
+     │                    │    └─────────────────────────────┘               │
 ```
 
 ---
@@ -1054,8 +1110,8 @@ Source System     events.incoming      Consumer           PostgreSQL / events.no
 
 ### Dead-Letter Queue Strategy
 
-- **DLQ Exchange:** `notifications.dlq` (fanout)
-- **Configuration:** All source queues declare `x-dead-letter-exchange: notifications.dlq`
+- **DLQ Exchange:** `xch.notifications.dlq` (fanout)
+- **Configuration:** All source queues declare `x-dead-letter-exchange: xch.notifications.dlq`
 - **Trigger:** Messages are dead-lettered after 3 failed delivery attempts (tracked via `x-death` headers)
 - **`x-death` Headers:** RabbitMQ automatically appends `x-death` headers with failure count, reason, original exchange, and routing key
 

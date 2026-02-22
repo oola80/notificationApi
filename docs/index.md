@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Version:** | 1.7 |
-| **Date:** | 2026-02-20 |
+| **Version:** | 1.9 |
+| **Date:** | 2026-02-21 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
 
@@ -116,6 +116,24 @@ Deep-dive into the Notification Engine Service — rule engine with condition op
 
 [Read Notification Engine Service](08-notification-engine-service.md)
 
+### 09 — Bulk Upload Service
+
+Deep-dive into the Bulk Upload Service — asynchronous XLSX file processing, three-endpoint upload lifecycle (upload, poll status, download result), result file generation with per-row submission status column, flexible column mapping, Event Ingestion integration via HTTP, fire-and-forget audit logging via RabbitMQ, circuit breaker for downstream resilience, database design, sequence diagrams, and configuration.
+
+[Read Bulk Upload Service](09-bulk-upload-service.md)
+
+### 10 — Template Service
+
+Deep-dive into the Template Service — Handlebars rendering pipeline with compiled template caching, immutable versioning model, variable auto-detection, custom helpers, multi-channel content specifications (email HTML, SMS, WhatsApp, push), performance evaluation (PostgreSQL vs DynamoDB/MongoDB/Redis), fire-and-forget audit logging via RabbitMQ, REST API contracts, database design with 4 tables, media pass-through architecture, sequence diagrams, security considerations (HTML escaping, XSS prevention, RBAC), and configuration.
+
+[Read Template Service](10-template-service.md)
+
+### 11 — Channel Router Service
+
+Deep-dive into the Channel Router Service — provider strategy pattern with multi-provider support (SendGrid, Mailgun, Braze, Twilio, FCM), dumb-pipe integration architecture, delivery pipeline, token bucket rate limiting, circuit breaker pattern, retry strategy with exponential backoff and jitter, fallback channel logic, media and attachment handling, webhook receivers with provider signature verification, Braze user profile synchronization, asynchronous audit logging via RabbitMQ fire-and-forget, database design with 4 tables, sequence diagrams (email delivery, Braze multi-channel, retry with circuit breaker trip, fallback), and configuration.
+
+[Read Channel Router Service](11-channel-router-service.md)
+
 ---
 
-*Notification API Documentation v1.7 -- Architecture Team -- 2026*
+*Notification API Documentation v1.9 -- Architecture Team -- 2026*
