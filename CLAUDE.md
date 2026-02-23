@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Design documentation phase. Service folders and database scripts scaffolded — no application code yet.
+Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** has NestJS installed and is the most advanced service — Step 3 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks; 200+ unit tests across 27 suites). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
 
 ## Tech Stack (Planned)
 
@@ -44,9 +44,36 @@ notification-gateway/           # NestJS — port 3150
     13-notification-gateway.md  # Convenience copy of design doc
     changelog_dev.md            # Code-only development changelog
 
-event-ingestion-service/        # NestJS — port 3151
+event-ingestion-service/        # NestJS — port 3151 (Step 3 complete)
   CLAUDE.md
+  .env                          # Local environment variables (git-ignored)
+  .gitignore                    # Node/NestJS ignores (dist, node_modules, .env, coverage, etc.)
+  .prettierrc                   # Prettier config (singleQuote, trailingComma: all)
+  eslint.config.mjs             # ESLint flat config (typescript-eslint + prettier)
+  nest-cli.json                 # NestJS CLI config (sourceRoot: src, deleteOutDir)
+  package.json                  # NestJS 11, TypeScript 5.7, Jest 30
+  package-lock.json
+  tsconfig.json                 # ES2023 target, nodenext modules, decorators enabled
+  tsconfig.build.json
+  src/
+    main.ts                     # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3151
+    app.module.ts               # Root module: Config, Logger, TypeORM, Common, all feature modules, Health
+    common/                     # @Global() module: errors, filters, pipes, interceptors, base repo, utils
+    config/                     # ConfigModule.forRoot: app, database, rabbitmq configs, env validation
+    normalization/               # MappingEngine, EventTypeResolver, PayloadValidator, 13 transforms
+    event-mappings/             # CRUD + test-mapping endpoint (controller, service, repository, DTOs, entity)
+    event-sources/              # Source system config (repository, entity)
+    events/                     # Event persistence + query (controller, service, repository, DTOs, entity)
+    rabbitmq/                   # @golevelup/nestjs-rabbitmq wrapper (exchanges, publisher, constants)
+    consumers/                  # 3 consumer handlers (AMQP, webhook, email-ingest) + shared processing pipeline
+    webhook/                    # Webhook endpoint (controller, service, DTOs, guards, auth, deduplication)
+    health/                     # Terminus health checks (DB + RabbitMQ Management API)
+  test/
+    app.e2e-spec.ts             # E2E test for GET /health
+    jest-e2e.json               # Jest E2E config
   dbscripts/
+    schema-event-ingestion-service.sql
+    event-ingestion-service-dbscripts.sql
   docs/
     07-event-ingestion-service.md
     changelog_dev.md
