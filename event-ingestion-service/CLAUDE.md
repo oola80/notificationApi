@@ -15,11 +15,12 @@ Receives and normalizes events from source systems via runtime field mappings; a
 
 ## Implementation Status
 
-**Step 3 complete** — RabbitMQ integration with real message broker publishing, consumer handlers, retry/DLQ logic, and health checks.
+**Step 4 complete** — Mapping cache, rate limiting, Prometheus metrics, and enhanced structured logging.
 
 - **Step 1:** Foundation, configuration, data layer, event-mappings CRUD (5 endpoints), health check
 - **Step 2:** Normalization module (13 transforms, mapping engine, event type resolver, JSON Schema validator), webhook pipeline (10-step orchestrator with source auth, deduplication, normalization, persistence), event query endpoints (GET single + paginated list), test mapping endpoint.
-- **Step 3:** RabbitMQ integration via `@golevelup/nestjs-rabbitmq`. Shared `EventProcessingService` pipeline (extracted from WebhookService). 3 consumer handlers (AMQP, webhook relay, email-ingest) with republish-with-header retry pattern and exponential backoff. `EventPublisherService` publishes normalized events to `xch.events.normalized`. RabbitMQ health indicator with Management API queue depth monitoring. WebhookService refactored to thin adapter. 200 unit tests passing across 27 suites.
+- **Step 3:** RabbitMQ integration via `@golevelup/nestjs-rabbitmq`. Shared `EventProcessingService` pipeline (extracted from WebhookService). 3 consumer handlers (AMQP, webhook relay, email-ingest) with republish-with-header retry pattern and exponential backoff. `EventPublisherService` publishes normalized events to `xch.events.normalized`. RabbitMQ health indicator with Management API queue depth monitoring. WebhookService refactored to thin adapter.
+- **Step 4:** Optional in-memory mapping cache (warm-up from DB, single-flight fetch, RabbitMQ-driven invalidation). Sliding-window rate limiter (global webhook + per-source). Prometheus metrics via prom-client (13 metrics: counters, histogram, gauges) at `GET /metrics`. Enhanced structured logging (PinoLogger DI, correlationId/sourceId extraction). Config change publishing from EventMappingsService mutations. 264 unit tests passing across 33 suites.
 
 ## Key Dependencies
 
@@ -36,6 +37,7 @@ Receives and normalizes events from source systems via runtime field mappings; a
 | `dayjs` | ^1.x | Lightweight date parsing/formatting for timestamp normalization |
 | `jsonpath-plus` | ^10.x | JSONPath expression evaluation for `jsonPath` transform |
 | `@golevelup/nestjs-rabbitmq` | ^7.1.2 | NestJS-idiomatic RabbitMQ integration (decorators, DI, exchange assertions, reconnection) |
+| `prom-client` | ^15.x | Prometheus metrics (Registry, Counter, Histogram, Gauge) |
 | `typeorm` | ^0.3.28 | ORM (PostgreSQL, entities, repositories) |
 | `pg` | ^8.18.0 | PostgreSQL driver |
 | `class-validator` | ^0.14.3 | DTO validation decorators |
@@ -115,6 +117,8 @@ Configured via `.env` file in the service root (git-ignored). Required for local
 | `RETRY_INITIAL_DELAY_MS` | Initial retry delay (ms) | `1000` |
 | `RETRY_BACKOFF_MULTIPLIER` | Retry backoff multiplier | `2` |
 | `RETRY_MAX_DELAY_MS` | Maximum retry delay (ms) | `30000` |
+| `MAPPING_CACHE_ENABLED` | Enable in-memory mapping cache | `false` |
+| `WEBHOOK_RATE_LIMIT` | Global webhook rate limit (requests/second) | `100` |
 
 ## Related Services
 
@@ -242,6 +246,27 @@ event-ingestion-service/
         event.entity.ts              # 12 columns, BIGSERIAL PK (string), UUID eventId
       dto/
         list-events-query.dto.ts     # Pagination + filters (sourceId, eventType, status, date range)
+    metrics/
+      metrics.module.ts              # @Global() module, provides + exports MetricsService
+      metrics.service.ts             # prom-client wrapper: 13 metrics (counters, histograms, gauges)
+      metrics.service.spec.ts
+      metrics.controller.ts          # GET /metrics — Prometheus text format
+      metrics.controller.spec.ts
+    mapping-cache/
+      mapping-cache.module.ts        # Imports EventMappingsModule, AppRabbitMQModule
+      mapping-cache.service.ts       # In-memory Map cache, warm-up, single-flight fetch, invalidation
+      mapping-cache.service.spec.ts
+      mapping-cache.consumer.ts      # @RabbitSubscribe on q.config.mapping-cache
+      mapping-cache.consumer.spec.ts
+      interfaces/
+        mapping-cache-message.interface.ts  # MappingCacheInvalidationMessage { id, version }
+    rate-limiter/
+      rate-limiter.module.ts         # Provides + exports RateLimiterService, WebhookRateLimitGuard
+      rate-limiter.service.ts        # Sliding-window rate limiter (global + per-source)
+      rate-limiter.service.spec.ts
+      guards/
+        webhook-rate-limit.guard.ts  # CanActivate guard, Retry-After header, EIS-017
+        webhook-rate-limit.guard.spec.ts
     rabbitmq/
       rabbitmq.module.ts             # AppRabbitMQModule — @golevelup/nestjs-rabbitmq wrapper (4 exchanges, connection config)
       rabbitmq.constants.ts          # Exchange/queue name constants, routing key builders/parsers
@@ -251,8 +276,8 @@ event-ingestion-service/
       interfaces/
         rabbitmq-event-message.interface.ts  # RabbitMqEventMessage (inbound), NormalizedEventMessage (outbound)
     consumers/
-      consumers.module.ts            # ConsumersModule — imports RabbitMQ + domain modules, exports EventProcessingService
-      event-processing.service.ts    # Shared 10-step pipeline (source→mapping→validate→dedup→normalize→persist→publish)
+      consumers.module.ts            # ConsumersModule — imports RabbitMQ + domain modules + MappingCacheModule + RateLimiterModule
+      event-processing.service.ts    # Shared pipeline with cache, metrics, rate limiting integration
       event-processing.service.spec.ts
       base-event.consumer.ts         # Abstract base — handleMessage(), retryOrDlq(), isRetryable(), calculateDelay()
       amqp-event.consumer.ts         # @RabbitSubscribe on q.events.amqp (source.*.#)

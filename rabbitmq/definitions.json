@@ -1,0 +1,460 @@
+{
+  "rabbit_version": "3.13.x",
+  "vhosts": [
+    {
+      "name": "vhnotificationapi"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "guest",
+      "vhost": "vhnotificationapi",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "xch.events.incoming",
+      "vhost": "vhnotificationapi",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "xch.events.normalized",
+      "vhost": "vhnotificationapi",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "xch.notifications.status",
+      "vhost": "vhnotificationapi",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "xch.config.events",
+      "vhost": "vhnotificationapi",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "xch.notifications.dlq",
+      "vhost": "vhnotificationapi",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "q.events.amqp",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.events.webhook",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.events.email-ingest",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.config.mapping-cache",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "q.engine.events.critical",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.engine.events.normal",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.config.rule-cache",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "q.config.override-cache",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "q.engine.status.inbound",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.email.critical",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.email.normal",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.sms.critical",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.sms.normal",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.whatsapp.critical",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.whatsapp.normal",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.push.critical",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.deliver.push.normal",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "q.audit.template",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "q.status.updates",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "xch.notifications.dlq"
+      }
+    },
+    {
+      "name": "audit.events",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "audit.deliver",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "audit.dlq",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "q.dlq",
+      "vhost": "vhnotificationapi",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "xch.events.incoming",
+      "vhost": "vhnotificationapi",
+      "destination": "q.events.amqp",
+      "destination_type": "queue",
+      "routing_key": "source.*.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.events.incoming",
+      "vhost": "vhnotificationapi",
+      "destination": "q.events.webhook",
+      "destination_type": "queue",
+      "routing_key": "source.webhook.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.events.incoming",
+      "vhost": "vhnotificationapi",
+      "destination": "q.events.email-ingest",
+      "destination_type": "queue",
+      "routing_key": "source.email-ingest.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.events.normalized",
+      "vhost": "vhnotificationapi",
+      "destination": "q.engine.events.critical",
+      "destination_type": "queue",
+      "routing_key": "event.critical.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.events.normalized",
+      "vhost": "vhnotificationapi",
+      "destination": "q.engine.events.normal",
+      "destination_type": "queue",
+      "routing_key": "event.normal.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.events.normalized",
+      "vhost": "vhnotificationapi",
+      "destination": "audit.events",
+      "destination_type": "queue",
+      "routing_key": "event.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.email.critical",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.critical.email",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.email.normal",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.normal.email",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.sms.critical",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.critical.sms",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.sms.normal",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.normal.sms",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.whatsapp.critical",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.critical.whatsapp",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.whatsapp.normal",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.normal.whatsapp",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.push.critical",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.critical.push",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "q.deliver.push.normal",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.normal.push",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.deliver",
+      "vhost": "vhnotificationapi",
+      "destination": "audit.deliver",
+      "destination_type": "queue",
+      "routing_key": "notification.deliver.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.status",
+      "vhost": "vhnotificationapi",
+      "destination": "q.engine.status.inbound",
+      "destination_type": "queue",
+      "routing_key": "notification.status.delivered",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.status",
+      "vhost": "vhnotificationapi",
+      "destination": "q.engine.status.inbound",
+      "destination_type": "queue",
+      "routing_key": "notification.status.failed",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.status",
+      "vhost": "vhnotificationapi",
+      "destination": "q.audit.template",
+      "destination_type": "queue",
+      "routing_key": "template.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.status",
+      "vhost": "vhnotificationapi",
+      "destination": "q.status.updates",
+      "destination_type": "queue",
+      "routing_key": "notification.status.#",
+      "arguments": {}
+    },
+    {
+      "source": "xch.config.events",
+      "vhost": "vhnotificationapi",
+      "destination": "q.config.mapping-cache",
+      "destination_type": "queue",
+      "routing_key": "config.mapping.changed",
+      "arguments": {}
+    },
+    {
+      "source": "xch.config.events",
+      "vhost": "vhnotificationapi",
+      "destination": "q.config.rule-cache",
+      "destination_type": "queue",
+      "routing_key": "config.rule.changed",
+      "arguments": {}
+    },
+    {
+      "source": "xch.config.events",
+      "vhost": "vhnotificationapi",
+      "destination": "q.config.override-cache",
+      "destination_type": "queue",
+      "routing_key": "config.override.changed",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.dlq",
+      "vhost": "vhnotificationapi",
+      "destination": "q.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "xch.notifications.dlq",
+      "vhost": "vhnotificationapi",
+      "destination": "audit.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    }
+  ]
+}

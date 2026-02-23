@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** has NestJS installed and is the most advanced service — Step 3 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks; 200+ unit tests across 27 suites). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
+Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** has NestJS installed and is the most advanced service — Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
 
 ## Tech Stack (Planned)
 
