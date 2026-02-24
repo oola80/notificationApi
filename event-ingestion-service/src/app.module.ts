@@ -49,6 +49,7 @@ import { Event } from './events/entities/event.entity.js';
         password: config.get<string>('database.password'),
         entities: [EventMapping, EventSource, Event],
         synchronize: false,
+        charset: 'utf8',
       }),
     }),
     CommonModule,

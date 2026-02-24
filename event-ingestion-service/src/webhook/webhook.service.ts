@@ -4,8 +4,6 @@ import {
   EventProcessingInput,
 } from '../consumers/event-processing.service.js';
 import { WebhookEventDto } from './dto/webhook-event.dto.js';
-import { EventSource } from '../event-sources/entities/event-source.entity.js';
-
 export interface WebhookResult {
   eventId: string;
   correlationId: string;
@@ -20,7 +18,7 @@ export class WebhookService {
 
   async processWebhookEvent(
     dto: WebhookEventDto,
-    _eventSource: EventSource,
+    _eventSource: unknown,
     correlationId: string,
   ): Promise<WebhookResult> {
     const input: EventProcessingInput = {
