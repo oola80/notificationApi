@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** has NestJS installed and is the most advanced service — Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
+Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
 
 ## Tech Stack (Planned)
 
@@ -44,7 +44,7 @@ notification-gateway/           # NestJS — port 3150
     13-notification-gateway.md  # Convenience copy of design doc
     changelog_dev.md            # Code-only development changelog
 
-event-ingestion-service/        # NestJS — port 3151 (Step 3 complete)
+event-ingestion-service/        # NestJS — port 3151 (Step 4 complete)
   CLAUDE.md
   .env                          # Local environment variables (git-ignored)
   .gitignore                    # Node/NestJS ignores (dist, node_modules, .env, coverage, etc.)
@@ -78,9 +78,43 @@ event-ingestion-service/        # NestJS — port 3151 (Step 3 complete)
     07-event-ingestion-service.md
     changelog_dev.md
 
-notification-engine-service/    # NestJS — port 3152
+notification-engine-service/    # NestJS — port 3152 (Phase 7 complete)
   CLAUDE.md
+  .env                          # Local environment variables (git-ignored)
+  .gitignore                    # Node/NestJS ignores (dist, node_modules, .env, coverage, etc.)
+  .prettierrc                   # Prettier config (singleQuote, trailingComma: all)
+  eslint.config.mjs             # ESLint flat config (typescript-eslint + prettier)
+  nest-cli.json                 # NestJS CLI config (sourceRoot: src, deleteOutDir)
+  package.json                  # NestJS 11, TypeScript 5.7, Jest 30
+  package-lock.json
+  tsconfig.json                 # ES2023 target, nodenext modules, decorators enabled
+  tsconfig.build.json
+  src/
+    main.ts                     # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3152
+    app.module.ts               # Root module: Config, Logger, TypeORM, Common, Metrics, Health, all feature modules, RabbitMQ, TemplateClient, Consumers
+    common/                     # @Global() module: errors, filters, pipes, interceptors, base repo
+    config/                     # ConfigModule.forRoot: app, database, rabbitmq configs, env validation
+    metrics/                    # @Global() MetricsModule: 14 custom metrics, GET /metrics
+    health/                     # Custom health controller (DB, RabbitMQ, template service, queue depths)
+    rules/                      # Rules CRUD, rule engine (conditions, matching, priority), rule cache
+    recipients/                 # Recipient groups CRUD, member management, resolver, channel resolver
+    preferences/                # Customer channel preferences webhook, LRU cache
+    overrides/                  # Critical channel overrides CRUD, eager cache
+    notifications/              # Notification CRUD, lifecycle, suppression engine, manual send
+    rabbitmq/                   # @golevelup/nestjs-rabbitmq wrapper (5 exchanges, publisher, constants)
+    consumers/                  # 6 consumers (critical/normal events, status inbound, rule/override cache invalidation) + pipeline
+    template-client/            # HTTP client for template-service with circuit breaker + retry
+  test/
+    test-utils.ts               # Shared E2E helper
+    app.e2e-spec.ts             # E2E: health + metrics
+    rules.e2e-spec.ts           # E2E: rules CRUD lifecycle
+    recipient-groups.e2e-spec.ts  # E2E: recipient groups + members
+    overrides.e2e-spec.ts       # E2E: critical channel overrides
+    notifications.e2e-spec.ts   # E2E: notifications list/filter/timeline
+    jest-e2e.json               # Jest E2E config
   dbscripts/
+    schema-notification-engine-service.sql
+    notification-engine-service-dbscripts.sql
   docs/
     08-notification-engine-service.md
     changelog_dev.md
@@ -158,7 +192,7 @@ Each backend service (all except `notification-admin-ui`) contains a `dbscripts/
 - **`schema-{service-name}.sql`** — Schema creation script (schema, role, user, grants). Run once per environment.
 - **`{service-name}-dbscripts.sql`** — Database object definitions (tables, indexes, functions, triggers, views, etc.). **Must be updated every time a database change is made to the service.** This is the single source of truth for the service's database structure.
 
-The schema creation script follows the naming convention `schema-{service-name}.sql`. Each script creates the schema, role, user, and grants all necessary privileges (schema-per-service pattern). Schema/role/user names use snake_case derived from the folder name. The `event-ingestion-service` script also creates the `event_mappings` table for runtime field mapping configuration (keyed by `source_id` + `event_type`) with a `priority` column (`normal`/`critical`, default `normal`), the `event_sources` table for registered source system configurations, and the `events` table for storing all ingested events (raw and normalized) with a required `cycle_id` column for business cycle tracking. A `purge_event_payloads()` PL/pgSQL function NULLs out `raw_payload` and `normalized_payload` on rows older than a configurable threshold (default 90 days) for scheduled retention. The `notification-engine-service` script also creates the `customer_channel_preferences` table for per-customer per-channel opt-in/opt-out preferences (keyed by `customer_id`, FILLFACTOR 90, with autovacuum tuning) and the `critical_channel_overrides` table for configurable forced-channel rules per event type (UUID PK, partial index on active overrides). The `bulk-upload-service` script also creates the `uploads` table for tracking XLSX file uploads (UUID PK, status state machine, aggregate row counters, `total_events` for group mode event count, result file path), the `upload_rows` table for per-row processing tracking (FK to uploads with ON DELETE CASCADE, raw data, mapped payload, event ID, status, `group_key` for multi-item row grouping with partial index), and a `purge_old_uploads()` PL/pgSQL function that deletes terminal-state uploads and cascading rows older than a configurable threshold (default 90 days). The `audit-service` script also creates the `audit_events` table for immutable notification lifecycle event logging (UUID PK, notification_id, correlation_id, cycle_id, event type taxonomy, actor, metadata JSONB, payload snapshot JSONB, tsvector search vector), the `delivery_receipts` table for provider-reported delivery outcomes correlated via provider_message_id, the `notification_analytics` table for pre-aggregated hourly/daily rollups with idempotent upsert, the `dlq_entries` table for dead-letter queue monitoring with status tracking (pending/investigated/reprocessed/discarded), and a `purge_audit_payloads()` PL/pgSQL function that NULLs payload data older than a configurable threshold (default 90 days). The `template-service` script also creates the `templates` table for master template records (UUID PK, unique slug, current version pointer), the `template_versions` table for immutable version snapshots (FK to templates, unique version number per template), the `template_channels` table for channel-specific content per version (FK to template_versions, unique channel per version, Handlebars body), and the `template_variables` table for auto-detected template variables (FK to templates, unique variable name per template, optional defaults and required flag).
+The schema creation script follows the naming convention `schema-{service-name}.sql`. Each script creates the schema, role, user, and grants all necessary privileges (schema-per-service pattern). Schema/role/user names use snake_case derived from the folder name. The `event-ingestion-service` script also creates the `event_mappings` table for runtime field mapping configuration (keyed by `source_id` + `event_type`) with a `priority` column (`normal`/`critical`, default `normal`), the `event_sources` table for registered source system configurations, and the `events` table for storing all ingested events (raw and normalized) with a required `cycle_id` column for business cycle tracking. A `purge_event_payloads()` PL/pgSQL function NULLs out `raw_payload` and `normalized_payload` on rows older than a configurable threshold (default 90 days) for scheduled retention. The `notification-engine-service` script also creates the `notification_rules` table for rule definitions (UUID PK, JSONB conditions/actions/suppression, priority ordering, exclusive flag), the `recipient_groups` and `recipient_group_members` tables for group-based recipient management, the `customer_channel_preferences` table for per-customer per-channel opt-in/opt-out preferences (keyed by `customer_id`, FILLFACTOR 90, with autovacuum tuning), the `critical_channel_overrides` table for configurable forced-channel rules per event type (UUID PK, partial index on active overrides), the `notifications` table for core notification records (BIGSERIAL PK, UUID notification_id, status state machine, dedup hash, FILLFACTOR 80), the `notification_status_log` table for immutable status transition audit log, the `notification_recipients` table for per-notification recipient details, and a `purge_notification_content()` PL/pgSQL function for batch content retention. The `bulk-upload-service` script also creates the `uploads` table for tracking XLSX file uploads (UUID PK, status state machine, aggregate row counters, `total_events` for group mode event count, result file path), the `upload_rows` table for per-row processing tracking (FK to uploads with ON DELETE CASCADE, raw data, mapped payload, event ID, status, `group_key` for multi-item row grouping with partial index), and a `purge_old_uploads()` PL/pgSQL function that deletes terminal-state uploads and cascading rows older than a configurable threshold (default 90 days). The `audit-service` script also creates the `audit_events` table for immutable notification lifecycle event logging (UUID PK, notification_id, correlation_id, cycle_id, event type taxonomy, actor, metadata JSONB, payload snapshot JSONB, tsvector search vector), the `delivery_receipts` table for provider-reported delivery outcomes correlated via provider_message_id, the `notification_analytics` table for pre-aggregated hourly/daily rollups with idempotent upsert, the `dlq_entries` table for dead-letter queue monitoring with status tracking (pending/investigated/reprocessed/discarded), and a `purge_audit_payloads()` PL/pgSQL function that NULLs payload data older than a configurable threshold (default 90 days). The `template-service` script also creates the `templates` table for master template records (UUID PK, unique slug, current version pointer), the `template_versions` table for immutable version snapshots (FK to templates, unique version number per template), the `template_channels` table for channel-specific content per version (FK to template_versions, unique channel per version, Handlebars body), and the `template_variables` table for auto-detected template variables (FK to templates, unique variable name per template, optional defaults and required flag).
 
 | Service Folder | Schema | Role | User |
 |---|---|---|---|
