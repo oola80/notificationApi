@@ -15,6 +15,10 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    if (context.getType() !== 'http') {
+      return next.handle();
+    }
+
     const ctx = context.switchToHttp();
     const request = ctx.getRequest<Request>();
     const { method, url } = request;

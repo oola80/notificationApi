@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Bugfix: LoggingInterceptor crash on non-HTTP contexts (2026-02-24)
+
+- Added guard in `LoggingInterceptor.intercept()`: when `context.getType() !== 'http'`, returns `next.handle()` immediately (skips logging). Fixes crash when RabbitMQ consumers pass through the interceptor pipeline (no `request`/`response` objects available).
+- Fixed `WebhookController` unit tests: removed stale `mockRequest` parameter from `receiveEvent()` calls — the `@Req()` decorator was removed in a previous refactor but tests still passed 4 arguments instead of 3, and the `processWebhookEvent` assertion now expects `null` (not `mockEventSource`) for the second argument.
+- Added `getType: () => 'http'` to existing mock context in `logging.interceptor.spec.ts`.
+- Added 1 new test: non-HTTP context (`rpc`) passes through without logging.
+- **269 tests passing, 33 suites** (was 264 passing + 4 failing).
+
 ### Bugfix: RabbitMQ DLQ Exchange Type Mismatch (2026-02-23)
 
 - Fixed `xch.notifications.dlq` exchange type in `rabbitmq/rabbitmq.module.ts` from `topic` to `fanout`, matching the authoritative RabbitMQ topology in `rabbitmq/definitions.json`

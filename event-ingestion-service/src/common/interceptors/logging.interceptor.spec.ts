@@ -36,6 +36,7 @@ describe('LoggingInterceptor', () => {
     };
     mockResponse = { statusCode: 200 };
     mockContext = {
+      getType: () => 'http',
       switchToHttp: () => ({
         getRequest: () => mockRequest,
         getResponse: () => mockResponse,
@@ -159,6 +160,22 @@ describe('LoggingInterceptor', () => {
           }),
           expect.any(String),
         );
+        done();
+      },
+    });
+  });
+
+  it('should pass through without logging for non-HTTP contexts', (done) => {
+    const rpcContext = {
+      getType: () => 'rpc',
+    } as unknown as ExecutionContext;
+    const handler: CallHandler = { handle: () => of('result') };
+
+    interceptor.intercept(rpcContext, handler).subscribe({
+      complete: () => {
+        expect(mockLogger.info).not.toHaveBeenCalled();
+        expect(mockLogger.warn).not.toHaveBeenCalled();
+        expect(mockLogger.error).not.toHaveBeenCalled();
         done();
       },
     });

@@ -39,7 +39,6 @@ describe('WebhookController', () => {
     };
     service.processWebhookEvent.mockResolvedValue(result);
 
-    const mockRequest: any = { eventSource: {} };
     const mockResponse: any = { status: jest.fn() };
 
     const dto = {
@@ -51,7 +50,6 @@ describe('WebhookController', () => {
 
     const response = await controller.receiveEvent(
       dto,
-      mockRequest,
       mockResponse,
       'req-id',
     );
@@ -68,7 +66,6 @@ describe('WebhookController', () => {
     };
     service.processWebhookEvent.mockResolvedValue(result);
 
-    const mockRequest: any = { eventSource: {} };
     const mockResponse: any = { status: jest.fn() };
 
     const dto = {
@@ -81,7 +78,6 @@ describe('WebhookController', () => {
 
     const response = await controller.receiveEvent(
       dto,
-      mockRequest,
       mockResponse,
       'req-id',
     );
@@ -98,8 +94,6 @@ describe('WebhookController', () => {
     };
     service.processWebhookEvent.mockResolvedValue(result);
 
-    const mockEventSource = { id: 1, name: 'shopify' };
-    const mockRequest: any = { eventSource: mockEventSource };
     const mockResponse: any = { status: jest.fn() };
 
     const dto = {
@@ -109,11 +103,11 @@ describe('WebhookController', () => {
       payload: { id: '123' },
     };
 
-    await controller.receiveEvent(dto, mockRequest, mockResponse, undefined);
+    await controller.receiveEvent(dto, mockResponse, undefined);
 
     expect(service.processWebhookEvent).toHaveBeenCalledWith(
       dto,
-      mockEventSource,
+      null,
       expect.any(String),
     );
   });
@@ -126,8 +120,6 @@ describe('WebhookController', () => {
     };
     service.processWebhookEvent.mockResolvedValue(result);
 
-    const mockEventSource = { id: 1, name: 'shopify' };
-    const mockRequest: any = { eventSource: mockEventSource };
     const mockResponse: any = { status: jest.fn() };
 
     const dto = {
@@ -139,14 +131,13 @@ describe('WebhookController', () => {
 
     await controller.receiveEvent(
       dto,
-      mockRequest,
       mockResponse,
       'my-request-id',
     );
 
     expect(service.processWebhookEvent).toHaveBeenCalledWith(
       dto,
-      mockEventSource,
+      null,
       'my-request-id',
     );
   });
