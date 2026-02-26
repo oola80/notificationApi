@@ -12,6 +12,18 @@ export interface TemplateRenderResult {
   templateVersion?: number;
 }
 
+interface TemplateServiceRenderResponse {
+  rendered: { subject?: string; body: string };
+  metadata: {
+    templateId: string;
+    versionNumber: number;
+    channel: string;
+    renderedAt: string;
+    renderDurationMs: number;
+  };
+  warnings: string[];
+}
+
 const MAX_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MULTIPLIER = 3;
@@ -45,12 +57,18 @@ export class TemplateClientService {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         const response = await firstValueFrom(
-          this.httpService.post<TemplateRenderResult>(
+          this.httpService.post<TemplateServiceRenderResponse>(
             `/templates/${templateId}/render`,
             { channel, data },
           ),
         );
-        return response.data;
+        const { rendered, metadata } = response.data;
+        return {
+          channel: metadata.channel,
+          subject: rendered.subject,
+          body: rendered.body,
+          templateVersion: metadata.versionNumber,
+        };
       } catch (error) {
         const axiosError = error as AxiosError;
         lastError = error as Error;

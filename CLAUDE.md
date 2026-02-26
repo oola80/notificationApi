@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
+Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). **template-service** Phase 5 complete (foundation, template CRUD & versioning, rendering engine with caching & preview, RabbitMQ audit publishing, rollback endpoint, enhanced health checks, E2E tests, Prometheus metrics, channel query filter, HTML sanitization, render timeout; 247 unit tests across 21 suites, 4 E2E test files). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
 
 ## Tech Stack (Planned)
 
@@ -115,13 +115,43 @@ notification-engine-service/    # NestJS — port 3152 (Phase 7 complete)
   dbscripts/
     schema-notification-engine-service.sql
     notification-engine-service-dbscripts.sql
+    seed-order-delay-data.sh
   docs/
     08-notification-engine-service.md
     changelog_dev.md
 
-template-service/               # NestJS — port 3153
+template-service/               # NestJS — port 3153 (Phase 5 complete)
   CLAUDE.md
+  .env                          # Local environment variables (git-ignored)
+  .gitignore                    # Node/NestJS ignores (dist, node_modules, .env, coverage, etc.)
+  .prettierrc                   # Prettier config (singleQuote, trailingComma: all)
+  eslint.config.mjs             # ESLint flat config (typescript-eslint + prettier)
+  nest-cli.json                 # NestJS CLI config (sourceRoot: src, deleteOutDir)
+  package.json                  # NestJS 11, TypeScript 5.7, Jest 30
+  package-lock.json
+  tsconfig.json                 # ES2023 target, nodenext modules, decorators enabled
+  tsconfig.build.json
+  src/
+    main.ts                     # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3153
+    app.module.ts               # Root module: Config, Logger, TypeORM, Common, Metrics, RabbitMQ, Health, Templates, Rendering
+    common/                     # @Global() module: errors, filters, pipes, interceptors, base repo
+    config/                     # ConfigModule.forRoot: app, database, rabbitmq configs, env validation
+    metrics/                    # @Global() MetricsModule: 10 custom metrics, GET /metrics
+    health/                     # Custom health controller (DB, RabbitMQ, cache status)
+    templates/                  # CRUD + versioning (controller, service, repositories, DTOs, entities, variable detector)
+    rendering/                  # Handlebars rendering, LRU cache, preview, HTML sanitizer, custom helpers
+    rabbitmq/                   # @golevelup/nestjs-rabbitmq wrapper (1 exchange, audit publisher, publish-only)
+  test/
+    test-utils.ts               # Shared E2E helper
+    app.e2e-spec.ts             # E2E: health + metrics
+    templates.e2e-spec.ts       # E2E: full CRUD lifecycle
+    rendering.e2e-spec.ts       # E2E: render, preview, warnings, sanitization
+    rollback.e2e-spec.ts        # E2E: rollback lifecycle
+    jest-e2e.json               # Jest E2E config
   dbscripts/
+    schema-template-service.sql
+    template-service-dbscripts.sql
+    seed-order-delay-template.sql
   docs/
     10-template-service.md
     changelog_dev.md

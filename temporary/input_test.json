@@ -1,0 +1,28 @@
+{
+    "cycleId":"121212",
+    "eventType": "order.delay",
+    "sourceId": "bulk.messages",
+    "customerId": "omar-ola@hotmail.com",
+    "customerEmail": "omar-ola@hotmail.com",
+    "customerName": "Omar Ola",
+    "phone": "40009954",
+    "message": "Lamentamos informarle que su pedido ha sufrido un retraso. Se estara entregando el dia de mañana",
+    "items": [
+        {
+            "sku": "RUSH",
+            "name": "Ventilador de piso y pared Taurus de 20 pulgadas",
+            "quantity": 1,
+            "price": 79.99
+        }
+    ],
+    "images": [
+        {
+            "url": "https://backoffice.max.com.gt/media/catalog/product/cache/94dd7777337ccc7ac42c8ee85d48fab6/r/u/rush.jpg"
+        }
+    ],
+    "trackingNumber": "794644790132",
+    "carrierId": "FORZA_GT",
+    "trackingURL": "https://www.forzadelivery.com/gt/",
+    "promiseDate": "2026-02-25T06:10:00Z"
+}
+

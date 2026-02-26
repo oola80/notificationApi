@@ -1,0 +1,552 @@
+{
+	"info": {
+		"_postman_id": "eis-collection-2026-02-24",
+		"name": "Event Ingestion Service",
+		"description": "Complete API collection for the Event Ingestion Service (port 3151).\n\nThis service receives events from external source systems, normalizes them using runtime field mappings, and publishes them to RabbitMQ for downstream processing.\n\nWorkflow:\n1. Create an event mapping (defines how to transform source payloads)\n2. Test the mapping with a sample payload\n3. Send events via the webhook endpoint\n4. Query ingested events",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3151",
+			"type": "string"
+		},
+		{
+			"key": "mappingId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "eventId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "0. Health & Metrics",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Returns the health status of the service including database and RabbitMQ connectivity.\n\n- 200 OK: All checks pass\n- 503 Service Unavailable: One or more checks failed"
+					},
+					"response": []
+				},
+				{
+					"name": "Prometheus Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/metrics",
+							"host": ["{{baseUrl}}"],
+							"path": ["metrics"]
+						},
+						"description": "Returns Prometheus-format metrics (text/plain).\n\nIncludes: events received/normalized/duplicated counters, normalization duration histogram, rate limit rejections, mapping cache stats, and more."
+					},
+					"response": []
+				}
+			],
+			"description": "Observability endpoints — check service health and view metrics."
+		},
+		{
+			"name": "1. Event Mappings (CRUD)",
+			"item": [
+				{
+					"name": "Create Mapping — Shopify order.created",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const body = pm.response.json();",
+									"    pm.collectionVariables.set('mappingId', body.id);",
+									"    pm.test('Mapping created — ID saved', function () {",
+									"        pm.expect(body.id).to.be.a('string');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"shopify\",\n  \"eventType\": \"order.created\",\n  \"name\": \"Shopify Order Created\",\n  \"description\": \"Maps Shopify order.created webhook payloads to canonical format\",\n  \"fieldMappings\": {\n    \"orderId\": \"id\",\n    \"customerId\": \"customer.id\",\n    \"email\": \"customer.email\",\n    \"total\": \"total_price\",\n    \"currency\": \"currency\",\n    \"items\": \"line_items\"\n  },\n  \"timestampField\": \"created_at\",\n  \"timestampFormat\": \"iso8601\",\n  \"sourceEventIdField\": \"id\",\n  \"priority\": \"normal\",\n  \"createdBy\": \"postman-tester\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings"]
+						},
+						"description": "Create a new event mapping that defines how to extract and transform fields from a Shopify order.created webhook payload.\n\nThe `fieldMappings` object uses dot-path notation: keys are canonical field names, values are paths into the source payload.\n\nThe response ID is automatically saved to the `mappingId` collection variable."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Mapping — SAP shipment.dispatched (critical)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const body = pm.response.json();",
+									"    pm.test('Critical mapping created', function () {",
+									"        pm.expect(body.priority).to.eql('critical');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"sap\",\n  \"eventType\": \"shipment.dispatched\",\n  \"name\": \"SAP Shipment Dispatched (Critical)\",\n  \"description\": \"Critical-priority mapping for SAP shipment dispatch events\",\n  \"fieldMappings\": {\n    \"shipmentId\": \"VBELN\",\n    \"customerId\": \"KUNNR\",\n    \"email\": \"contact.email\",\n    \"trackingNumber\": \"tracking.number\",\n    \"carrier\": \"tracking.carrier\",\n    \"estimatedDelivery\": \"delivery.eta\"\n  },\n  \"timestampField\": \"ERDAT\",\n  \"timestampFormat\": \"iso8601\",\n  \"sourceEventIdField\": \"VBELN\",\n  \"priority\": \"critical\",\n  \"createdBy\": \"postman-tester\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings"]
+						},
+						"description": "Create a critical-priority mapping for SAP shipment events.\n\nCritical events are routed to a priority queue for faster downstream processing."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Mapping — with Validation Schema",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"erp-system\",\n  \"eventType\": \"invoice.generated\",\n  \"name\": \"ERP Invoice Generated\",\n  \"description\": \"Mapping with JSON Schema validation for ERP invoice events\",\n  \"fieldMappings\": {\n    \"invoiceId\": \"invoice_number\",\n    \"customerId\": \"customer.code\",\n    \"email\": \"customer.email_address\",\n    \"amount\": \"total_amount\",\n    \"currency\": \"currency_code\",\n    \"dueDate\": \"payment.due_date\"\n  },\n  \"timestampField\": \"created_timestamp\",\n  \"timestampFormat\": \"epoch_ms\",\n  \"sourceEventIdField\": \"invoice_number\",\n  \"validationSchema\": {\n    \"type\": \"object\",\n    \"required\": [\"invoice_number\", \"customer\", \"total_amount\"],\n    \"properties\": {\n      \"invoice_number\": { \"type\": \"string\" },\n      \"customer\": {\n        \"type\": \"object\",\n        \"required\": [\"code\", \"email_address\"],\n        \"properties\": {\n          \"code\": { \"type\": \"string\" },\n          \"email_address\": { \"type\": \"string\", \"format\": \"email\" }\n        }\n      },\n      \"total_amount\": { \"type\": \"number\", \"minimum\": 0 }\n    }\n  },\n  \"priority\": \"normal\",\n  \"createdBy\": \"postman-tester\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings"]
+						},
+						"description": "Create a mapping with a JSON Schema validation rule.\n\nWhen a webhook event is received, the raw payload is validated against this schema BEFORE normalization. If validation fails, the event is rejected with EIS-005 (422)."
+					},
+					"response": []
+				},
+				{
+					"name": "List Mappings (all)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings"]
+						},
+						"description": "List all event mappings with default pagination (page 1, limit 50)."
+					},
+					"response": []
+				},
+				{
+					"name": "List Mappings (filtered by sourceId)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings?sourceId=shopify&isActive=true",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings"],
+							"query": [
+								{
+									"key": "sourceId",
+									"value": "shopify"
+								},
+								{
+									"key": "isActive",
+									"value": "true"
+								}
+							]
+						},
+						"description": "Filter mappings by source ID and active status."
+					},
+					"response": []
+				},
+				{
+					"name": "List Mappings (with pagination)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "List mappings with explicit pagination (page 1, 10 per page)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Mapping by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings/{{mappingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings", "{{mappingId}}"]
+						},
+						"description": "Retrieve a single event mapping by its UUID.\n\nUses the `mappingId` variable (auto-set by the Create Mapping request)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Mapping",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Shopify Order Created (v2)\",\n  \"description\": \"Updated mapping — added phone field\",\n  \"fieldMappings\": {\n    \"orderId\": \"id\",\n    \"customerId\": \"customer.id\",\n    \"email\": \"customer.email\",\n    \"phone\": \"customer.phone\",\n    \"total\": \"total_price\",\n    \"currency\": \"currency\",\n    \"items\": \"line_items\"\n  },\n  \"priority\": \"critical\",\n  \"updatedBy\": \"postman-tester\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings/{{mappingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings", "{{mappingId}}"]
+						},
+						"description": "Update an existing mapping. Only the fields you include are changed.\n\nNote: `sourceId`, `eventType`, and `createdBy` cannot be changed after creation."
+					},
+					"response": []
+				},
+				{
+					"name": "Test Mapping with Sample Payload",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"samplePayload\": {\n    \"id\": \"ORD-98765\",\n    \"customer\": {\n      \"id\": \"CUST-555\",\n      \"email\": \"jane.doe@example.com\",\n      \"phone\": \"+1-555-0100\"\n    },\n    \"total_price\": 249.99,\n    \"currency\": \"USD\",\n    \"line_items\": [\n      { \"sku\": \"WIDGET-A\", \"quantity\": 3, \"price\": 49.99 },\n      { \"sku\": \"GADGET-B\", \"quantity\": 1, \"price\": 100.02 }\n    ],\n    \"created_at\": \"2026-02-24T14:30:00Z\"\n  },\n  \"cycleId\": \"test-cycle-001\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings/{{mappingId}}/test",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings", "{{mappingId}}", "test"]
+						},
+						"description": "Dry-run a mapping against a sample payload.\n\nReturns the normalized output WITHOUT persisting or publishing to RabbitMQ. Use this to verify your fieldMappings are correct before sending real events."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Mapping (soft-delete)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/event-mappings/{{mappingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "event-mappings", "{{mappingId}}"]
+						},
+						"description": "Soft-delete a mapping (sets isActive = false).\n\nReturns 204 No Content on success. The mapping still exists in the database but will no longer be used for event normalization."
+					},
+					"response": []
+				}
+			],
+			"description": "CRUD operations for event mapping configurations.\n\nMappings define how to extract and transform fields from source system payloads into the canonical format."
+		},
+		{
+			"name": "2. Webhook Ingestion",
+			"item": [
+				{
+					"name": "Send Event — Shopify order.created",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 202) {",
+									"    const body = pm.response.json();",
+									"    pm.collectionVariables.set('eventId', body.eventId);",
+									"    pm.test('Event accepted — ID saved', function () {",
+									"        pm.expect(body.status).to.eql('published');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "your-api-key-here",
+								"description": "Source authentication (API key mode)",
+								"disabled": true
+							},
+							{
+								"key": "X-Request-Id",
+								"value": "{{$guid}}",
+								"description": "Optional correlation ID (auto-generated UUID)"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"shopify\",\n  \"cycleId\": \"batch-20260224-001\",\n  \"eventType\": \"order.created\",\n  \"sourceEventId\": \"shopify-ord-{{$timestamp}}\",\n  \"timestamp\": \"2026-02-24T14:30:00Z\",\n  \"payload\": {\n    \"id\": \"ORD-12345\",\n    \"customer\": {\n      \"id\": \"CUST-789\",\n      \"email\": \"john.smith@example.com\",\n      \"phone\": \"+1-555-0199\"\n    },\n    \"total_price\": 159.97,\n    \"currency\": \"USD\",\n    \"line_items\": [\n      { \"sku\": \"WIDGET-A\", \"quantity\": 2, \"price\": 29.99 },\n      { \"sku\": \"GADGET-C\", \"quantity\": 1, \"price\": 99.99 }\n    ],\n    \"created_at\": \"2026-02-24T14:30:00Z\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/webhooks/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["webhooks", "events"]
+						},
+						"description": "Send a Shopify order.created event through the webhook pipeline.\n\nRequires an active mapping for sourceId='shopify' + eventType='order.created'.\n\nThe event is validated, deduplicated, normalized using the mapping, persisted, and published to RabbitMQ.\n\nReturns 202 Accepted with the canonical eventId.\n\nNote: `sourceEventId` uses {{$timestamp}} to ensure uniqueness across multiple sends (avoids deduplication)."
+					},
+					"response": []
+				},
+				{
+					"name": "Send Event — SAP shipment.dispatched (critical)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Request-Id",
+								"value": "{{$guid}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"sap\",\n  \"cycleId\": \"sap-dispatch-20260224\",\n  \"eventType\": \"shipment.dispatched\",\n  \"sourceEventId\": \"SAP-VBELN-{{$timestamp}}\",\n  \"timestamp\": \"2026-02-24T16:00:00Z\",\n  \"payload\": {\n    \"VBELN\": \"SHIP-90001\",\n    \"KUNNR\": \"CUST-456\",\n    \"contact\": {\n      \"email\": \"maria.garcia@example.com\"\n    },\n    \"tracking\": {\n      \"number\": \"1Z999AA10123456784\",\n      \"carrier\": \"UPS\"\n    },\n    \"delivery\": {\n      \"eta\": \"2026-02-27T12:00:00Z\"\n    },\n    \"ERDAT\": \"2026-02-24T16:00:00Z\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/webhooks/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["webhooks", "events"]
+						},
+						"description": "Send a critical-priority SAP shipment event.\n\nThis event will be routed to the priority queue (q.events.webhook.priority) for faster downstream processing."
+					},
+					"response": []
+				},
+				{
+					"name": "Send Event — Duplicate (same sourceEventId)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"shopify\",\n  \"cycleId\": \"batch-20260224-001\",\n  \"eventType\": \"order.created\",\n  \"sourceEventId\": \"shopify-duplicate-test-fixed-id\",\n  \"payload\": {\n    \"id\": \"ORD-12345\",\n    \"customer\": {\n      \"id\": \"CUST-789\",\n      \"email\": \"john.smith@example.com\"\n    },\n    \"total_price\": 159.97,\n    \"currency\": \"USD\",\n    \"line_items\": [],\n    \"created_at\": \"2026-02-24T14:30:00Z\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/webhooks/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["webhooks", "events"]
+						},
+						"description": "Send the same event twice (fixed sourceEventId) to test deduplication.\n\nFirst send: 202 Accepted (status: 'published')\nSecond send: 200 OK (status: 'duplicate')\n\nRun this request twice to see the deduplication in action."
+					},
+					"response": []
+				},
+				{
+					"name": "Send Event — Missing mapping (expect 422)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"unknown-source\",\n  \"cycleId\": \"test-cycle\",\n  \"eventType\": \"does.not.exist\",\n  \"payload\": {\n    \"foo\": \"bar\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/webhooks/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["webhooks", "events"]
+						},
+						"description": "Send an event with a sourceId+eventType that has no mapping.\n\nExpected: 422 Unprocessable Entity with error code EIS-014 (MAPPING_NOT_FOUND)."
+					},
+					"response": []
+				},
+				{
+					"name": "Send Event — Invalid body (expect 400)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceId\": \"shopify\",\n  \"eventType\": \"order.created\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/webhooks/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["webhooks", "events"]
+						},
+						"description": "Send an event with missing required fields (cycleId, payload).\n\nExpected: 400 Bad Request with validation errors from DtoValidationPipe."
+					},
+					"response": []
+				}
+			],
+			"description": "Webhook endpoint for receiving events from external source systems.\n\nPOST /webhooks/events is the main ingestion entry point."
+		},
+		{
+			"name": "3. Events (Query)",
+			"item": [
+				{
+					"name": "List Events (all)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["events"]
+						},
+						"description": "List all ingested events with default pagination."
+					},
+					"response": []
+				},
+				{
+					"name": "List Events (filtered)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/events?sourceId=shopify&eventType=order.created&page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["events"],
+							"query": [
+								{
+									"key": "sourceId",
+									"value": "shopify"
+								},
+								{
+									"key": "eventType",
+									"value": "order.created"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Filter events by source, event type, with pagination."
+					},
+					"response": []
+				},
+				{
+					"name": "List Events (by status + date range)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/events?status=received&from=2026-02-24T00:00:00Z&to=2026-02-25T00:00:00Z",
+							"host": ["{{baseUrl}}"],
+							"path": ["events"],
+							"query": [
+								{
+									"key": "status",
+									"value": "received"
+								},
+								{
+									"key": "from",
+									"value": "2026-02-24T00:00:00Z"
+								},
+								{
+									"key": "to",
+									"value": "2026-02-25T00:00:00Z"
+								}
+							]
+						},
+						"description": "Filter events by processing status and date range."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Event by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/events/{{eventId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["events", "{{eventId}}"]
+						},
+						"description": "Retrieve a single event by its canonical eventId (UUID).\n\nUses the `eventId` variable (auto-set by the webhook Send Event request)."
+					},
+					"response": []
+				}
+			],
+			"description": "Query ingested events — view raw payloads, normalized output, and processing status."
+		}
+	]
+}

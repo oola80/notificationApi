@@ -39,7 +39,22 @@ describe('TemplateClientService', () => {
     jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
   });
 
-  const mockRenderResult = {
+  const mockServiceResponse = {
+    rendered: {
+      subject: 'Order Confirmed',
+      body: '<p>Your order #12345 has been confirmed</p>',
+    },
+    metadata: {
+      templateId: 'tpl-order-confirm',
+      versionNumber: 3,
+      channel: 'email',
+      renderedAt: '2026-02-25T00:00:00.000Z',
+      renderDurationMs: 50,
+    },
+    warnings: [],
+  };
+
+  const expectedRenderResult = {
     channel: 'email',
     subject: 'Order Confirmed',
     body: '<p>Your order #12345 has been confirmed</p>',
@@ -77,14 +92,14 @@ describe('TemplateClientService', () => {
   describe('render', () => {
     it('should render template successfully', async () => {
       httpService.post.mockReturnValue(
-        of(createAxiosResponse(mockRenderResult)),
+        of(createAxiosResponse(mockServiceResponse)),
       );
 
       const result = await service.render('tpl-order-confirm', 'email', {
         orderId: '12345',
       });
 
-      expect(result).toEqual(mockRenderResult);
+      expect(result).toEqual(expectedRenderResult);
       expect(httpService.post).toHaveBeenCalledWith(
         '/templates/tpl-order-confirm/render',
         { channel: 'email', data: { orderId: '12345' } },
@@ -111,11 +126,11 @@ describe('TemplateClientService', () => {
     it('should retry on 5xx error and succeed', async () => {
       httpService.post
         .mockReturnValueOnce(throwError(() => createAxiosError(500)))
-        .mockReturnValueOnce(of(createAxiosResponse(mockRenderResult)));
+        .mockReturnValueOnce(of(createAxiosResponse(mockServiceResponse)));
 
       const result = await service.render('tpl-1', 'email', {});
 
-      expect(result).toEqual(mockRenderResult);
+      expect(result).toEqual(expectedRenderResult);
       expect(httpService.post).toHaveBeenCalledTimes(2);
     });
 
@@ -124,11 +139,11 @@ describe('TemplateClientService', () => {
         .mockReturnValueOnce(
           throwError(() => createAxiosError(0, 'ECONNABORTED')),
         )
-        .mockReturnValueOnce(of(createAxiosResponse(mockRenderResult)));
+        .mockReturnValueOnce(of(createAxiosResponse(mockServiceResponse)));
 
       const result = await service.render('tpl-1', 'email', {});
 
-      expect(result).toEqual(mockRenderResult);
+      expect(result).toEqual(expectedRenderResult);
       expect(httpService.post).toHaveBeenCalledTimes(2);
     });
 
@@ -182,7 +197,7 @@ describe('TemplateClientService', () => {
 
     it('should pass channel and data in request body', async () => {
       httpService.post.mockReturnValue(
-        of(createAxiosResponse(mockRenderResult)),
+        of(createAxiosResponse(mockServiceResponse)),
       );
 
       await service.render('tpl-1', 'sms', {
@@ -198,7 +213,7 @@ describe('TemplateClientService', () => {
 
     it('should delegate to circuit breaker execute', async () => {
       httpService.post.mockReturnValue(
-        of(createAxiosResponse(mockRenderResult)),
+        of(createAxiosResponse(mockServiceResponse)),
       );
 
       await service.render('tpl-1', 'email', {});

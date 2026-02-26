@@ -8,7 +8,10 @@ import { DedupKeyResolverService } from '../notifications/suppression/dedup-key-
 import { SuppressionEvaluatorService } from '../notifications/suppression/suppression-evaluator.service.js';
 import { NotificationsRepository } from '../notifications/notifications.repository.js';
 import { NotificationLifecycleService } from '../notifications/notification-lifecycle.service.js';
-import { TemplateClientService } from '../template-client/template-client.service.js';
+import {
+  TemplateClientService,
+  TemplateRenderResult,
+} from '../template-client/template-client.service.js';
 import { NotificationPublisherService } from '../rabbitmq/notification-publisher.service.js';
 import { MetricsService } from '../metrics/metrics.service.js';
 import { NormalizedEventMessage } from '../rabbitmq/interfaces/normalized-event-message.interface.js';
@@ -345,9 +348,10 @@ export class EventProcessingPipelineService {
     await this.lifecycleService.transition(notificationId, 'PROCESSING');
 
     // x. RENDER TEMPLATE
+    let renderResult: TemplateRenderResult;
     const renderStart = process.hrtime.bigint();
     try {
-      const renderResult = await this.templateClientService.render(
+      renderResult = await this.templateClientService.render(
         action.templateId,
         channel,
         payload,
@@ -425,9 +429,9 @@ export class EventProcessingPipelineService {
           customerId: recipient.customerId,
         },
         content: {
-          subject: notification.renderedContent?.subject,
-          body: notification.renderedContent?.body ?? '',
-          templateVersion: notification.templateVersion ?? undefined,
+          subject: renderResult.subject,
+          body: renderResult.body,
+          templateVersion: renderResult.templateVersion,
         },
         media: payload.media,
         metadata: {

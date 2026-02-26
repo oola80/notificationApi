@@ -380,6 +380,7 @@ notification-engine-service/
   dbscripts/
     schema-notification-engine-service.sql       # Schema/role/user/grants only
     notification-engine-service-dbscripts.sql    # All table/index/function DDL
+    seed-order-delay-data.sh                     # Seeds order-delay template + rule via service APIs
   docs/
     08-notification-engine-service.md
     changelog_dev.md

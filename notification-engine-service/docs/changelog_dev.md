@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### 2026-02-25 — Fix: Template Render Response Mapping & Delivery Content
+
+**Fixed:**
+- `src/template-client/template-client.service.ts` — Template-service returns `{ rendered: { subject, body }, metadata: { versionNumber, channel, ... } }` but the client was returning the raw nested response without unwrapping. Added `TemplateServiceRenderResponse` interface and mapped `response.data` to the flat `TemplateRenderResult` shape (`{ channel, subject, body, templateVersion }`).
+- `src/consumers/event-processing-pipeline.service.ts` — Dispatch step was reading rendered content from the stale `notification` entity (created with empty `renderedContent` before rendering) instead of using the `renderResult` from the template client. Hoisted `renderResult` variable outside the render `try` block and used it directly in `publishToDeliver()` content payload. Delivery messages now correctly include rendered subject, body, and templateVersion.
+
+**Changed:**
+- `src/template-client/template-client.service.spec.ts` — Updated mock data to use nested `{ rendered, metadata, warnings }` response shape matching template-service output. Split into `mockServiceResponse` (API shape) and `expectedRenderResult` (flat mapped shape). All 11 tests pass.
+
+### 2026-02-25 — Seed Script: Order Delay Template + Notification Rule
+
+**Added:**
+- `dbscripts/seed-order-delay-data.sh` — Shell script that seeds the `order-delay` template (email + whatsapp channels) via template-service API and creates a matching notification rule (`order.delay` event type, `recipientType: customer`, channels: email + whatsapp) via notification-engine-service API. Extracts template UUID from step 1 response and passes it to step 2. Supports `--template-host` and `--engine-host` CLI args. Requires `curl` and `jq`.
+
 ### 2026-02-24 — Phase 7: Performance Optimizations & DB Maintenance
 
 **Added:**

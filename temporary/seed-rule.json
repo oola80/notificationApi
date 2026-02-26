@@ -1,0 +1,15 @@
+{
+  "name": "Order Delay — Email + WhatsApp",
+  "eventType": "order.delay",
+  "actions": [
+    {
+      "templateId": "fff60f43-59a9-4c75-80f2-ed7214e023be",
+      "channels": ["email", "whatsapp"],
+      "recipientType": "customer"
+    }
+  ],
+  "deliveryPriority": "normal",
+  "priority": 100,
+  "isExclusive": false,
+  "createdBy": "seed-script"
+}

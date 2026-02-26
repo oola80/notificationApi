@@ -36,6 +36,7 @@ describe('LoggingInterceptor', () => {
     };
     mockResponse = { statusCode: 200 };
     mockContext = {
+      getType: () => 'http',
       switchToHttp: () => ({
         getRequest: () => mockRequest,
         getResponse: () => mockResponse,
@@ -175,6 +176,26 @@ describe('LoggingInterceptor', () => {
         expect(logContext).toHaveProperty('statusCode', 200);
         expect(logContext).toHaveProperty('durationMs');
         expect(typeof logContext.durationMs).toBe('number');
+        done();
+      },
+    });
+  });
+
+  it('should skip logging for non-HTTP contexts (e.g. RabbitMQ consumers)', (done) => {
+    const nonHttpContext = {
+      getType: () => 'rpc',
+      switchToHttp: () => ({
+        getRequest: () => undefined,
+        getResponse: () => undefined,
+      }),
+    } as unknown as ExecutionContext;
+    const handler: CallHandler = { handle: () => of('result') };
+
+    interceptor.intercept(nonHttpContext, handler).subscribe({
+      complete: () => {
+        expect(mockLogger.info).not.toHaveBeenCalled();
+        expect(mockLogger.warn).not.toHaveBeenCalled();
+        expect(mockLogger.error).not.toHaveBeenCalled();
         done();
       },
     });
