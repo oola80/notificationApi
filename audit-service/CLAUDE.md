@@ -42,7 +42,8 @@ Notification tracking, delivery receipts, analytics, DLQ monitoring — immutabl
 
 ## Key References
 
-- Design doc: `docs/16-audit-service.md` (convenience copy) — authoritative at `../../docs/16-audit-service.md`
+- Design doc (v2): `docs/16-audit-service-v2.md` (convenience copy) — authoritative at `../../docs/16-audit-service-v2.md`
+- Design doc (v1): `../../docs/16-audit-service.md` (original design)
 - Endpoints: `../../endpoints/endpoints-audit-service.md`
 - DB schema script: `dbscripts/schema-audit-service.sql`
 - DB objects script: `dbscripts/audit-service-dbscripts.sql` — **must be updated on every database change**

@@ -1,6 +1,4 @@
-> **Note:** This is a convenience copy. The authoritative version is at `../../docs/13-notification-gateway.md`.
-
----
+> *This is a convenience copy. The authoritative version is at `../../docs/13-notification-gateway-v2.md`.*
 
 # 13 — Notification Gateway
 
@@ -8,10 +6,12 @@
 
 | | |
 |---|---|
-| **Version:** | 1.0 |
-| **Date:** | 2026-02-21 |
+| **Version:** | 2.0 |
+| **Date:** | 2026-02-26 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
+
+> **Note:** This is v2 of the Notification Gateway design, updated for the decoupled provider adapter architecture. The v1 reference is at `13-notification-gateway.md`.
 
 ---
 
@@ -46,7 +46,7 @@ The Notification Gateway is the Backend-for-Frontend (BFF) and API Gateway for t
 | **Technology** | NestJS (TypeScript) with `@nestjs/axios` (HttpService), `@nestjs/passport`, `@nestjs/throttler` |
 | **Port** | `3150` |
 | **Schema** | PostgreSQL — `notification_gateway` |
-| **Dependencies** | All internal microservices, Admin Service (auth delegation), PostgreSQL |
+| **Dependencies** | All internal microservices, Admin Service (auth delegation), Provider Adapter Services (webhook routing), PostgreSQL |
 | **Source Repo Folder** | `notification-gateway/` |
 
 ### Responsibilities
@@ -61,6 +61,7 @@ The Notification Gateway is the Backend-for-Frontend (BFF) and API Gateway for t
 8. **Request Correlation:** Generates or propagates a `X-Correlation-ID` header on every inbound request, passing it to all downstream service calls for end-to-end tracing.
 9. **API Key Management:** Stores and validates API keys for external integrations. Keys are scoped to specific endpoint groups and rate-limited independently.
 10. **Session Management:** Manages JWT token issuance, refresh token rotation, and session lifecycle for admin users. Delegates credential validation to the Admin Service.
+11. **Webhook Routing to Provider Adapters:** Routes inbound provider webhook callbacks (`/webhooks/{provider}`) to the appropriate provider adapter microservice. Each adapter handles its own signature verification and payload parsing.
 
 > **Info:** **BFF Pattern**
 >
@@ -78,14 +79,19 @@ The Notification Gateway sits at the edge layer of the platform, receiving all i
 |---|---|---|---|
 | **Inbound** | Admin UI (Next.js :3159) | HTTP/REST | All frontend API calls — CRUD operations, dashboard data, notifications, logs |
 | **Inbound** | External API Consumers | HTTP/REST | Source system integrations using API key authentication |
+| **Inbound** | Provider Webhooks (Mailgun, Braze, WhatsApp/Meta, AWS SES/SNS) | HTTP/REST | Delivery status callbacks from notification providers |
 | **Downstream** | Event Ingestion Service :3151 | HTTP/REST (proxy) | Event webhook proxying (`POST /api/v1/events`), event queries |
 | **Downstream** | Notification Engine Service :3152 | HTTP/REST (proxy) | Notification CRUD, manual send, rule queries |
 | **Downstream** | Template Service :3153 | HTTP/REST (proxy) | Template CRUD, rendering, preview |
-| **Downstream** | Channel Router Service :3154 | HTTP/REST (proxy) | Channel config, provider health, webhook passthrough |
+| **Downstream** | Channel Router Service :3154 | HTTP/REST (proxy) | Channel config, provider health |
 | **Downstream** | Admin Service :3155 | HTTP/REST (proxy + auth) | User management, rule CRUD, SAML IdP config, dashboard metrics, credential validation |
 | **Downstream** | Audit Service :3156 | HTTP/REST (proxy) | Audit logs, notification trace, delivery analytics |
 | **Downstream** | Email Ingest Service :3157 | HTTP/REST (proxy) | Parsing rule CRUD, processed email queries |
 | **Downstream** | Bulk Upload Service :3158 | HTTP/REST (proxy) | File upload proxying, upload status, error retrieval, retry/cancel |
+| **Downstream** | adapter-mailgun :3171 | HTTP/REST (proxy) | Mailgun webhook passthrough |
+| **Downstream** | adapter-braze :3172 | HTTP/REST (proxy) | Braze webhook/Currents passthrough |
+| **Downstream** | adapter-whatsapp :3173 | HTTP/REST (proxy) | WhatsApp/Meta webhook passthrough |
+| **Downstream** | adapter-aws-ses :3174 | HTTP/REST (proxy) | AWS SES/SNS notification passthrough |
 
 ### Figure 2.1 — Integration Context
 
@@ -103,12 +109,12 @@ The Notification Gateway sits at the edge layer of the platform, receiving all i
 │  (X-API-Key)     │  │                                                             │
 └──────────────────┘  │  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌───────────┐  │
                       │  │  Auth    │  │ Validate  │  │  Rate    │  │ Response  │  │
-                      │  │  Guard   │──▶│  Pipe     │──▶│  Limit  │──▶│ Transform │  │
-                      │  │  (JWT/   │  │ (class-   │  │ (sliding │  │ (envelope │  │
-                      │  │  API Key)│  │ validator) │  │  window) │  │  { data,  │  │
-                      │  └──────────┘  └───────────┘  └──────────┘  │  meta,    │  │
-                      │                                              │  errors })│  │
-                      │  PostgreSQL: notification_gateway             └───────────┘  │
+┌──────────────────┐  │  │  Guard   │──▶│  Pipe     │──▶│  Limit  │──▶│ Transform │  │
+│  Provider        │──▶  │  (JWT/   │  │ (class-   │  │ (sliding │  │ (envelope │  │
+│  Webhooks        │  │  │  API Key)│  │ validator) │  │  window) │  │  { data,  │  │
+│  (Mailgun,       │  │  └──────────┘  └───────────┘  └──────────┘  │  meta,    │  │
+│   Braze, etc.)   │  │                                              │  errors })│  │
+└──────────────────┘  │  PostgreSQL: notification_gateway             └───────────┘  │
                       │  (api_keys, rate_limits, sessions, refresh_tokens)           │
                       └────────────────────────────┬────────────────────────────────┘
                                                    │
@@ -130,6 +136,12 @@ The Notification Gateway sits at the edge layer of the platform, receiving all i
            │ Email Ingest    │      │ Bulk Upload      │
            │ :3157           │      │ :3158            │
            └─────────────────┘      └──────────────────┘
+
+           Provider Adapter Services (webhook routing targets)
+           ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+           │ adapter-mailgun │  │ adapter-braze   │  │adapter-whatsapp │  │ adapter-aws-ses │
+           │ :3171           │  │ :3172           │  │ :3173           │  │ :3174           │
+           └─────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
 ---
@@ -147,6 +159,10 @@ Every inbound HTTP request passes through a 7-step processing pipeline implement
 5. **Rate Limiting:** The `ThrottlerGuard` checks the request against the applicable rate limit pool. API key clients are rate-limited by key ID; JWT users are rate-limited by user ID. Per-endpoint overrides (e.g., stricter limits on auth endpoints) are applied via `@Throttle()` decorators.
 6. **Validation:** The NestJS `ValidationPipe` with `class-validator` validates the request body (DTO), query parameters, and path parameters. Invalid payloads receive a `422 Unprocessable Entity` with field-level error details.
 7. **Proxy & Transform:** The controller handler invokes the `ServiceProxyService` to forward the validated request to the appropriate internal service. The response is wrapped in the standard envelope format and returned to the caller.
+
+> **Note:** **Webhook Routing Bypass**
+>
+> Provider webhook endpoints (`POST /webhooks/{provider}`) bypass the full authentication and validation pipeline. These requests originate from external provider systems (Mailgun, Braze, WhatsApp/Meta, AWS SES/SNS) and carry provider-specific signatures. The gateway performs only CORS check and correlation ID assignment before proxying to the target adapter service. Signature verification and payload validation are the responsibility of each adapter service.
 
 ### Figure 3.1 — Request Processing Pipeline Flowchart
 
@@ -459,6 +475,7 @@ The gateway enforces RBAC using the `@Roles()` decorator on controller methods. 
 | `DELETE /admin/saml/idp/:id` | Super Admin |
 | `GET /api/v1/users/*` | Admin, Super Admin |
 | `POST /api/v1/users` | Super Admin |
+| `POST /webhooks/{provider}` | Public (no auth — provider signature verified by adapter service) |
 
 > **Info:** **Auth Bypass for Internal Services**
 >
@@ -513,6 +530,21 @@ The gateway maintains a declarative route registry that maps external URL paths 
     └──────────────────────────────┴─────────────────┴─────────────────────┘
 ```
 
+### 5.3 Webhook Routing to Provider Adapter Services
+
+In the decoupled provider adapter architecture, delivery status webhooks from external notification providers are routed by the gateway directly to the appropriate provider adapter microservice. Each adapter is an independent service responsible for its own webhook signature verification, payload parsing, and status event publishing.
+
+| External Path | Target Service | Target URL |
+|---|---|---|
+| `POST /webhooks/mailgun` | adapter-mailgun | `http://provider-adapter-mailgun:3171/webhooks/inbound` |
+| `POST /webhooks/braze` | adapter-braze | `http://provider-adapter-braze:3172/webhooks/inbound` |
+| `POST /webhooks/whatsapp` | adapter-whatsapp | `http://provider-adapter-whatsapp:3173/webhooks/inbound` |
+| `POST /webhooks/aws-ses` | adapter-aws-ses | `http://provider-adapter-aws-ses:3174/webhooks/inbound` |
+
+> **Info:** **Webhook Routing Is Configuration Only**
+>
+> Adding a new webhook route for a new provider adapter is configuration only — a new proxy rule, no code changes. The Gateway does not verify webhook signatures; that responsibility belongs to each adapter service. The gateway proxies the raw request body and all headers unmodified to the target adapter, preserving the original `Content-Type` and any provider-specific headers required for signature verification.
+
 > **Note:** **Auth Endpoints Are Local**
 >
 > Authentication endpoints (`/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/logout`) are handled locally by the gateway. The gateway delegates credential validation to the Admin Service via an internal HTTP call but manages token issuance, refresh rotation, and session lifecycle itself. SAML endpoints (`/api/v1/auth/saml/*`) are also handled locally, with assertion validation delegated to the Admin Service for user lookup/creation.
@@ -533,6 +565,7 @@ The Service Proxy Layer is the core routing mechanism that forwards validated re
 | **Circuit Breaker** | Per-service circuit breaker (5 failures in 60 seconds → open for 30 seconds) |
 | **Header Propagation** | `X-Correlation-ID`, `X-User-ID`, `X-User-Role`, `X-Service-Signature` forwarded to downstream |
 | **Multipart Forwarding** | For file upload endpoints (`POST /api/v1/bulk-upload/uploads`), the gateway streams the multipart body directly to the downstream service without buffering the entire file in memory |
+| **Webhook Passthrough** | For provider webhook endpoints (`POST /webhooks/{provider}`), the gateway proxies the raw body and all headers to the target adapter service without modification |
 
 ### 6.2 Circuit Breaker per Service
 
@@ -1118,7 +1151,31 @@ Rotate an API key. Issues a new key and places the old key in a grace period (de
 - Required role: Super Admin
 - Response (200): `{ "data": { "id": "uuid", "newKey": "napi_live_...", "oldKeyExpiresAt": "..." }, "meta": {...}, "errors": null }`
 
-### 11.13 Health Endpoints (Public — No Auth)
+### 11.13 Webhook Endpoints (Proxied → Provider Adapter Services)
+
+Provider webhook endpoints receive delivery status callbacks from external notification providers. These endpoints bypass the standard authentication pipeline — each adapter service is responsible for verifying its provider's webhook signatures.
+
+**POST** `/webhooks/mailgun`
+Proxied to adapter-mailgun :3171 at `/webhooks/inbound`.
+- Auth: None (HMAC-SHA256 signature verified by adapter)
+
+**POST** `/webhooks/braze`
+Proxied to adapter-braze :3172 at `/webhooks/inbound`.
+- Auth: None (shared secret header verified by adapter)
+
+**GET** `/webhooks/whatsapp`
+Meta webhook verification challenge (GET with `hub.verify_token`). Proxied to adapter-whatsapp :3173 at `/webhooks/inbound`.
+- Auth: None (verify token checked by adapter)
+
+**POST** `/webhooks/whatsapp`
+Proxied to adapter-whatsapp :3173 at `/webhooks/inbound`.
+- Auth: None (X-Hub-Signature-256 verified by adapter)
+
+**POST** `/webhooks/aws-ses`
+Proxied to adapter-aws-ses :3174 at `/webhooks/inbound`.
+- Auth: None (SNS X.509 signature verified by adapter)
+
+### 11.14 Health Endpoints (Public — No Auth)
 
 **GET** `/health`
 Liveness probe. Returns service status.
@@ -1126,7 +1183,7 @@ Liveness probe. Returns service status.
 
 **GET** `/ready`
 Readiness probe. Checks database connectivity and downstream service health.
-- Response (200): `{ "status": "ready", "checks": { "database": "up", "services": { "event-ingestion": "up", "notification-engine": "up", ... } } }`
+- Response (200): `{ "status": "ready", "checks": { "database": "up", "services": { "event-ingestion": "up", "notification-engine": "up", ... }, "adapters": { "adapter-mailgun": "up", "adapter-braze": "up", "adapter-whatsapp": "up", "adapter-aws-ses": "up" } } }`
 - Response (503): If any critical dependency is unhealthy.
 
 ---
@@ -1512,6 +1569,48 @@ Admin UI          Gateway :3150           Template Service :3153
    │◀───────────────────│                        │
 ```
 
+### 13.6 Provider Webhook Routing Flow
+
+```
+Provider (e.g.       Gateway :3150           adapter-mailgun :3171
+Mailgun)
+   │                    │                        │
+   │  POST /webhooks/   │                        │
+   │  mailgun           │                        │
+   │  Content-Type:     │                        │
+   │    application/json│                        │
+   │  timestamp: ...    │                        │
+   │  token: ...        │                        │
+   │  signature: ...    │                        │
+   │  { delivery status │                        │
+   │    payload }       │                        │
+   │───────────────────▶│                        │
+   │                    │                        │
+   │                    │  1. CORS check (pass)    │
+   │                    │  2. Correlation ID        │
+   │                    │     (generate UUID)       │
+   │                    │  3. Auth: bypass           │
+   │                    │     (webhook route)        │
+   │                    │                        │
+   │                    │  POST /webhooks/inbound │
+   │                    │  X-Correlation-ID: ...  │
+   │                    │  (all original headers   │
+   │                    │   + body preserved)      │
+   │                    │───────────────────────▶│
+   │                    │                        │
+   │                    │                        │  4. Verify provider
+   │                    │                        │     signature
+   │                    │                        │  5. Parse payload
+   │                    │                        │  6. Publish status
+   │                    │                        │     to RabbitMQ
+   │                    │                        │
+   │                    │  200 OK                │
+   │                    │◀───────────────────────│
+   │                    │                        │
+   │  200 OK            │                        │
+   │◀───────────────────│                        │
+```
+
 ---
 
 ## 14. Error Handling
@@ -1587,6 +1686,7 @@ All errors are logged with structured JSON including:
 | **CORS Misconfiguration** | Origins are validated against an explicit allowlist. Dynamic origin reflection is not used. Credentials mode requires specific origin (no wildcard). |
 | **Timing Attacks** | API key comparison uses constant-time comparison (`crypto.timingSafeEqual`) after hashing to prevent timing-based key extraction. |
 | **Denial of Service** | Request body size limited to 10 MB (configurable). JSON parsing depth limited. Multipart file uploads streamed (not buffered) for bulk upload. Rate limits prevent request flooding. |
+| **Webhook Signature Delegation** | The gateway does not verify provider webhook signatures. Each adapter service is responsible for verifying signatures using the provider's recommended mechanism. This prevents the gateway from needing to hold provider-specific secrets. |
 
 ---
 
@@ -1597,11 +1697,11 @@ All errors are logged with structured JSON including:
 | Endpoint | Type | Checks | Used By |
 |---|---|---|---|
 | `GET /health` | Liveness | Gateway process is running | Container orchestrator (Docker, K8s) |
-| `GET /ready` | Readiness | Database connected, downstream services reachable | Load balancer, container orchestrator |
+| `GET /ready` | Readiness | Database connected, downstream services reachable, adapter services reachable (optional) | Load balancer, container orchestrator |
 
 ### 16.2 Readiness Check Details
 
-The readiness probe checks connectivity to all critical downstream services:
+The readiness probe checks connectivity to all critical downstream services. It can optionally aggregate provider adapter service health status to determine whether webhook routing is available.
 
 ```json
 {
@@ -1617,10 +1717,20 @@ The readiness probe checks connectivity to all critical downstream services:
       "audit-service": { "status": "up", "latency": "4ms" },
       "email-ingest": { "status": "up", "latency": "5ms" },
       "bulk-upload": { "status": "up", "latency": "4ms" }
+    },
+    "adapters": {
+      "adapter-mailgun": { "status": "up", "latency": "4ms" },
+      "adapter-braze": { "status": "up", "latency": "3ms" },
+      "adapter-whatsapp": { "status": "up", "latency": "5ms" },
+      "adapter-aws-ses": { "status": "up", "latency": "4ms" }
     }
   }
 }
 ```
+
+> **Info:** **Adapter Health and Readiness**
+>
+> The `/ready` endpoint should consider adapter service availability for webhook routing. If an adapter service is unreachable, the gateway can still report overall readiness as `"ready"` (since adapter unavailability does not prevent admin UI or event ingestion traffic), but the specific adapter's status will show as `"down"` in the `adapters` section. This allows monitoring systems to alert on individual adapter outages without blocking gateway traffic.
 
 ### 16.3 Monitoring Metrics
 
@@ -1640,6 +1750,8 @@ The readiness probe checks connectivity to all critical downstream services:
 | `gateway_proxy_timeouts_total` | Counter | Downstream request timeouts by service |
 | `gateway_token_refresh_total` | Counter | Successful token refresh operations |
 | `gateway_token_replay_detected_total` | Counter | Refresh token replay detection events (indicates potential compromise) |
+| `gateway_webhook_proxy_total` | Counter | Webhook proxy requests by provider adapter and status code |
+| `gateway_webhook_proxy_duration_ms` | Histogram | Webhook proxy response time by provider adapter |
 
 ---
 
@@ -1695,6 +1807,21 @@ The readiness probe checks connectivity to all critical downstream services:
 | `EMAIL_INGEST_URL` | Email Ingest Service base URL | `http://email-ingest-service:3157` |
 | `BULK_UPLOAD_URL` | Bulk Upload Service base URL | `http://bulk-upload-service:3158` |
 
+### 17.3 Provider Adapter Service URLs
+
+Webhook routes (`POST /webhooks/{provider}`) target provider adapter services directly. Each adapter is an independent microservice responsible for a single provider's delivery and webhook handling.
+
+| Variable | Description | Default |
+|---|---|---|
+| `ADAPTER_MAILGUN_URL` | Mailgun adapter service base URL | `http://provider-adapter-mailgun:3171` |
+| `ADAPTER_BRAZE_URL` | Braze adapter service base URL | `http://provider-adapter-braze:3172` |
+| `ADAPTER_WHATSAPP_URL` | WhatsApp/Meta adapter service base URL | `http://provider-adapter-whatsapp:3173` |
+| `ADAPTER_AWS_SES_URL` | AWS SES adapter service base URL | `http://provider-adapter-aws-ses:3174` |
+
+> **Info:** **Adding New Provider Adapters**
+>
+> To onboard a new notification provider, deploy the new adapter service and add its URL environment variable to the gateway configuration. Then add a new webhook proxy rule mapping `/webhooks/{new-provider}` to the adapter's `/webhooks/inbound` endpoint. No gateway code changes are required.
+
 ---
 
-*Notification API Documentation v1.0 -- Architecture Team -- 2026*
+*Notification API Documentation v2.0 -- Architecture Team -- 2026*

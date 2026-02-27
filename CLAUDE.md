@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). **template-service** Phase 5 complete (foundation, template CRUD & versioning, rendering engine with caching & preview, RabbitMQ audit publishing, rollback endpoint, enhanced health checks, E2E tests, Prometheus metrics, channel query filter, HTML sanitization, render timeout; 247 unit tests across 21 suites, 4 E2E test files). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
+Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). **template-service** Phase 5 complete (foundation, template CRUD & versioning, rendering engine with caching & preview, RabbitMQ audit publishing, rollback endpoint, enhanced health checks, E2E tests, Prometheus metrics, channel query filter, HTML sanitization, render timeout; 247 unit tests across 21 suites, 4 E2E test files). **channel-router-service** Phase 4 complete (foundation, data layer, health checks, Prometheus metrics, structured logging, channel & provider CRUD, adapter HTTP client, provider cache, circuit breaker per provider, token bucket rate limiter, retry engine with exponential backoff, media processor per channel, RabbitMQ integration with 3 exchanges and 8 priority-tiered queues, 8 consumers with abstract base class, 7-step delivery pipeline orchestrator, fire-and-forget audit publishing, single-level fallback, adapter health monitoring with CB integration; 432 unit tests across 46 suites, 5 E2E test files). **provider-adapters/adapter-mailgun** Phase 3 complete (monorepo foundation, shared library with DTOs/errors/metrics/RabbitMQ/health, Mailgun HTTP client, send pipeline with attachments and error classification, webhook verification with HMAC-SHA256 and replay protection, event normalization, fire-and-forget RabbitMQ publishing; 204 unit tests across 28 suites, 17 E2E tests across 3 files). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
 
 ## Tech Stack (Planned)
 
@@ -13,7 +13,7 @@ Design documentation phase. Service folders and database scripts scaffolded. **e
 - **Message Broker:** RabbitMQ (AMQP, topic exchanges, dead-letter queues)
 - **Database:** PostgreSQL (schema-per-service pattern, single database with separate schemas)
 - **Containerization:** Docker / Docker Compose
-- **Notification Providers:** SendGrid (email), Mailgun (email), Braze (email/SMS/WhatsApp/push — unified multi-channel, dumb pipe pattern), Twilio (SMS/WhatsApp), Firebase Cloud Messaging (push)
+- **Notification Providers:** Mailgun (email), Braze (email/SMS/WhatsApp/push — unified multi-channel, dumb pipe pattern), WhatsApp (Meta Cloud API — native WhatsApp), AWS SES (email)
 
 ## Microservices
 
@@ -23,7 +23,7 @@ Design documentation phase. Service folders and database scripts scaffolded. **e
 | event-ingestion-service | 3151 | Receives and normalizes events from source systems via runtime field mappings; assigns priority tier (normal/critical) per mapping config |
 | notification-engine-service | 3152 | Core orchestrator — rules, recipients, lifecycle; priority-aware processing via tiered queues |
 | template-service | 3153 | Template CRUD, Handlebars rendering, versioning |
-| channel-router-service | 3154 | Routes to delivery providers (SendGrid, Mailgun, Braze, Twilio, FCM) via provider strategy pattern; all providers are dumb pipes (pre-rendered content); retry/circuit breaker; priority-tiered delivery queues per channel; fire-and-forget audit logging |
+| channel-router-service | 3154 | Routes to delivery providers via decoupled provider adapter microservices (Mailgun, Braze, WhatsApp/Meta, AWS SES); core orchestration (circuit breaker, rate limiting, retry, fallback, media processing); all providers are dumb pipes (pre-rendered content); priority-tiered delivery queues per channel; fire-and-forget audit logging. V2 design docs reflect the decoupled adapter architecture. |
 | admin-service | 3155 | Backoffice administration |
 | audit-service | 3156 | Notification tracking, delivery receipts, analytics |
 | email-ingest-service | 3157/2525 | SMTP ingest — receives emails, parses, generates events |
@@ -41,7 +41,7 @@ notification-gateway/           # NestJS — port 3150
     schema-notification-gateway.sql       # Schema/role/user creation (run once)
     notification-gateway-dbscripts.sql    # Database objects (tables, indexes, functions, etc.)
   docs/                         # Service-level documentation
-    13-notification-gateway.md  # Convenience copy of design doc
+    13-notification-gateway-v2.md  # Convenience copy of design doc (v2)
     changelog_dev.md            # Code-only development changelog
 
 event-ingestion-service/        # NestJS — port 3151 (Step 4 complete)
@@ -156,11 +156,48 @@ template-service/               # NestJS — port 3153 (Phase 5 complete)
     10-template-service.md
     changelog_dev.md
 
-channel-router-service/         # NestJS — port 3154
+channel-router-service/         # NestJS — port 3154 (Phase 4 complete)
   CLAUDE.md
+  .env                          # Local environment variables (git-ignored)
+  .gitignore                    # Node/NestJS ignores (dist, node_modules, .env, coverage, etc.)
+  .prettierrc                   # Prettier config (singleQuote, trailingComma: all)
+  eslint.config.mjs             # ESLint flat config (typescript-eslint + prettier)
+  nest-cli.json                 # NestJS CLI config (sourceRoot: src, deleteOutDir)
+  package.json                  # NestJS 11, TypeScript 5.7, Jest 30
+  package-lock.json
+  tsconfig.json                 # ES2023 target, nodenext modules, decorators enabled
+  tsconfig.build.json
+  src/
+    main.ts                     # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3154
+    app.module.ts               # Root module: Config, Logger, TypeORM, Common, Metrics, Channels, Providers, Delivery, CircuitBreaker, RateLimiter, Retry, Media, Fallback, RabbitMQ, HealthMonitor, Consumers, Health
+    common/                     # @Global() module: errors, filters, pipes, interceptors, base repo
+    config/                     # ConfigModule.forRoot: app, database, rabbitmq configs, env validation
+    channels/                   # Channel CRUD (controller, service, repository, DTOs, entities), auto-seed 4 defaults
+    providers/                  # Provider CRUD (controller, service, repository, DTOs, entities), cache service
+    delivery/                   # DeliveryAttempt entity/repo, DeliveryPipelineService (7-step orchestrator), dispatch interfaces
+    adapter-client/             # HTTP client for adapter services (send, health, capabilities) via @nestjs/axios
+    circuit-breaker/            # Per-provider circuit breaker (CLOSED/OPEN/HALF_OPEN), DB persistence
+    rate-limiter/               # Token bucket rate limiter per provider
+    retry/                      # Per-channel exponential backoff with jitter
+    media/                      # Channel-specific media processing (email/SMS/WhatsApp/push)
+    rabbitmq/                   # @golevelup/nestjs-rabbitmq (3 exchanges, named channels, fire-and-forget publisher)
+    fallback/                   # Single-level fallback chain (no cascading)
+    consumers/                  # 8 priority-tiered consumers (4 channels × 2 priorities) + abstract base
+    health-monitor/             # Periodic adapter health checks with CB integration
+    metrics/                    # @Global() MetricsModule: 13 custom metrics, GET /metrics
+    health/                     # Health controller (GET /health liveness, GET /ready readiness + adapter health)
+  test/
+    test-utils.ts               # Shared E2E helper
+    app.e2e-spec.ts             # E2E: health, ready, metrics
+    channels.e2e-spec.ts        # E2E: channel list, update config, validation
+    providers.e2e-spec.ts       # E2E: register, deregister, list, update, capabilities, health
+    delivery.e2e-spec.ts        # E2E: delivery pipeline (happy path, retry, fallback) with mocked adapter
+    jest-e2e.json               # Jest E2E config
   dbscripts/
+    schema-channel-router-service.sql
+    channel-router-service-dbscripts.sql
   docs/
-    11-channel-router-service.md
+    11-channel-router-service-v2.md  # Convenience copy of design doc (v2)
     changelog_dev.md
 
 admin-service/                  # NestJS — port 3155
@@ -174,7 +211,7 @@ audit-service/                  # NestJS — port 3156
   CLAUDE.md
   dbscripts/
   docs/
-    16-audit-service.md
+    16-audit-service-v2.md  # Convenience copy of design doc (v2)
     changelog_dev.md
 
 email-ingest-service/           # NestJS — port 3157/2525
@@ -196,6 +233,25 @@ notification-admin-ui/          # Next.js — port 3159
   docs/
     15-notification-admin-ui.md
     changelog_dev.md
+
+provider-adapters/              # NestJS monorepo — ports 3171-3174 (adapter-mailgun, adapter-braze, adapter-whatsapp, adapter-aws-ses)
+  CLAUDE.md
+  nest-cli.json                 # Monorepo config (4 apps + 1 shared lib)
+  package.json
+  apps/                         # One app per adapter service
+    adapter-mailgun/            # :3171 — Email via Mailgun v3 REST API
+    adapter-braze/              # :3172 — Multi-channel (Email, SMS, WhatsApp, Push) via Braze
+    adapter-whatsapp/           # :3173 — WhatsApp via Meta Cloud API v21.0
+    adapter-aws-ses/            # :3174 — Email via AWS SES v2 API or SMTP relay
+  libs/
+    common/                     # Shared: base controller, DTOs, RabbitMQ publisher, error handling, metrics
+  docs/
+    17-provider-adapters.md     # Convenience copy of design doc
+    adapter-mailgun.md          # Mailgun-specific reference
+    adapter-braze.md            # Braze multi-channel reference
+    adapter-whatsapp.md         # WhatsApp Meta Cloud API reference
+    adapter-aws-ses.md          # AWS SES reference
+    changelog_dev.md
 ```
 
 ### Endpoint Reference
@@ -208,12 +264,14 @@ endpoints/
   endpoints-event-ingestion-service.md
   endpoints-notification-engine-service.md
   endpoints-template-service.md
-  endpoints-channel-router-service.md
+  endpoints-channel-router-service.md       # V1 — monolithic provider design
+  endpoints-channel-router-service-v2.md   # V2 — decoupled adapter architecture (webhooks removed, adapter mgmt added)
   endpoints-admin-service.md
   endpoints-audit-service.md
   endpoints-email-ingest-service.md
   endpoints-bulk-upload-service.md
   endpoints-notification-admin-ui.md
+  endpoints-provider-adapters.md   # Standardized contract (4 adapters × 5 endpoints)
 ```
 
 ### Database Scripts
@@ -248,7 +306,8 @@ All design docs (authoritative versions) live in `docs/` as Markdown files. Each
 docs/
   css/styles.css                    # Legacy shared stylesheet (unused — HTML docs removed)
   index.md                          # Documentation hub page
-  01-executive-summary.md           # Project overview, problem, solution, scope
+  01-executive-summary.md           # Project overview, problem, solution, scope (v1)
+  01-executive-summary-v2.md        # Executive summary (v2 — decoupled adapter architecture references)
   02-detailed-microservices.md      # Service specs, APIs, schemas, RabbitMQ config
   03-system-architecture.md         # Architecture diagrams, layers, flows, security
   04-authentication-identity.md     # Auth flows, SAML SSO, JWT sessions, account linking
@@ -258,12 +317,17 @@ docs/
   08-notification-engine-service.md # Notification Engine Service detailed spec
   09-bulk-upload-service.md         # Bulk Upload Service detailed spec
   10-template-service.md            # Template Service detailed spec
-  11-channel-router-service.md      # Channel Router Service detailed spec
-  12-rabbitmq-topology.md           # RabbitMQ topology — exchanges, queues, bindings reference
-  13-notification-gateway.md        # Notification Gateway (BFF) detailed spec
+  11-channel-router-service.md      # Channel Router Service detailed spec (v1 — monolithic)
+  11-channel-router-service-v2.md   # Channel Router Service detailed spec (v2 — decoupled adapter architecture)
+  12-rabbitmq-topology.md           # RabbitMQ topology — exchanges, queues, bindings reference (v1)
+  12-rabbitmq-topology-v2.md        # RabbitMQ topology (v2 — adapter services as additional publishers)
+  13-notification-gateway.md        # Notification Gateway (BFF) detailed spec (v1)
+  13-notification-gateway-v2.md     # Notification Gateway (v2 — webhook routing to adapter services)
   14-admin-service.md               # Admin Service (Backoffice Administration) detailed spec
   15-notification-admin-ui.md       # Notification Admin UI (Next.js Frontend) detailed spec
-  16-audit-service.md               # Audit Service detailed spec
+  16-audit-service.md               # Audit Service detailed spec (v1)
+  16-audit-service-v2.md            # Audit Service (v2 — adapter actor references, webhook correlation)
+  17-provider-adapters.md           # Provider Adapter Services detailed spec (Mailgun, Braze, WhatsApp/Meta, AWS SES)
 ```
 
 ### Markdown docs

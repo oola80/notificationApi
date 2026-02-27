@@ -28,11 +28,13 @@ No direct RabbitMQ interaction. Pure HTTP/REST BFF.
 ## Related Services
 
 - Proxies to: notification-engine-service (:3152), template-service (:3153), channel-router-service (:3154), admin-service (:3155), audit-service (:3156), email-ingest-service (:3157), bulk-upload-service (:3158)
+- Webhook proxy targets: adapter-mailgun (:3171), adapter-braze (:3172), adapter-whatsapp (:3173), adapter-aws-ses (:3174)
 - Frontend consumer: notification-admin-ui (:3159)
 
 ## Key References
 
-- Design doc: `docs/13-notification-gateway.md` (convenience copy) — authoritative at `../../docs/13-notification-gateway.md`
+- Design doc (v2): `docs/13-notification-gateway-v2.md` (convenience copy) — authoritative at `../../docs/13-notification-gateway-v2.md`
+- Design doc (v1): `../../docs/13-notification-gateway.md` (original design)
 - Endpoints: `../../endpoints/endpoints-notification-gateway.md`
 - DB schema script: `dbscripts/schema-notification-gateway.sql`
 - DB objects script: `dbscripts/notification-gateway-dbscripts.sql` — **must be updated on every database change**

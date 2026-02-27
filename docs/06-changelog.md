@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Version:** | 2.4 |
-| **Date:** | 2026-02-21 |
+| **Version:** | 2.5 |
+| **Date:** | 2026-02-26 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
 
@@ -14,6 +14,7 @@
 ## Table of Contents
 
 - [About This Changelog](#about-this-changelog)
+- [Version 3.8](#version-38--2026-02-26) — Provider Adapter Services & Adapter Replacement
 - [Version 3.7](#version-37--2026-02-21) — Audit Service Deep-Dive
 - [Version 3.6](#version-36--2026-02-21) — Notification Admin UI Deep-Dive
 - [Version 3.5](#version-35--2026-02-21) — Admin Service Deep-Dive
@@ -52,6 +53,34 @@ This document tracks all notable changes to the Notification API documentation a
 > **Info:** **Change Types**
 >
 > Each entry is categorized using one of the following types: **Added**, **Changed**, **Fixed**, **Removed**, **Deprecated**.
+
+---
+
+## Version 3.8 — 2026-02-26
+
+**Provider Adapter Services & Adapter Replacement**
+
+Replaces the original 5-adapter set (SendGrid, Mailgun, Braze, Twilio, FCM) with a new 4-adapter set in a single NestJS monorepo: Mailgun (:3171), Braze (:3172), WhatsApp/Meta Cloud API (:3173), AWS SES (:3174). SendGrid, Twilio, and Firebase Cloud Messaging are permanently removed. Port 3170 is left unassigned for future use. Adds the authoritative Provider Adapter Services design document (17-provider-adapters.md) with 19 sections covering the monorepo architecture, standardized HTTP contract (4 endpoints × 4 adapters), per-adapter deep-dives (Mailgun v3 REST API, Braze multi-channel /messages/send, WhatsApp Meta Cloud API v21.0, AWS SES v2 API/SMTP), webhook architecture with unified status mapping, error classification, media handling, registration in core services, WhatsApp routing rule (mutual exclusion via isActive flag), and testing/monitoring strategy. Adds 4 per-adapter reference documents, service CLAUDE.md, endpoint reference, and convenience copy. Updates all v2 design documents to replace stale adapter references: Channel Router Service v2 (heaviest update — dependencies, architecture diagram, upstream/downstream table, per-adapter sections, provider summary, rate limits, webhook routing, status mapping, sequence diagrams, security credentials), RabbitMQ Topology v2 (exchange publishers, port ranges, routing key examples, system-wide flow diagram), Notification Gateway v2 (downstream table, architecture diagram, webhook routing table, endpoint sections, readiness response, env vars), Audit Service v2 (provider examples, event status mapping, trace examples, sequence diagrams, provider column values). Updates service CLAUDE.md files (channel-router-service, notification-gateway) and root CLAUDE.md with new adapter set.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | 17 — Provider Adapter Services Deep-Dive document (MD) with 19 sections covering service overview, architecture, NestJS monorepo structure, adapter service table (4 adapters), standardized HTTP contract (SendRequest/SendResult/Health/Capabilities interfaces), shared infrastructure (libs/common), Mailgun adapter, Braze adapter, WhatsApp adapter, AWS SES adapter, webhook architecture, error classification, media handling, configuration, registration in core services, WhatsApp routing rule, adding a new provider, testing strategy, monitoring | 17-provider-adapters |
+| **Added** | Per-adapter reference docs: adapter-mailgun.md (Mailgun v3 REST, HMAC-SHA256 webhooks), adapter-braze.md (multi-channel, profile sync, Currents), adapter-whatsapp.md (Meta Cloud API v21.0, template messages, 24h window), adapter-aws-ses.md (dual mode API/SMTP, SNS webhooks, X.509 verification) | provider-adapters/docs/ |
+| **Added** | Provider adapters endpoint reference (5 endpoints × 4 adapters with adapter-specific notes) | endpoints-provider-adapters |
+| **Added** | Provider adapters CLAUDE.md with monorepo context, adapter table, target folder structure, coding conventions | provider-adapters/CLAUDE.md |
+| **Added** | Convenience copy of 17-provider-adapters.md in provider-adapters/docs/ | provider-adapters/docs/ |
+| **Added** | Provider webhook endpoints section in notification-gateway endpoint reference (4 webhook proxy routes) | endpoints-notification-gateway |
+| **Changed** | Channel Router Service v2: Replaced 5-adapter set with 4-adapter set throughout — dependencies, architecture diagram, upstream/downstream table, provider adapter reference table, per-adapter sections (removed SendGrid/Twilio/FCM, added WhatsApp/AWS SES), provider summary, rate limits, webhook routing, event status mapping, provider message ID correlation, webhook signature verification, Braze latency note, RabbitMQ routing key examples, readiness response, sequence diagrams, security credentials | 11-channel-router-service-v2 |
+| **Changed** | RabbitMQ Topology v2: Updated xch.notifications.status publishers, port ranges (:3171-:3174), adapter names in flow diagram and routing key examples | 12-rabbitmq-topology-v2 |
+| **Changed** | Notification Gateway v2: Updated provider webhooks inbound row, downstream adapter rows, architecture diagram, webhook routing table, webhook endpoint sections, readiness response, env vars (ADAPTER_*_URL) | 13-notification-gateway-v2 |
+| **Changed** | Audit Service v2: Replaced all sendgrid/twilio/fcm references with mailgun/whatsapp-meta/aws-ses in examples, event status mapping, trace responses, sequence diagrams, provider column values | 16-audit-service-v2 |
+| **Changed** | Root CLAUDE.md: Updated tech stack (notification providers), service table (channel-router-service description), service folders (added provider-adapters/ entry), endpoint reference (added endpoints-provider-adapters.md), documentation listing (added 17-provider-adapters.md) | CLAUDE.md |
+| **Changed** | channel-router-service CLAUDE.md: Updated dependencies and related services to new adapter set | channel-router-service/CLAUDE.md |
+| **Changed** | notification-gateway CLAUDE.md: Added webhook proxy targets to related services | notification-gateway/CLAUDE.md |
+| **Changed** | Synced convenience copies: channel-router-service/docs/11-channel-router-service-v2.md, notification-gateway/docs/13-notification-gateway-v2.md, audit-service/docs/16-audit-service-v2.md | Convenience copies |
+| **Removed** | SendGrid adapter references (adapter-sendgrid :3170) from all v2 design docs | All v2 docs |
+| **Removed** | Twilio adapter references (adapter-twilio :3173) from all v2 design docs — replaced by adapter-whatsapp | All v2 docs |
+| **Removed** | Firebase Cloud Messaging / FCM adapter references (adapter-fcm :3174) from all v2 design docs — replaced by adapter-aws-ses | All v2 docs |
 
 ---
 

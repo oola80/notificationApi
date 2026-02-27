@@ -1,17 +1,15 @@
-> **Note:** This is a convenience copy. The authoritative version is at `../../docs/16-audit-service.md`.
-
----
-
 # 16 — Audit Service
 
 **Notification API — Audit Service Deep-Dive**
 
 | | |
 |---|---|
-| **Version:** | 1.0 |
-| **Date:** | 2026-02-21 |
+| **Version:** | 2.0 |
+| **Date:** | 2026-02-26 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
+
+> **Info:** This is v2 of the Audit Service design, updated for the decoupled provider adapter architecture. The v1 reference is at `16-audit-service.md`.
 
 ---
 
@@ -54,7 +52,7 @@ The Audit Service is the observability backbone of the Notification API platform
 ### Responsibilities
 
 1. **Event Sourcing:** Captures every state transition in the notification lifecycle as an immutable audit event. Events are never updated or deleted — only appended.
-2. **Delivery Receipt Tracking:** Records delivery receipts from external providers (opened, clicked, bounced, unsubscribed) via webhook callbacks proxied through the Channel Router.
+2. **Delivery Receipt Tracking:** Records delivery receipts from external providers (opened, clicked, bounced, unsubscribed) via webhook callbacks received by provider adapter microservices and published to `xch.notifications.status`.
 3. **End-to-End Notification Trace:** Reconstructs the full lifecycle of any notification — from event ingestion through delivery confirmation — via a unified trace API.
 4. **Searchable Notification History:** Provides full-text search across notification content, recipients, and metadata using PostgreSQL `tsvector`/`tsquery`.
 5. **Analytics Aggregation:** Pre-aggregates notification metrics for dashboard consumption — delivery rates, channel performance, average delivery latency, hourly/daily volume trends, and failure categorization.
@@ -79,7 +77,8 @@ The Audit Service is a **consume-only** service — it subscribes to 5 RabbitMQ 
 |---|---|---|---|
 | **Upstream** | Event Ingestion Service | RabbitMQ (`audit.events` queue) | Event ingestion and normalization audit trail |
 | **Upstream** | Notification Engine Service | RabbitMQ (`q.status.updates` queue) | Processing status transitions (processing, rendering, delivering, suppressed) |
-| **Upstream** | Channel Router Service | RabbitMQ (`q.status.updates`, `audit.deliver` queues) | Delivery attempts, delivery status (sent, delivered, failed), webhook receipts |
+| **Upstream** | Channel Router Service (Core) | RabbitMQ (`q.status.updates`, `audit.deliver` queues) | Delivery attempts, delivery status (sent, failed), delivery-path events |
+| **Upstream** | Provider Adapter Services | RabbitMQ (`q.status.updates` queue, routing key `adapter.webhook.{providerId}`) | Webhook-originated delivery receipts (delivered, bounced, opened, clicked, etc.) |
 | **Upstream** | Template Service | RabbitMQ (`q.audit.template` queue) | Template lifecycle events (created, updated, deleted, rolledback, render completed/failed) |
 | **Upstream** | DLQ (all services) | RabbitMQ (`audit.dlq` queue) | Permanently failed messages from all DLQ-enabled queues |
 | **Downstream** | Notification Gateway | REST API (proxied) | Trace queries, log queries, analytics, DLQ monitoring |
@@ -95,6 +94,9 @@ The Audit Service is a **consume-only** service — it subscribes to 5 RabbitMQ 
 |  xch.events.normalized -----> [ audit.events ]               |
 |  xch.notifications.deliver -> [ audit.deliver ]              |
 |  xch.notifications.status --> [ q.status.updates ]           |
+|    routing keys:                                             |
+|      notification.status.# (from Channel Router Core)        |
+|      adapter.webhook.{providerId} (from Adapter Services)    |
 |                           --> [ q.audit.template ]           |
 |  xch.notifications.dlq ----> [ audit.dlq ]                  |
 +---------------------------+---------------------------------+
@@ -119,7 +121,7 @@ The Audit Service is a **consume-only** service — it subscribes to 5 RabbitMQ 
 +-------------------+    +-------------------+
 ```
 
-*Figure 2.1 — Audit Service integration context showing 5 inbound RabbitMQ queues and REST API consumers.*
+*Figure 2.1 — Audit Service integration context showing 5 inbound RabbitMQ queues (including adapter webhook events on `q.status.updates`) and REST API consumers.*
 
 ---
 
@@ -147,13 +149,37 @@ Each audit event follows a consistent structure regardless of source:
   "actor": "channel-router-service",
   "metadata": {
     "channel": "email",
-    "provider": "sendgrid",
+    "provider": "mailgun",
     "attempt": 1
   },
   "payloadSnapshot": { "subject": "Your order has shipped", "recipientEmail": "customer@example.com" },
   "createdAt": "2026-02-20T10:15:30.500Z"
 }
 ```
+
+**Webhook-originated event example (adapter as actor):**
+
+```json
+{
+  "id": "ae-661f9500-f30c-52e5-b827-557766550111",
+  "notificationId": "notif-456",
+  "correlationId": "corr-abc-123",
+  "cycleId": "CYC-2026-00451",
+  "eventType": "DELIVERED",
+  "actor": "adapter-mailgun",
+  "metadata": {
+    "channel": "email",
+    "provider": "mailgun",
+    "providerMessageId": "<20230101.abc123@domain.com>"
+  },
+  "payloadSnapshot": null,
+  "createdAt": "2026-02-20T10:16:05.000Z"
+}
+```
+
+> **Info:** **Actor Attribution**
+>
+> For events on the delivery path (`DELIVERY_ATTEMPTED`, `DELIVERY_SENT`, `DELIVERY_FAILED`, `DELIVERY_RETRYING`), the actor is `channel-router-service` — the core orchestrator. For webhook-originated events (`DELIVERED`, `BOUNCED`, `OPENED`, `CLICKED`, `UNSUBSCRIBED`, `SPAM_COMPLAINT`), the actor is `adapter-{providerId}` — the adapter service that received and verified the provider webhook. This distinction is critical for understanding which component produced each audit event.
 
 ### Event Type Taxonomy
 
@@ -165,7 +191,7 @@ Audit event types are grouped by lifecycle stage:
 | **Rule Matching** | `RULE_MATCHED`, `RULE_NO_MATCH`, `NOTIFICATION_SUPPRESSED` | notification-engine-service |
 | **Rendering** | `TEMPLATE_RENDERED`, `TEMPLATE_RENDER_FAILED` | notification-engine-service |
 | **Delivery** | `DELIVERY_DISPATCHED`, `DELIVERY_ATTEMPTED`, `DELIVERY_SENT`, `DELIVERY_FAILED`, `DELIVERY_RETRYING` | channel-router-service |
-| **Provider Status** | `PROVIDER_ACCEPTED`, `DELIVERED`, `BOUNCED`, `OPENED`, `CLICKED`, `UNSUBSCRIBED`, `SPAM_COMPLAINT` | audit-service (via webhooks) |
+| **Provider Status** | `PROVIDER_ACCEPTED`, `DELIVERED`, `BOUNCED`, `OPENED`, `CLICKED`, `UNSUBSCRIBED`, `SPAM_COMPLAINT` | adapter-{providerId} (via webhooks) |
 | **Template Lifecycle** | `TEMPLATE_CREATED`, `TEMPLATE_UPDATED`, `TEMPLATE_DELETED`, `TEMPLATE_ROLLEDBACK` | template-service |
 | **DLQ** | `DLQ_CAPTURED` | audit-service |
 
@@ -239,7 +265,7 @@ The Audit Service runs 5 independent consumer groups — one per consumed queue.
 |---|---|---|---|---|
 | **Events Consumer** | `audit.events` | `xch.events.normalized` | `event.#` | Event ingestion/normalization |
 | **Deliver Consumer** | `audit.deliver` | `xch.notifications.deliver` | `notification.deliver.#` | Delivery dispatch from engine |
-| **Status Consumer** | `q.status.updates` | `xch.notifications.status` | `notification.status.#` | All status transitions |
+| **Status Consumer** | `q.status.updates` | `xch.notifications.status` | `notification.status.#`, `adapter.webhook.#` | All status transitions (delivery-path from Channel Router Core, webhook events from adapter services) |
 | **Template Consumer** | `q.audit.template` | `xch.notifications.status` | `template.#` | Template lifecycle events |
 | **DLQ Consumer** | `audit.dlq` | `xch.notifications.dlq` | _(fanout)_ | Permanently failed messages |
 
@@ -323,66 +349,108 @@ Upstream services publish audit messages using a fire-and-forget pattern — the
 
 ## 5. Delivery Receipt Correlation
 
-When external providers (SendGrid, Twilio, etc.) report delivery outcomes via webhooks, the Channel Router Service maps these to the originating notification using the `provider_message_id` stored at send time and publishes status updates to `xch.notifications.status`. The Audit Service consumes these updates and persists them as `delivery_receipts`.
+The delivery receipt correlation flow spans two decoupled paths — the send path (through Channel Router Core and the adapter) and the webhook path (from the provider through the adapter back to the Audit Service). Both paths converge on the `provider_message_id` as the correlation key.
+
+### Send Path — Provider Message ID Acquisition
+
+When the Channel Router Core dispatches a notification for delivery, it calls the appropriate provider adapter microservice via `POST /send`. The adapter communicates with the external provider, receives a `provider_message_id` in the provider's response, and returns it as part of the `SendResult` to the Core. The Core then publishes a delivery-attempt status message to `xch.notifications.status` that includes the `provider_message_id`. The Audit Service consumes this message and persists the `provider_message_id` in the `delivery_receipts` table, establishing the correlation anchor.
+
+### Webhook Path — Provider Event Correlation
+
+When a provider (Mailgun, Braze, etc.) reports a delivery outcome via webhook, the webhook is received by the Notification Gateway, which routes it to the appropriate provider adapter microservice. The adapter verifies the webhook signature, normalizes the provider-specific event into a standardized format, and publishes it to `xch.notifications.status` with routing key `adapter.webhook.{providerId}`. The published message includes the `provider_message_id` from the webhook payload. The Audit Service receives this message on the `q.status.updates` queue and correlates it to the existing `delivery_receipts` record using the `provider_message_id`.
 
 ### Correlation Strategy
 
 ```
-  Channel Router sends notification
-  via provider (e.g., SendGrid)
+  SEND PATH:
+
+  Channel Router Core
+  calls adapter POST /send
            |
            v
+  Adapter sends to provider (e.g., Mailgun)
   Provider returns provider_message_id
-  (e.g., "sg-msg-789")
+  (e.g., "<20230101.abc123@domain.com>")
            |
            v
-  Channel Router stores provider_message_id
-  in delivery_attempts table
+  Adapter returns SendResult
+  { providerMessageId: "<20230101.abc123@domain.com>", ... }
+  to Channel Router Core
            |
            v
-  Channel Router publishes status to
-  xch.notifications.status
+  Core publishes delivery-attempt status
+  to xch.notifications.status
+  (routing key: notification.status.sent)
            |
            v
   Audit Service (Status Consumer)
   persists to delivery_receipts
            |
            +--- notification_id: "notif-456"
-           +--- provider_message_id: "sg-msg-789"
+           +--- provider_message_id: "<20230101.abc123@domain.com>"
+           +--- status: "sent"
+           +--- channel: "email"
+           +--- provider: "mailgun"
+
+
+  WEBHOOK PATH:
+
+  Provider sends webhook to Gateway
+           |
+           v
+  Gateway routes to adapter-mailgun
+           |
+           v
+  Adapter verifies signature,
+  normalizes event
+           |
+           v
+  Adapter publishes to xch.notifications.status
+  (routing key: adapter.webhook.mailgun)
+  { providerMessageId: "<20230101.abc123@domain.com>",
+    status: "delivered", ... }
+           |
+           v
+  Audit Service (Status Consumer)
+  correlates via provider_message_id
+  persists to delivery_receipts
+           |
+           +--- notification_id: "notif-456"
+           +--- provider_message_id: "<20230101.abc123@domain.com>"
            +--- status: "delivered"
            +--- channel: "email"
-           +--- provider: "sendgrid"
+           +--- provider: "mailgun"
 ```
 
-*Figure 5.1 — Provider message ID correlation from send to webhook receipt.*
+*Figure 5.1 — Decoupled correlation flow: send path acquires provider_message_id via adapter SendResult; webhook path correlates via adapter-published normalized event.*
 
 ### Provider Status Mapping
 
-The Audit Service normalizes provider-specific statuses into a standard set:
+The provider adapter microservices normalize provider-specific statuses into a standard set before publishing to `xch.notifications.status`. The Audit Service receives these pre-normalized statuses:
 
 | Provider | Provider Status | Normalized Status |
 |---|---|---|
-| SendGrid | `delivered` | `DELIVERED` |
-| SendGrid | `open` | `OPENED` |
-| SendGrid | `click` | `CLICKED` |
-| SendGrid | `bounce` | `BOUNCED` |
-| SendGrid | `spamreport` | `SPAM_COMPLAINT` |
-| SendGrid | `unsubscribe` | `UNSUBSCRIBED` |
 | Mailgun | `delivered` | `DELIVERED` |
 | Mailgun | `opened` | `OPENED` |
 | Mailgun | `clicked` | `CLICKED` |
-| Mailgun | `failed` / `bounced` | `BOUNCED` |
+| Mailgun | `failed` (permanent) | `BOUNCED` |
 | Mailgun | `complained` | `SPAM_COMPLAINT` |
 | Mailgun | `unsubscribed` | `UNSUBSCRIBED` |
-| Twilio | `delivered` | `DELIVERED` |
-| Twilio | `undelivered` | `BOUNCED` |
-| Twilio | `failed` | `BOUNCED` |
-| FCM | `success` | `DELIVERED` |
-| FCM | `failure` | `BOUNCED` |
-| Braze | `sent` | `DELIVERED` |
-| Braze | `open` | `OPENED` |
-| Braze | `click` | `CLICKED` |
-| Braze | `bounce` | `BOUNCED` |
+| Braze | `*.Delivery` | `DELIVERED` |
+| Braze | `*.Open` | `OPENED` |
+| Braze | `*.Click` | `CLICKED` |
+| Braze | `*.Bounce` | `BOUNCED` |
+| Braze | `*.SpamReport` | `SPAM_COMPLAINT` |
+| WhatsApp (Meta) | `sent` | `SENT` |
+| WhatsApp (Meta) | `delivered` | `DELIVERED` |
+| WhatsApp (Meta) | `read` | `READ` |
+| WhatsApp (Meta) | `failed` | `BOUNCED` |
+| AWS SES | `Send` | `SENT` |
+| AWS SES | `Delivery` | `DELIVERED` |
+| AWS SES | `Bounce` | `BOUNCED` |
+| AWS SES | `Complaint` | `SPAM_COMPLAINT` |
+| AWS SES | `Open` | `OPENED` |
+| AWS SES | `Click` | `CLICKED` |
 
 ### Orphaned Webhook Handling
 
@@ -390,7 +458,7 @@ If a delivery receipt arrives for a `provider_message_id` that does not match an
 
 > **Warning:** **Orphaned Receipt Investigation**
 >
-> A sustained increase in orphaned receipts may indicate a synchronization issue between the Channel Router's `delivery_attempts` table and the Audit Service's receipt store — or that a provider is reporting on messages sent before the platform was deployed. The `audit_orphaned_receipts_total` metric should be monitored with an alerting threshold.
+> A sustained increase in orphaned receipts may indicate a synchronization issue between the adapter service's webhook events and the Audit Service's receipt store — for example, an adapter publishing a webhook event before the corresponding send-path status message has been consumed, or a provider reporting on messages sent before the platform was deployed. The `audit_orphaned_receipts_total` metric should be monitored with an alerting threshold.
 
 ---
 
@@ -432,12 +500,16 @@ Returns the complete end-to-end timeline for a notification.
     { "timestamp": "2026-02-20T10:15:30.000Z", "stage": "EVENT_INGESTED", "actor": "event-ingestion-service", "details": {} },
     { "timestamp": "2026-02-20T10:15:30.200Z", "stage": "RULE_MATCHED", "actor": "notification-engine-service", "details": { "ruleId": "r-550e", "ruleName": "Order Shipped" } },
     { "timestamp": "2026-02-20T10:15:30.350Z", "stage": "TEMPLATE_RENDERED", "actor": "notification-engine-service", "details": { "templateId": "tpl-order-shipped", "channel": "email" } },
-    { "timestamp": "2026-02-20T10:15:30.500Z", "stage": "DELIVERY_ATTEMPTED", "actor": "channel-router-service", "details": { "channel": "email", "attempt": 1, "provider": "sendgrid" } },
-    { "timestamp": "2026-02-20T10:15:31.200Z", "stage": "PROVIDER_ACCEPTED", "actor": "channel-router-service", "details": { "providerMessageId": "sg-msg-789" } },
-    { "timestamp": "2026-02-20T10:16:05.000Z", "stage": "DELIVERED", "actor": "audit-service", "details": { "channel": "email", "providerMessageId": "sg-msg-789" } }
+    { "timestamp": "2026-02-20T10:15:30.500Z", "stage": "DELIVERY_ATTEMPTED", "actor": "channel-router-service", "details": { "channel": "email", "attempt": 1, "provider": "mailgun" } },
+    { "timestamp": "2026-02-20T10:15:31.200Z", "stage": "DELIVERY_SENT", "actor": "channel-router-service", "details": { "providerMessageId": "<20230101.abc123@domain.com>" } },
+    { "timestamp": "2026-02-20T10:16:05.000Z", "stage": "DELIVERED", "actor": "adapter-mailgun", "details": { "channel": "email", "providerMessageId": "<20230101.abc123@domain.com>" } }
   ]
 }
 ```
+
+> **Info:** **Actor Attribution in Timeline**
+>
+> Note the actor change at the delivery boundary: `DELIVERY_ATTEMPTED` and `DELIVERY_SENT` show `channel-router-service` (the core orchestrator), while `DELIVERED` shows `adapter-mailgun` because that event originated from a provider webhook received and published by the Mailgun adapter service.
 
 **Response — `404 Not Found`:**
 
@@ -461,17 +533,17 @@ Returns the complete end-to-end timeline for a notification.
 | `TEMPLATE_RENDERED` | `audit_events` | Template rendered for target channel |
 | `TEMPLATE_RENDER_FAILED` | `audit_events` | Template rendering failed |
 | `DELIVERY_DISPATCHED` | `audit_events` | Notification dispatched to Channel Router queue |
-| `DELIVERY_ATTEMPTED` | `audit_events` | Channel Router attempted provider delivery |
-| `DELIVERY_SENT` | `audit_events` | Provider accepted the message |
-| `DELIVERY_FAILED` | `audit_events` | Provider rejected the message |
+| `DELIVERY_ATTEMPTED` | `audit_events` | Channel Router Core attempted provider delivery (via adapter) |
+| `DELIVERY_SENT` | `audit_events` | Provider accepted the message (reported by Channel Router Core via adapter SendResult) |
+| `DELIVERY_FAILED` | `audit_events` | Provider rejected the message (reported by Channel Router Core via adapter SendResult) |
 | `DELIVERY_RETRYING` | `audit_events` | Delivery scheduled for retry |
 | `PROVIDER_ACCEPTED` | `audit_events` | Provider confirmed acceptance |
-| `DELIVERED` | `delivery_receipts` | Provider confirmed delivery to recipient |
-| `BOUNCED` | `delivery_receipts` | Provider reported bounce |
-| `OPENED` | `delivery_receipts` | Provider reported email opened |
-| `CLICKED` | `delivery_receipts` | Provider reported link clicked |
-| `UNSUBSCRIBED` | `delivery_receipts` | Provider reported unsubscribe |
-| `SPAM_COMPLAINT` | `delivery_receipts` | Provider reported spam complaint |
+| `DELIVERED` | `delivery_receipts` | Provider confirmed delivery to recipient (via adapter webhook) |
+| `BOUNCED` | `delivery_receipts` | Provider reported bounce (via adapter webhook) |
+| `OPENED` | `delivery_receipts` | Provider reported email opened (via adapter webhook) |
+| `CLICKED` | `delivery_receipts` | Provider reported link clicked (via adapter webhook) |
+| `UNSUBSCRIBED` | `delivery_receipts` | Provider reported unsubscribe (via adapter webhook) |
+| `SPAM_COMPLAINT` | `delivery_receipts` | Provider reported spam complaint (via adapter webhook) |
 
 ### Trace Merge Diagram
 
@@ -479,10 +551,12 @@ Returns the complete end-to-end timeline for a notification.
   audit_events                          delivery_receipts
   +---------------------------+         +---------------------------+
   | EVENT_INGESTED   10:15:30 |         | DELIVERED       10:16:05  |
-  | RULE_MATCHED     10:15:30 |         | OPENED          10:20:15  |
-  | TEMPLATE_RENDERED 10:15:30|         | CLICKED         10:20:22  |
-  | DELIVERY_ATTEMPTED 10:15:30|        +---------------------------+
-  | PROVIDER_ACCEPTED 10:15:31|
+  | RULE_MATCHED     10:15:30 |         |  (actor: adapter-mailgun)|
+  | TEMPLATE_RENDERED 10:15:30|         | OPENED          10:20:15  |
+  | DELIVERY_ATTEMPTED 10:15:30|        |  (actor: adapter-mailgun)|
+  |  (actor: channel-router)  |         | CLICKED         10:20:22  |
+  | DELIVERY_SENT    10:15:31 |         |  (actor: adapter-mailgun)|
+  |  (actor: channel-router)  |         +---------------------------+
   +---------------------------+
               \                            /
                \                          /
@@ -494,14 +568,19 @@ Returns the complete end-to-end timeline for a notification.
          | 10:15:30  RULE_MATCHED           |
          | 10:15:30  TEMPLATE_RENDERED      |
          | 10:15:30  DELIVERY_ATTEMPTED     |
-         | 10:15:31  PROVIDER_ACCEPTED      |
+         |            (channel-router-svc)  |
+         | 10:15:31  DELIVERY_SENT          |
+         |            (channel-router-svc)  |
          | 10:16:05  DELIVERED              |
+         |            (adapter-mailgun)    |
          | 10:20:15  OPENED                 |
+         |            (adapter-mailgun)    |
          | 10:20:22  CLICKED                |
+         |            (adapter-mailgun)    |
          +----------------------------------+
 ```
 
-*Figure 6.1 — Trace reconstruction merges audit_events and delivery_receipts into a single chronological timeline.*
+*Figure 6.1 — Trace reconstruction merges audit_events and delivery_receipts into a single chronological timeline. Delivery-path events show channel-router-service as actor; webhook-originated events show the adapter service.*
 
 ### Cross-Notification Tracing
 
@@ -670,10 +749,10 @@ USING GIN (search_vector);
 **Example — Compound Search:**
 
 ```
-GET /audit/search?q=order.shipped & sendgrid & bounced&from=2026-02-01&to=2026-02-21
+GET /audit/search?q=order.shipped & mailgun & bounced&from=2026-02-01&to=2026-02-21
 ```
 
-Returns all audit events mentioning "order.shipped" AND "sendgrid" AND "bounced" within the date range.
+Returns all audit events mentioning "order.shipped" AND "mailgun" AND "bounced" within the date range.
 
 ---
 
@@ -700,7 +779,7 @@ When a message arrives on `audit.dlq`, the DLQ Consumer:
   "originalRoutingKey": "notification.deliver.normal.email",
   "rejectionReason": "max retries exhausted",
   "retryCount": 5,
-  "payload": { "notificationId": "notif-789", "channel": "email", "provider": "sendgrid" },
+  "payload": { "notificationId": "notif-789", "channel": "email", "provider": "mailgun" },
   "xDeathHeaders": [ { "count": 5, "queue": "q.deliver.email.normal", "reason": "rejected" } ],
   "status": "pending",
   "capturedAt": "2026-02-20T10:30:00.000Z",
@@ -769,14 +848,14 @@ The Audit Service is a **consume-only** participant in the RabbitMQ topology. It
 |---|---|---|---|---|---|---|
 | `audit.events` | `xch.events.normalized` | `event.#` | — | 2 | 20 | Event ingestion/normalization audit trail |
 | `audit.deliver` | `xch.notifications.deliver` | `notification.deliver.#` | — | 2 | 20 | Delivery dispatch audit trail |
-| `q.status.updates` | `xch.notifications.status` | `notification.status.#` | `xch.notifications.dlq` | 3 | 15 | Delivery status updates (highest volume) |
+| `q.status.updates` | `xch.notifications.status` | `notification.status.#`, `adapter.webhook.#` | `xch.notifications.dlq` | 3 | 15 | Delivery status updates from Channel Router Core (`notification.status.#`) and webhook events from adapter services (`adapter.webhook.{providerId}`) |
 | `q.audit.template` | `xch.notifications.status` | `template.#` | — | 1 | 10 | Template lifecycle events (low volume) |
 | `audit.dlq` | `xch.notifications.dlq` | _(fanout)_ | — | 1 | 5 | Dead-lettered messages |
 | | | | | **Total: 9** | | |
 
 ### Consumer Allocation Rationale
 
-- **`q.status.updates` (3 consumers):** Highest volume queue — receives all notification status transitions, delivery attempts, webhook receipts from Channel Router. Priority allocation prevents backlog.
+- **`q.status.updates` (3 consumers):** Highest volume queue — receives all notification status transitions and delivery-path events from Channel Router Core, plus webhook-originated events from provider adapter services. Priority allocation prevents backlog.
 - **`audit.events` and `audit.deliver` (2 each):** Moderate volume — one message per normalized event and one per delivery dispatch.
 - **`q.audit.template` (1 consumer):** Low volume — template CRUD and render events are infrequent relative to notification volume.
 - **`audit.dlq` (1 consumer):** Low volume by design — only receives permanently failed messages.
@@ -803,6 +882,7 @@ The Audit Service does not publish to any RabbitMQ exchange. All data leaves the
 |                                                                       |
 |  xch.notifications.status (topic)                                    |
 |    |-- notification.status.# ---> [ q.status.updates ] (3 consumers) |
+|    |-- adapter.webhook.# -------> [ q.status.updates ] (3 consumers) |
 |    |-- template.# --------------> [ q.audit.template ] (1 consumer)  |
 |                                                                       |
 |  xch.notifications.dlq (fanout)                                      |
@@ -816,7 +896,7 @@ The Audit Service does not publish to any RabbitMQ exchange. All data leaves the
     +--------------------------------------------------------------+
 ```
 
-*Figure 10.1 — Audit Service RabbitMQ topology showing 5 queues, 4 exchanges, and 9 consumers.*
+*Figure 10.1 — Audit Service RabbitMQ topology showing 5 queues, 4 exchanges, and 9 consumers. The `q.status.updates` queue receives both delivery-path events (from Channel Router Core) and webhook events (from adapter services).*
 
 ---
 
@@ -914,7 +994,7 @@ Returns paginated audit event log entries with filtering and full-text search.
       "cycleId": "CYC-2026-00451",
       "eventType": "DELIVERY_ATTEMPTED",
       "actor": "channel-router-service",
-      "metadata": { "channel": "email", "provider": "sendgrid", "attempt": 1 },
+      "metadata": { "channel": "email", "provider": "mailgun", "attempt": 1 },
       "createdAt": "2026-02-20T10:15:30.500Z"
     }
   ],
@@ -946,18 +1026,18 @@ Returns all delivery receipts for a notification.
     {
       "id": "dr-001",
       "channel": "email",
-      "provider": "sendgrid",
+      "provider": "mailgun",
       "status": "DELIVERED",
-      "providerMessageId": "sg-msg-789",
+      "providerMessageId": "<20230101.abc123@domain.com>",
       "rawResponse": { "event": "delivered", "timestamp": 1708423565 },
       "receivedAt": "2026-02-20T10:16:05.000Z"
     },
     {
       "id": "dr-002",
       "channel": "email",
-      "provider": "sendgrid",
+      "provider": "mailgun",
       "status": "OPENED",
-      "providerMessageId": "sg-msg-789",
+      "providerMessageId": "<20230101.abc123@domain.com>",
       "rawResponse": { "event": "open", "timestamp": 1708423815 },
       "receivedAt": "2026-02-20T10:20:15.000Z"
     }
@@ -1096,7 +1176,7 @@ Updates a DLQ entry status (for investigation tracking).
 ```json
 {
   "status": "investigated",
-  "notes": "Root cause: SendGrid API key expired. Rotated key, ready for reprocessing."
+  "notes": "Root cause: Mailgun API key expired. Rotated key, ready for reprocessing."
 }
 ```
 
@@ -1211,7 +1291,7 @@ Immutable event log for all notification lifecycle transitions.
 | `correlation_id` | `VARCHAR(255)` | YES | — | Request/batch correlation identifier |
 | `cycle_id` | `VARCHAR(255)` | YES | — | Business cycle identifier |
 | `event_type` | `VARCHAR(100)` | NO | — | Event type from taxonomy (e.g., `DELIVERY_ATTEMPTED`) |
-| `actor` | `VARCHAR(100)` | NO | — | Service that produced the event |
+| `actor` | `VARCHAR(100)` | NO | — | Service that produced the event (e.g., `channel-router-service`, `adapter-mailgun`) |
 | `metadata` | `JSONB` | YES | `'{}'` | Structured context (channel, provider, attempt, etc.) |
 | `payload_snapshot` | `JSONB` | YES | — | Point-in-time payload snapshot (NULLed after retention period) |
 | `search_vector` | `TSVECTOR` | YES | — | Generated full-text search vector |
@@ -1228,7 +1308,7 @@ Provider-reported delivery outcomes correlated to notifications.
 | `correlation_id` | `VARCHAR(255)` | YES | — | Request/batch correlation identifier |
 | `cycle_id` | `VARCHAR(255)` | YES | — | Business cycle identifier |
 | `channel` | `VARCHAR(20)` | NO | — | Delivery channel (`email`, `sms`, `whatsapp`, `push`) |
-| `provider` | `VARCHAR(50)` | NO | — | Provider name (`sendgrid`, `mailgun`, `braze`, `twilio`, `fcm`) |
+| `provider` | `VARCHAR(50)` | NO | — | Provider name (`mailgun`, `braze`, `whatsapp-meta`, `aws-ses`) |
 | `status` | `VARCHAR(30)` | NO | — | Normalized status (`DELIVERED`, `BOUNCED`, `OPENED`, etc.) |
 | `provider_message_id` | `VARCHAR(255)` | YES | — | Provider's tracking ID for webhook correlation |
 | `raw_response` | `JSONB` | YES | — | Raw provider webhook payload (NULLed after retention period) |
@@ -1425,76 +1505,86 @@ For deployments exceeding 50 GB in `audit_events`, range partitioning by `create
 Shows how audit events accumulate as a notification progresses through the pipeline.
 
 ```
-  Event Ingestion      Notification Engine    Channel Router        Audit Service
-       |                      |                     |                     |
-       | publish event.normal.order.shipped          |                     |
-       |--- xch.events.normalized ---------------------------------------->|
-       |                      |                     |                     | persist
-       |                      |                     |                     | EVENT_INGESTED
-       |                      |                     |                     |
-       |                      | publish notification.status.processing    |
-       |                      |--- xch.notifications.status ------------->|
-       |                      |                     |                     | persist
-       |                      |                     |                     | RULE_MATCHED
-       |                      |                     |                     |
-       |                      | publish notification.status.rendering     |
-       |                      |--- xch.notifications.status ------------->|
-       |                      |                     |                     | persist
-       |                      |                     |                     | TEMPLATE_RENDERED
-       |                      |                     |                     |
-       |                      | publish notification.deliver.normal.email |
-       |                      |--- xch.notifications.deliver ------------>|
-       |                      |                     |                     | persist
-       |                      |                     |                     | DELIVERY_DISPATCHED
-       |                      |                     |                     |
-       |                      |                     | publish notification.status.sent
-       |                      |                     |--- xch.notifications.status -->|
-       |                      |                     |                     | persist
-       |                      |                     |                     | DELIVERY_SENT
-       |                      |                     |                     |
-       |                      |                     | publish channel-router.webhook.received
-       |                      |                     |--- xch.notifications.status -->|
-       |                      |                     |                     | persist
-       |                      |                     |                     | DELIVERED
-       |                      |                     |                     | (delivery_receipts)
+  Event Ingestion      Notification Engine    Channel Router Core     Adapter Service       Audit Service
+       |                      |                     |                     |                     |
+       | publish event.normal.order.shipped          |                     |                     |
+       |--- xch.events.normalized ---------------------------------------------------------->|
+       |                      |                     |                     |                     | persist
+       |                      |                     |                     |                     | EVENT_INGESTED
+       |                      |                     |                     |                     |
+       |                      | publish notification.status.processing    |                     |
+       |                      |--- xch.notifications.status ---------------------------------------->|
+       |                      |                     |                     |                     | persist
+       |                      |                     |                     |                     | RULE_MATCHED
+       |                      |                     |                     |                     |
+       |                      | publish notification.status.rendering     |                     |
+       |                      |--- xch.notifications.status ---------------------------------------->|
+       |                      |                     |                     |                     | persist
+       |                      |                     |                     |                     | TEMPLATE_RENDERED
+       |                      |                     |                     |                     |
+       |                      | publish notification.deliver.normal.email |                     |
+       |                      |--- xch.notifications.deliver ---------------------------------------->|
+       |                      |                     |                     |                     | persist
+       |                      |                     |                     |                     | DELIVERY_DISPATCHED
+       |                      |                     |                     |                     |
+       |                      |                     | POST /send          |                     |
+       |                      |                     |-------------------->|                     |
+       |                      |                     |   SendResult        |                     |
+       |                      |                     |<--------------------|                     |
+       |                      |                     |                     |                     |
+       |                      |                     | publish notification.status.sent          |
+       |                      |                     |--- xch.notifications.status ------------->|
+       |                      |                     |                     |                     | persist
+       |                      |                     |                     |                     | DELIVERY_SENT
+       |                      |                     |                     |                     |
+       |                      |                     |                     | (provider webhook)  |
+       |                      |                     |                     | publish adapter.webhook.mailgun
+       |                      |                     |                     |--- xch.notifications.status -->|
+       |                      |                     |                     |                     | persist
+       |                      |                     |                     |                     | DELIVERED
+       |                      |                     |                     |                     | (delivery_receipts)
 ```
 
-*Figure 14.1 — Full lifecycle audit accumulation from ingestion to delivery confirmation.*
+*Figure 14.1 — Full lifecycle audit accumulation from ingestion to delivery confirmation. Note: delivery-path events (DELIVERY_SENT) originate from Channel Router Core; webhook-originated events (DELIVERED) originate from the adapter service.*
 
 ### 14.2 Delivery Receipt Correlation
 
-Shows how a provider webhook is correlated back to the notification.
+Shows how a provider webhook is correlated back to the notification via the decoupled adapter architecture.
 
 ```
-  External Provider     Channel Router        RabbitMQ              Audit Service
-       |                      |                     |                     |
-       | POST /webhooks/sendgrid                    |                     |
-       | { event: "delivered", sg_message_id: "sg-789" }                  |
-       |--------------------->|                     |                     |
-       |                      | Lookup notification |                     |
-       |                      | by provider_message_id                    |
-       |                      | in delivery_attempts|                     |
-       |                      |                     |                     |
-       |                      | Found: notif-456    |                     |
-       |                      |                     |                     |
-       |                      | publish notification.status.delivered     |
-       |                      |--- xch.notifications.status ------------->|
-       |                      |                     |                     |
-       |                      |                     |                     | Extract notification_id,
-       |                      |                     |                     | provider_message_id,
-       |                      |                     |                     | channel, status
-       |                      |                     |                     |
-       |                      |                     |                     | INSERT INTO
-       |                      |                     |                     | delivery_receipts
-       |                      |                     |                     |
-       |                      |                     |                     | INSERT INTO
-       |                      |                     |                     | audit_events
-       |                      |                     |                     | (DELIVERED)
-       |  200 OK              |                     |                     |
-       |<---------------------|                     |                     |
+  External Provider     Gateway              Adapter Service       RabbitMQ              Audit Service
+       |                    |                     |                     |                     |
+       | POST /webhooks/mailgun                   |                     |                     |
+       |------------------->|                     |                     |                     |
+       |                    | Route to adapter    |                     |                     |
+       |                    |-------------------->|                     |                     |
+       |                    |                     |                     |                     |
+       |                    |                     | Verify signature    |                     |
+       |                    |                     | Normalize event     |                     |
+       |                    |                     |                     |                     |
+       |                    |                     | publish adapter.webhook.mailgun           |
+       |                    |                     | { notificationId: "notif-456",            |
+       |                    |                     |   providerMessageId: "<20230101.abc123>", |
+       |                    |                     |   status: "delivered" }                   |
+       |                    |                     |--- xch.notifications.status ------------->|
+       |                    |                     |                     |                     |
+       |                    |                     |                     |                     | Extract notification_id,
+       |                    |                     |                     |                     | provider_message_id,
+       |                    |                     |                     |                     | channel, status
+       |                    |                     |                     |                     |
+       |                    |                     |                     |                     | INSERT INTO
+       |                    |                     |                     |                     | delivery_receipts
+       |                    |                     |                     |                     |
+       |                    |                     |                     |                     | INSERT INTO
+       |                    |                     |                     |                     | audit_events
+       |                    |                     |                     |                     | (DELIVERED,
+       |                    |                     |                     |                     |  actor: adapter-mailgun)
+       |                    |                     |                     |                     |
+       |  200 OK            |                     |                     |                     |
+       |<-------------------|                     |                     |                     |
 ```
 
-*Figure 14.2 — Delivery receipt correlation from provider webhook to audit persistence.*
+*Figure 14.2 — Delivery receipt correlation via decoupled adapter architecture: provider webhook flows through Gateway to adapter, which verifies, normalizes, and publishes to xch.notifications.status for Audit Service consumption.*
 
 ### 14.3 Analytics Aggregation Job
 
@@ -1679,7 +1769,7 @@ Exports all audit data for a customer as a JSON file, including:
 
 ### CAN-SPAM Compliance
 
-The Audit Service records `UNSUBSCRIBED` events from provider webhooks, enabling compliance verification:
+The Audit Service records `UNSUBSCRIBED` events from provider webhooks (published by adapter services), enabling compliance verification:
 
 - Timestamp of unsubscribe request.
 - Channel and provider that processed the unsubscribe.

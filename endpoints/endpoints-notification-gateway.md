@@ -119,6 +119,18 @@
 | DELETE | `/api/v1/api-keys/:id` | Revoke an API key | Not Started |
 | POST | `/api/v1/api-keys/:id/rotate` | Rotate an API key; issues new key with grace period for old key | Not Started |
 
+## Provider Webhook Endpoints (Proxied → Provider Adapter Services, No Auth)
+
+Provider webhook endpoints receive delivery status callbacks from external notification providers. These endpoints bypass the standard authentication pipeline — each adapter service verifies its own webhook signatures.
+
+| Method | Path | Description | Status |
+|--------|------|-------------|--------|
+| POST | `/webhooks/mailgun` | Mailgun delivery status webhooks; proxied to adapter-mailgun :3171 `/webhooks/inbound` | Not Started |
+| POST | `/webhooks/braze` | Braze transactional postbacks and Currents events; proxied to adapter-braze :3172 `/webhooks/inbound` | Not Started |
+| GET | `/webhooks/whatsapp` | Meta webhook verification challenge (hub.verify_token); proxied to adapter-whatsapp :3173 `/webhooks/inbound` | Not Started |
+| POST | `/webhooks/whatsapp` | WhatsApp/Meta delivery status webhooks; proxied to adapter-whatsapp :3173 `/webhooks/inbound` | Not Started |
+| POST | `/webhooks/aws-ses` | AWS SES/SNS delivery notifications; proxied to adapter-aws-ses :3174 `/webhooks/inbound` | Not Started |
+
 ## Health Endpoints (Public — No Auth)
 
 | Method | Path | Description | Status |
