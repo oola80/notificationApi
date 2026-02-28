@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Design documentation phase. Service folders and database scripts scaffolded. **Auth/RBAC decoupled** — authentication, user management, and RBAC extracted into standalone `auth-rbac-service-backend` (:3160) with `auth-rbac-service-frontend` (:3161) and `ecommerce-backoffice` (:3162) login portal; `notification-gateway` (:3150) deprecated and removed; `admin-service` simplified (user/SAML management removed, JWT validation guard added); `notification-admin-ui` connects directly to `admin-service`. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). **template-service** Phase 5 complete (foundation, template CRUD & versioning, rendering engine with caching & preview, RabbitMQ audit publishing, rollback endpoint, enhanced health checks, E2E tests, Prometheus metrics, channel query filter, HTML sanitization, render timeout; 247 unit tests across 21 suites, 4 E2E test files). **channel-router-service** Phase 4 complete (foundation, data layer, health checks, Prometheus metrics, structured logging, channel & provider CRUD, adapter HTTP client, provider cache, circuit breaker per provider, token bucket rate limiter, retry engine with exponential backoff, media processor per channel, RabbitMQ integration with 3 exchanges and 8 priority-tiered queues, 8 consumers with abstract base class, 7-step delivery pipeline orchestrator, fire-and-forget audit publishing, single-level fallback, adapter health monitoring with CB integration; 432 unit tests across 46 suites, 5 E2E test files). **provider-adapters/adapter-mailgun** Phase 3 complete (monorepo foundation, shared library with DTOs/errors/metrics/RabbitMQ/health, Mailgun HTTP client, send pipeline with attachments and error classification, webhook verification with HMAC-SHA256 and replay protection, event normalization, fire-and-forget RabbitMQ publishing; 204 unit tests across 28 suites, 17 E2E tests across 3 files). **bulk-upload-service** Phase 4 complete (foundation, data layer, TypeORM entities, upload CRUD with 8-step XLSX validation pipeline, XLSX parsing with type coercion, event ingestion HTTP client, background processing worker with 9-step pipeline and configurable batch/concurrency, result XLSX generation with _notification_status column and cell styling, result download endpoint, group mode processing with composite key grouping and conflict detection, in-memory circuit breaker with CLOSED/OPEN/HALF_OPEN state machine, token bucket rate limiter, retry endpoint for failed/partial uploads, RabbitMQ fire-and-forget audit publishing with 6 lifecycle events, enhanced health checks with liveness/readiness split and 3 custom indicators, Prometheus metrics, E2E tests; 387 unit tests across 23 suites, 24 E2E tests across 4 files). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
+Design documentation phase. Service folders and database scripts scaffolded. **Auth/RBAC decoupled** — authentication, user management, and RBAC extracted into standalone `auth-rbac-service-backend` (:3160) with `auth-rbac-service-frontend` (:3161) and `ecommerce-backoffice` (:3162) login portal; `notification-gateway` (:3150) deprecated and removed; `admin-service` simplified (user/SAML management removed, JWT validation guard added); `notification-admin-ui` connects directly to `admin-service`. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). **template-service** Phase 5 complete (foundation, template CRUD & versioning, rendering engine with caching & preview, RabbitMQ audit publishing, rollback endpoint, enhanced health checks, E2E tests, Prometheus metrics, channel query filter, HTML sanitization, render timeout; 247 unit tests across 21 suites, 4 E2E test files). **channel-router-service** Phase 4 complete (foundation, data layer, health checks, Prometheus metrics, structured logging, channel & provider CRUD, adapter HTTP client, provider cache, circuit breaker per provider, token bucket rate limiter, retry engine with exponential backoff, media processor per channel, RabbitMQ integration with 3 exchanges and 8 priority-tiered queues, 8 consumers with abstract base class, 7-step delivery pipeline orchestrator, fire-and-forget audit publishing, single-level fallback, adapter health monitoring with CB integration; 432 unit tests across 46 suites, 5 E2E test files). **provider-adapters/adapter-mailgun** Phase 3 complete (monorepo foundation, shared library with DTOs/errors/metrics/RabbitMQ/health, Mailgun HTTP client, send pipeline with attachments and error classification, webhook verification with HMAC-SHA256 and replay protection, event normalization, fire-and-forget RabbitMQ publishing; 204 unit tests across 28 suites, 17 E2E tests across 3 files). **bulk-upload-service** Phase 4 complete (foundation, data layer, TypeORM entities, upload CRUD with 8-step XLSX validation pipeline, XLSX parsing with type coercion, event ingestion HTTP client, background processing worker with 9-step pipeline and configurable batch/concurrency, result XLSX generation with _notification_status column and cell styling, result download endpoint, group mode processing with composite key grouping and conflict detection, in-memory circuit breaker with CLOSED/OPEN/HALF_OPEN state machine, token bucket rate limiter, retry endpoint for failed/partial uploads, RabbitMQ fire-and-forget audit publishing with 6 lifecycle events, enhanced health checks with liveness/readiness split and 3 custom indicators, Prometheus metrics, E2E tests; 387 unit tests across 23 suites, 24 E2E tests across 4 files). **audit-service** Phase 4 complete (foundation, data layer, RabbitMQ consumer pipeline with batch inserts, REST query API with logs/search/trace/receipts, DLQ monitoring CRUD with status transition validation and reprocessing via RabbitMQ publish, analytics aggregation engine with @Cron hourly/daily rollups and idempotent upsert, analytics query API with summary dashboard, data retention scheduling with payload purge and DLQ cleanup; 338 unit tests across 41 suites, 58 E2E tests across 8 files). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
 
 ## Tech Stack (Planned)
 
@@ -210,11 +210,49 @@ admin-service/                  # NestJS — port 3155
     14-admin-service.md
     changelog_dev.md
 
-audit-service/                  # NestJS — port 3156
+audit-service/                  # NestJS — port 3156 (Phase 4 complete)
   CLAUDE.md
+  .env                          # Local environment variables (git-ignored)
+  .gitignore                    # Node/NestJS ignores (dist, node_modules, .env, coverage, etc.)
+  .prettierrc                   # Prettier config (singleQuote, trailingComma: all)
+  eslint.config.mjs             # ESLint flat config (typescript-eslint + prettier)
+  nest-cli.json                 # NestJS CLI config (sourceRoot: src, deleteOutDir)
+  package.json                  # NestJS 11, TypeScript 5.7, Jest 30, @nestjs/schedule
+  package-lock.json
+  tsconfig.json                 # ES2023 target, nodenext modules, decorators enabled
+  tsconfig.build.json
+  src/
+    main.ts                     # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3156
+    app.module.ts               # Root module: Config, Logger, TypeORM, Common, Metrics, Events, Receipts, Analytics, DLQ, Search, Trace, Retention, Consumers, Health
+    common/                     # @Global() module: errors, filters, pipes, interceptors, base repo
+    config/                     # ConfigModule.forRoot: app, database, rabbitmq configs, env validation
+    events/                     # Audit event persistence + query (logs controller, FTS repository)
+    receipts/                   # Delivery receipts (controller, service, repository)
+    analytics/                  # Analytics CRUD, aggregation engine with @Cron, summary dashboard
+    dlq/                        # DLQ CRUD with status transitions, reprocessing via RabbitMQ
+    search/                     # Full-text search with operator detection
+    trace/                      # Notification lifecycle trace reconstruction
+    retention/                  # Data retention cron (payload purge, DLQ cleanup)
+    rabbitmq/                   # @golevelup/nestjs-rabbitmq wrapper (4 exchanges, 5 queues, DlqPublisher)
+    consumers/                  # 5 consumer handlers + BatchBufferService
+    metrics/                    # @Global() MetricsModule: 15 custom metrics, GET /metrics
+    health/                     # Health controller (GET /health, GET /health/ready)
+  test/
+    test-utils.ts               # Shared E2E helper
+    app.e2e-spec.ts             # E2E: health + metrics
+    consumers.e2e-spec.ts       # E2E: consumer pipeline
+    logs.e2e-spec.ts            # E2E: audit logs
+    search.e2e-spec.ts          # E2E: full-text search
+    trace.e2e-spec.ts           # E2E: notification traces
+    receipts.e2e-spec.ts        # E2E: delivery receipts
+    dlq.e2e-spec.ts             # E2E: DLQ CRUD + reprocess
+    analytics.e2e-spec.ts       # E2E: analytics query + summary
+    jest-e2e.json               # Jest E2E config
   dbscripts/
+    schema-audit-service.sql         # Schema/role/user/grants only
+    audit-service-dbscripts.sql      # 4 tables, 15 indexes, trigger, purge function
   docs/
-    16-audit-service-v2.md  # Convenience copy of design doc (v2)
+    16-audit-service-v2.md
     changelog_dev.md
 
 email-ingest-service/           # NestJS — port 3157/2525

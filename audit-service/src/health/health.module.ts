@@ -4,9 +4,10 @@ import { RabbitMQHealthIndicator } from './indicators/rabbitmq-health.indicator.
 import { DlqPendingHealthIndicator } from './indicators/dlq-pending-health.indicator.js';
 import { ConsumerHealthIndicator } from './indicators/consumer-health.indicator.js';
 import { DlqModule } from '../dlq/dlq.module.js';
+import { AppRabbitMQModule } from '../rabbitmq/rabbitmq.module.js';
 
 @Module({
-  imports: [DlqModule],
+  imports: [DlqModule, AppRabbitMQModule],
   controllers: [HealthController],
   providers: [
     RabbitMQHealthIndicator,

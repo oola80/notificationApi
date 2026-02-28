@@ -12,6 +12,7 @@ import {
   CHANNEL_TEMPLATE,
   CHANNEL_DLQ,
 } from './rabbitmq.constants.js';
+import { DlqPublisher } from './dlq-publisher.service.js';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import {
       }),
     }),
   ],
-  exports: [RabbitMQModule],
+  providers: [DlqPublisher],
+  exports: [RabbitMQModule, DlqPublisher],
 })
 export class AppRabbitMQModule {}

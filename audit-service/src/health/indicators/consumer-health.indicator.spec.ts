@@ -8,7 +8,7 @@ describe('ConsumerHealthIndicator', () => {
 
   beforeEach(() => {
     mockAmqpConnection = {
-      managedChannel: {},
+      connected: true,
     };
 
     mockConfigService = {
@@ -35,15 +35,15 @@ describe('ConsumerHealthIndicator', () => {
   });
 
   describe('check', () => {
-    it('should return up when AmqpConnection has a managed channel', async () => {
+    it('should return up when AmqpConnection is connected', async () => {
       // fetchQueueDepths will fail due to no actual HTTP server, but connection check passes
       const result = await indicator.check();
       expect(result.status).toBe('up');
       expect(result.connected).toBe(true);
     });
 
-    it('should return down when AmqpConnection has no managed channel', async () => {
-      mockAmqpConnection.managedChannel = null;
+    it('should return down when AmqpConnection is not connected', async () => {
+      mockAmqpConnection.connected = false;
 
       const result = await indicator.check();
       expect(result.status).toBe('down');
@@ -51,7 +51,7 @@ describe('ConsumerHealthIndicator', () => {
     });
 
     it('should return down when AmqpConnection throws', async () => {
-      Object.defineProperty(mockAmqpConnection, 'managedChannel', {
+      Object.defineProperty(mockAmqpConnection, 'connected', {
         get: () => {
           throw new Error('no connection');
         },

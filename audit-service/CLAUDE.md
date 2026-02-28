@@ -22,7 +22,7 @@ Notification tracking, delivery receipts, analytics, DLQ monitoring — immutabl
 
 ## RabbitMQ
 
-**Publishes to:** None (pure consumer/sink)
+**Publishes to:** DLQ reprocessing only — republishes DLQ entry payload to original exchange/routing key via `DlqPublisher` (single outbound use case)
 
 **Consumes from:**
 - `audit.events` — bound to `xch.events.normalized` via `event.#` (all normalized events)
@@ -109,10 +109,12 @@ The `.env` file (git-ignored) provides local development settings. Key variables
 
 ## Implementation Status
 
-**Phase 2 complete** — RabbitMQ consumer pipeline with batch insert optimization. 178 unit tests across 26 suites, 13 E2E tests across 2 suites.
+**Phase 4 complete** — DLQ monitoring with CRUD + reprocessing, analytics aggregation engine with cron jobs, and data retention scheduling. 338 unit tests across 41 suites, 58 E2E tests across 8 suites.
 
 - **Phase 1:** NestJS scaffold (main.ts bootstrap with Pino, global pipes/filters/interceptors, CORS, port 3156), Config module (appConfig, databaseConfig, rabbitmqConfig, env validation), Common module (@Global, 9 AUD-prefixed error codes, HttpExceptionFilter, DtoValidationPipe, LoggingInterceptor, PgBaseRepository), TypeORM entities (AuditEvent, DeliveryReceipt, NotificationAnalytics, DlqEntry), 4 repositories extending PgBaseRepository, 4 feature modules (Events, Receipts, Analytics, DLQ), Metrics module (@Global, 15 custom metrics: 6 counters, 5 histograms, 4 gauges, GET /metrics), Health module (GET /health liveness, GET /health/ready readiness with DB + RabbitMQ + DLQ pending + consumers), Database scripts (4 tables, 14 indexes, search_vector trigger, purge function, CHECK constraint).
-- **Phase 2:** RabbitMQ consumer-only module (@golevelup/nestjs-rabbitmq, 4 exchanges, 5 consumed queues, 5 named channels with per-queue prefetch), BatchBufferService (generic batch buffer with deferred ACK/NACK via Promises, transient/permanent error classification, poison message tracking via fingerprinting, graceful shutdown), 5 consumer handlers (EventsConsumer, DeliverConsumer, StatusConsumer with dual routing keys, TemplateConsumer, DlqConsumer with x-death extraction), ConsumerHealthIndicator (connection status + queue depth gauge), PgBaseRepository.insertMany() bulk insert method.
+- **Phase 2:** RabbitMQ consumer-only module (@golevelup/nestjs-rabbitmq, 4 exchanges, 5 consumed queues, 5 named channels with per-queue prefetch), BatchBufferService (generic batch buffer with deferred ACK/NACK via Promises, transient/permanent error classification, poison message tracking via fingerprinting, graceful shutdown), 5 consumer handlers (EventsConsumer, DeliverConsumer, StatusConsumer with dual routing keys, TemplateConsumer, DlqConsumer with x-death extraction), ConsumerHealthIndicator (AmqpConnection.connected check + queue depth gauge via Management API), PgBaseRepository.insertMany() bulk insert method.
+- **Phase 3:** REST query API — AuditLogsController (`GET /audit/logs` with 7 filters + inline FTS + 90-day date range validation), SearchController (`GET /audit/search` with operator detection + ts_rank_cd ranking + searchMaxResults enforcement), TraceController (`GET /audit/trace/:notificationId`, `GET /audit/trace/correlation/:correlationId`, `GET /audit/trace/cycle/:cycleId` with timeline merge + summary extraction), AuditReceiptsController (`GET /audit/receipts/:notificationId`). AuditEventsRepository enhanced with findWithFilters, fullTextSearch, findByNotificationIdOrdered, findDistinctNotificationIds. DeliveryReceiptsRepository enhanced with findByNotificationIdOrdered, findByNotificationId. SearchModule + TraceModule added to app.module.ts.
+- **Phase 4:** DLQ monitoring CRUD — DlqController (`GET /audit/dlq` with 4 filters + statusCounts, `PATCH /audit/dlq/:id` with status transition validation, `POST /audit/dlq/:id/reprocess` with RabbitMQ republishing). DlqEntriesRepository enhanced with findWithFilters, statusCounts, updateEntry. DlqPublisher for outbound RabbitMQ publish. Analytics engine — AnalyticsController (`GET /audit/analytics` with period/date/channel/eventType filters, `GET /audit/analytics/summary` with today/7d/channelBreakdown). AggregationService with @Cron hourly/daily rollups from delivery_receipts + audit_events, idempotent upsert, _all cross-channel totals. NotificationAnalyticsRepository enhanced with findWithFilters, upsertRow, aggregateFromReceipts, countSuppressed, findForSummary. Data retention — RetentionService with @Cron payload purge (03:00) and DLQ cleanup (03:30). DB script updated: COALESCE-based unique index for NULL-safe upsert, new DLQ captured_at index. @nestjs/schedule added.
 
 ## Current Folder Structure
 
@@ -129,7 +131,7 @@ audit-service/
   tsconfig.build.json          # Build-specific TS config (excludes test files)
   src/
     main.ts                    # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3156
-    app.module.ts              # Root module: Config, Logger, TypeORM, Common, Metrics, Events, Receipts, Analytics, DLQ, Consumers, Health
+    app.module.ts              # Root module: Config, Logger, TypeORM, Common, Metrics, Events, Receipts, Analytics, DLQ, Search, Trace, Consumers, Health
     common/
       common.module.ts         # @Global() module
       errors.ts                # Error registry (9 AUD-prefixed codes) + createErrorResponse()
@@ -155,37 +157,84 @@ audit-service/
       env.validation.ts        # class-validator EnvironmentVariables + validate()
       env.validation.spec.ts
     events/
-      events.module.ts         # TypeORM feature, exports AuditEventsRepository
-      audit-events.repository.ts     # Extends PgBaseRepository
+      events.module.ts         # TypeORM feature, controllers + services + exports AuditEventsRepository
+      audit-logs.controller.ts       # GET /audit/logs — paginated logs with filters
+      audit-logs.controller.spec.ts
+      audit-logs.service.ts          # Filter delegation, date range validation, response transform
+      audit-logs.service.spec.ts
+      audit-events.repository.ts     # Extends PgBaseRepository + findWithFilters, fullTextSearch, findByNotificationIdOrdered, findDistinctNotificationIds
       audit-events.repository.spec.ts
+      dto/
+        list-audit-logs-query.dto.ts # Query params: notificationId, correlationId, cycleId, eventType, actor, from, to, q, page, pageSize
       entities/
         audit-event.entity.ts        # 10 columns, UUID PK, tsvector search_vector
         audit-event.entity.spec.ts
     receipts/
-      receipts.module.ts       # TypeORM feature, exports DeliveryReceiptsRepository
-      delivery-receipts.repository.ts  # Extends PgBaseRepository
+      receipts.module.ts       # TypeORM feature, controllers + services + exports DeliveryReceiptsRepository
+      audit-receipts.controller.ts   # GET /audit/receipts/:notificationId
+      audit-receipts.controller.spec.ts
+      audit-receipts.service.ts      # Receipt lookup, 404 handling
+      audit-receipts.service.spec.ts
+      delivery-receipts.repository.ts  # Extends PgBaseRepository + findByNotificationIdOrdered, findByNotificationId
       delivery-receipts.repository.spec.ts
       entities/
         delivery-receipt.entity.ts   # 10 columns, UUID PK
         delivery-receipt.entity.spec.ts
+    search/
+      search.module.ts         # Imports EventsModule, provides SearchController + SearchService
+      search.controller.ts     # GET /audit/search — full-text search
+      search.controller.spec.ts
+      search.service.ts        # Operator detection, searchMaxResults enforcement, duration metric
+      search.service.spec.ts
+      dto/
+        search-query.dto.ts    # Required q, optional from, to, page, pageSize
+    trace/
+      trace.module.ts          # Imports EventsModule + ReceiptsModule
+      trace.controller.ts      # GET /audit/trace/:notificationId, correlation/:id, cycle/:id
+      trace.controller.spec.ts
+      trace.service.ts         # Timeline merge, summary extraction, correlation/cycle grouping
+      trace.service.spec.ts
+      interfaces/
+        trace-response.interface.ts  # TimelineEntry, NotificationTraceResponse, CorrelationTraceResponse, CycleTraceResponse
     analytics/
-      analytics.module.ts      # TypeORM feature, exports NotificationAnalyticsRepository
-      notification-analytics.repository.ts  # Extends PgBaseRepository
+      analytics.module.ts      # TypeORM feature + ScheduleModule, controller + services
+      analytics.controller.ts  # GET /audit/analytics, GET /audit/analytics/summary
+      analytics.controller.spec.ts
+      analytics.service.ts     # Query + summary computation
+      analytics.service.spec.ts
+      aggregation.service.ts   # @Cron hourly/daily rollups, idempotent upsert
+      aggregation.service.spec.ts
+      notification-analytics.repository.ts  # Extends PgBaseRepository + findWithFilters, upsertRow, aggregateFromReceipts, countSuppressed, findForSummary
       notification-analytics.repository.spec.ts
+      dto/
+        query-analytics.dto.ts # period, from (required), to (required), channel, eventType, page, pageSize
       entities/
-        notification-analytics.entity.ts  # 14 columns, UUID PK, unique composite index
+        notification-analytics.entity.ts  # 14 columns, UUID PK, COALESCE-based unique index
         notification-analytics.entity.spec.ts
     dlq/
-      dlq.module.ts            # TypeORM feature, exports DlqEntriesRepository
-      dlq-entries.repository.ts      # Extends PgBaseRepository + countPending()
+      dlq.module.ts            # TypeORM feature + AppRabbitMQModule, controller + service
+      dlq.controller.ts        # GET /audit/dlq, PATCH /audit/dlq/:id, POST /audit/dlq/:id/reprocess
+      dlq.controller.spec.ts
+      dlq.service.ts           # List, status update with transition validation, reprocess with RabbitMQ publish
+      dlq.service.spec.ts
+      dlq-entries.repository.ts      # Extends PgBaseRepository + countPending, findWithFilters, statusCounts, updateEntry
       dlq-entries.repository.spec.ts
+      dto/
+        list-dlq-query.dto.ts        # status, originalQueue, from, to, page, pageSize
+        update-dlq-status.dto.ts     # status (required), notes, resolvedBy
       entities/
         dlq-entry.entity.ts          # 13 columns, UUID PK, DlqEntryStatus enum, CHECK constraint
         dlq-entry.entity.spec.ts
+    retention/
+      retention.module.ts      # Retention module
+      retention.service.ts     # @Cron payload purge (03:00) + DLQ cleanup (03:30)
+      retention.service.spec.ts
     rabbitmq/
-      rabbitmq.module.ts       # Consumer-only RabbitMQ module (4 exchanges, 5 queues, 5 named channels)
+      rabbitmq.module.ts       # RabbitMQ module (4 exchanges, 5 queues, 5 named channels, DlqPublisher)
       rabbitmq.constants.ts    # Exchange, queue, channel, routing key constants + helpers
       rabbitmq.constants.spec.ts
+      dlq-publisher.service.ts       # Outbound RabbitMQ publisher for DLQ reprocessing
+      dlq-publisher.service.spec.ts
     consumers/
       consumers.module.ts      # Wires BatchBufferService + 5 consumers
       batch-buffer.service.ts  # Generic batch buffer (deferred ACK/NACK, transient/permanent error handling, poison tracking)
@@ -207,7 +256,7 @@ audit-service/
       metrics.controller.ts    # GET /metrics — Prometheus text format
       metrics.controller.spec.ts
     health/
-      health.module.ts         # Health module with 3 custom indicators, imports DlqModule
+      health.module.ts         # Health module with 3 custom indicators, imports DlqModule + AppRabbitMQModule
       health.controller.ts     # GET /health (liveness), GET /health/ready (readiness with 4 checks)
       health.controller.spec.ts
       indicators/
@@ -218,9 +267,15 @@ audit-service/
         consumer-health.indicator.ts       # AmqpConnection status + queue depth gauge
         consumer-health.indicator.spec.ts
   test/
-    test-utils.ts              # Shared E2E helper: createTestApp, mock factories
+    test-utils.ts              # Shared E2E helper: createTestApp, mock factories (with query API + DLQ + analytics methods)
     app.e2e-spec.ts            # E2E: health, ready, metrics (5 tests)
     consumers.e2e-spec.ts      # E2E: consumer pipeline (batch flush, timer, errors, status dual-key, DLQ)
+    logs.e2e-spec.ts           # E2E: audit logs pagination, filters, date range, inline FTS (7 tests)
+    search.e2e-spec.ts         # E2E: full-text search, operators, max results (6 tests)
+    trace.e2e-spec.ts          # E2E: notification/correlation/cycle trace, 404s (7 tests)
+    receipts.e2e-spec.ts       # E2E: receipt lookup, 404 (4 tests)
+    dlq.e2e-spec.ts            # E2E: DLQ list, status update lifecycle, reprocess, invalid transitions (13 tests)
+    analytics.e2e-spec.ts      # E2E: analytics query, default period, filters, summary (8 tests)
     jest-e2e.json              # Jest E2E config
   dbscripts/
     schema-audit-service.sql         # Schema/role/user/grants only

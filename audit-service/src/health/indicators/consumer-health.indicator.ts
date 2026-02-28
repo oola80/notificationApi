@@ -56,7 +56,7 @@ export class ConsumerHealthIndicator {
   private isConnected(): boolean {
     if (!this.amqpConnection) return false;
     try {
-      return !!this.amqpConnection.managedChannel;
+      return this.amqpConnection.connected;
     } catch {
       return false;
     }

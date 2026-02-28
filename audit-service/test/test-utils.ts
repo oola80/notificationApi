@@ -53,6 +53,20 @@ export function createMockAuditEventsRepository() {
       limit: 50,
       total: events.size,
     })),
+    findWithFilters: jest.fn(async () => ({
+      data: Array.from(events.values()),
+      total: events.size,
+      page: 1,
+      limit: 50,
+    })),
+    fullTextSearch: jest.fn(async () => ({
+      data: [],
+      total: 0,
+      page: 1,
+      limit: 50,
+    })),
+    findByNotificationIdOrdered: jest.fn(async () => []),
+    findDistinctNotificationIds: jest.fn(async () => []),
     _events: events,
     _reset: () => events.clear(),
   };
@@ -67,6 +81,8 @@ export function createMockDeliveryReceiptsRepository() {
       limit: 50,
       total: 0,
     })),
+    findByNotificationIdOrdered: jest.fn(async () => []),
+    findByNotificationId: jest.fn(async () => []),
   };
 }
 
@@ -79,6 +95,16 @@ export function createMockNotificationAnalyticsRepository() {
       limit: 50,
       total: 0,
     })),
+    findWithFilters: jest.fn(async () => ({
+      data: [],
+      total: 0,
+      page: 1,
+      limit: 50,
+    })),
+    findForSummary: jest.fn(async () => []),
+    upsertRow: jest.fn(async () => undefined),
+    aggregateFromReceipts: jest.fn(async () => []),
+    countSuppressed: jest.fn(async () => ({})),
   };
 }
 
@@ -91,6 +117,25 @@ export function createMockDlqEntriesRepository() {
       limit: 50,
       total: 0,
     })),
+    findWithFilters: jest.fn(async () => ({
+      data: [],
+      total: 0,
+      page: 1,
+      limit: 50,
+    })),
+    statusCounts: jest.fn(async () => ({
+      pending: 0,
+      investigated: 0,
+      reprocessed: 0,
+      discarded: 0,
+    })),
     countPending: jest.fn(async () => 0),
+    updateEntry: jest.fn(async () => undefined),
+  };
+}
+
+export function createMockDlqPublisher() {
+  return {
+    republish: jest.fn(async () => undefined),
   };
 }

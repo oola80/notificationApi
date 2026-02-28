@@ -6,37 +6,37 @@
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/audit/trace/:notificationId` | Returns the complete end-to-end notification lifecycle timeline | Not Started |
-| GET | `/audit/trace/correlation/:correlationId` | Returns merged timelines for all notifications sharing a correlation ID | Not Started |
-| GET | `/audit/trace/cycle/:cycleId` | Returns merged timelines for all notifications within a business cycle | Not Started |
+| GET | `/audit/trace/:notificationId` | Returns the complete end-to-end notification lifecycle timeline | Done |
+| GET | `/audit/trace/correlation/:correlationId` | Returns merged timelines for all notifications sharing a correlation ID | Done |
+| GET | `/audit/trace/cycle/:cycleId` | Returns merged timelines for all notifications within a business cycle | Done |
 
 ## Log Endpoints
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/audit/logs` | Returns paginated audit event log entries with filtering and full-text search | Not Started |
-| GET | `/audit/search` | Full-text search across audit events using tsvector/tsquery | Not Started |
+| GET | `/audit/logs` | Returns paginated audit event log entries with filtering and full-text search | Done |
+| GET | `/audit/search` | Full-text search across audit events using tsvector/tsquery | Done |
 
 ## Receipt Endpoints
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/audit/receipts/:notificationId` | Returns all delivery receipts for a notification | Not Started |
+| GET | `/audit/receipts/:notificationId` | Returns all delivery receipts for a notification | Done |
 
 ## Analytics Endpoints
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/audit/analytics` | Returns pre-aggregated analytics data (hourly/daily) with channel and event type filters | Not Started |
-| GET | `/audit/analytics/summary` | Returns high-level summary for dashboard consumption (today, last 7 days, channel breakdown) | Not Started |
+| GET | `/audit/analytics` | Returns pre-aggregated analytics data (hourly/daily) with channel and event type filters | Done |
+| GET | `/audit/analytics/summary` | Returns high-level summary for dashboard consumption (today, last 7 days, channel breakdown) | Done |
 
 ## DLQ Endpoints
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/audit/dlq` | Returns paginated DLQ entries with filtering by status, queue, and time range | Not Started |
-| PATCH | `/audit/dlq/:id` | Updates a DLQ entry status for investigation tracking | Not Started |
-| POST | `/audit/dlq/:id/reprocess` | Resubmits a DLQ entry to its original exchange/routing key for reprocessing | Not Started |
+| GET | `/audit/dlq` | Returns paginated DLQ entries with filtering by status, queue, and time range | Done |
+| PATCH | `/audit/dlq/:id` | Updates a DLQ entry status for investigation tracking | Done |
+| POST | `/audit/dlq/:id/reprocess` | Resubmits a DLQ entry to its original exchange/routing key for reprocessing | Done |
 
 ## Health
 

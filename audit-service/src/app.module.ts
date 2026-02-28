@@ -9,6 +9,9 @@ import { EventsModule } from './events/events.module.js';
 import { ReceiptsModule } from './receipts/receipts.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { DlqModule } from './dlq/dlq.module.js';
+import { SearchModule } from './search/search.module.js';
+import { TraceModule } from './trace/trace.module.js';
+import { RetentionModule } from './retention/retention.module.js';
 import { ConsumersModule } from './consumers/consumers.module.js';
 import { HealthModule } from './health/health.module.js';
 import { AuditEvent } from './events/entities/audit-event.entity.js';
@@ -55,6 +58,9 @@ import { DlqEntry } from './dlq/entities/dlq-entry.entity.js';
     ReceiptsModule,
     AnalyticsModule,
     DlqModule,
+    SearchModule,
+    TraceModule,
+    RetentionModule,
     ConsumersModule,
     HealthModule,
   ],

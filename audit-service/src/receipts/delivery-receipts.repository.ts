@@ -12,4 +12,21 @@ export class DeliveryReceiptsRepository extends PgBaseRepository<DeliveryReceipt
   ) {
     super(repository);
   }
+
+  async findByNotificationIdOrdered(
+    notificationId: string,
+  ): Promise<DeliveryReceipt[]> {
+    return this.repository.find({
+      where: { notificationId },
+      order: { receivedAt: 'ASC' },
+    });
+  }
+
+  async findByNotificationId(
+    notificationId: string,
+  ): Promise<DeliveryReceipt[]> {
+    return this.repository.find({
+      where: { notificationId },
+    });
+  }
 }

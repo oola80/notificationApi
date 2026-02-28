@@ -9,6 +9,7 @@ describe('DeliveryReceiptsRepository', () => {
     mockTypeOrmRepo = {
       findOne: jest.fn(),
       findAndCount: jest.fn(),
+      find: jest.fn(),
     };
     repository = new DeliveryReceiptsRepository(mockTypeOrmRepo);
   });
@@ -34,10 +35,60 @@ describe('DeliveryReceiptsRepository', () => {
   describe('findWithPagination', () => {
     it('should return paginated results', async () => {
       mockTypeOrmRepo.findAndCount.mockResolvedValue([[], 0]);
-      const result = await repository.findWithPagination({ page: 1, limit: 20 });
+      const result = await repository.findWithPagination({
+        page: 1,
+        limit: 20,
+      });
 
       expect(result.data).toHaveLength(0);
       expect(result.total).toBe(0);
+    });
+  });
+
+  describe('findByNotificationIdOrdered', () => {
+    it('should find receipts ordered by receivedAt ASC', async () => {
+      const receipts = [new DeliveryReceipt(), new DeliveryReceipt()];
+      mockTypeOrmRepo.find.mockResolvedValue(receipts);
+
+      const result =
+        await repository.findByNotificationIdOrdered('n-123');
+
+      expect(result).toBe(receipts);
+      expect(mockTypeOrmRepo.find).toHaveBeenCalledWith({
+        where: { notificationId: 'n-123' },
+        order: { receivedAt: 'ASC' },
+      });
+    });
+
+    it('should return empty array when none found', async () => {
+      mockTypeOrmRepo.find.mockResolvedValue([]);
+
+      const result =
+        await repository.findByNotificationIdOrdered('nonexistent');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('findByNotificationId', () => {
+    it('should find all receipts for a notification', async () => {
+      const receipts = [new DeliveryReceipt()];
+      mockTypeOrmRepo.find.mockResolvedValue(receipts);
+
+      const result = await repository.findByNotificationId('n-123');
+
+      expect(result).toBe(receipts);
+      expect(mockTypeOrmRepo.find).toHaveBeenCalledWith({
+        where: { notificationId: 'n-123' },
+      });
+    });
+
+    it('should return empty array when none found', async () => {
+      mockTypeOrmRepo.find.mockResolvedValue([]);
+
+      const result = await repository.findByNotificationId('nonexistent');
+
+      expect(result).toEqual([]);
     });
   });
 });

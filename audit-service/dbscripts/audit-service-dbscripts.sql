@@ -136,9 +136,11 @@ CREATE TABLE IF NOT EXISTS notification_analytics (
     CONSTRAINT pk_notification_analytics PRIMARY KEY (id)
 );
 
--- Indexes for notification_analytics (2 indexes — unique composite for upsert)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_period_start
-    ON notification_analytics (period, period_start, channel);
+-- Unique index for idempotent upsert — uses COALESCE to handle NULL event_type
+-- This replaces the previous idx_analytics_period_start unique index
+DROP INDEX IF EXISTS idx_analytics_period_start;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_upsert_key
+    ON notification_analytics (period, period_start, channel, COALESCE(event_type, ''));
 
 CREATE INDEX IF NOT EXISTS idx_analytics_event_type
     ON notification_analytics (period, period_start, event_type);
@@ -167,9 +169,12 @@ CREATE TABLE IF NOT EXISTS dlq_entries (
         CHECK (status IN ('pending', 'investigated', 'reprocessed', 'discarded'))
 );
 
--- Index for dlq_entries (1 index)
+-- Indexes for dlq_entries (2 indexes)
 CREATE INDEX IF NOT EXISTS idx_dlq_entries_status
     ON dlq_entries (status);
+
+CREATE INDEX IF NOT EXISTS idx_dlq_entries_captured_at
+    ON dlq_entries (captured_at);
 
 -- =============================================================================
 -- Function: purge_audit_payloads()

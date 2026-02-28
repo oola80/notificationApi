@@ -8,9 +8,6 @@ import {
 } from 'typeorm';
 
 @Entity('notification_analytics')
-@Index('idx_analytics_period_start', ['period', 'periodStart', 'channel'], {
-  unique: true,
-})
 @Index('idx_analytics_event_type', ['period', 'periodStart', 'eventType'])
 export class NotificationAnalytics {
   @PrimaryGeneratedColumn('uuid')
