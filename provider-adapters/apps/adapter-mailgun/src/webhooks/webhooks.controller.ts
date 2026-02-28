@@ -7,7 +7,7 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { WebhooksService } from './webhooks.service.js';
-import { MailgunWebhookPayload } from './interfaces/mailgun-webhook.interfaces.js';
+import type { MailgunWebhookPayload } from './interfaces/mailgun-webhook.interfaces.js';
 
 @Controller()
 export class WebhooksController {

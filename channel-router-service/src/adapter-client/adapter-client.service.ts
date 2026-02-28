@@ -31,9 +31,11 @@ export class AdapterClientService {
     const start = Date.now();
     this.logger.log(`Sending to adapter: ${url}`);
 
+    const adapterPayload = this.toAdapterPayload(request);
+
     try {
       const response = await firstValueFrom(
-        this.httpService.post<SendResult>(url, request, {
+        this.httpService.post<SendResult>(url, adapterPayload, {
           timeout: this.timeoutMs,
         }),
       );
@@ -52,6 +54,39 @@ export class AdapterClientService {
 
       return this.handleError(error);
     }
+  }
+
+  private toAdapterPayload(request: SendRequest): Record<string, any> {
+    const address =
+      request.recipient.email ||
+      request.recipient.phone ||
+      request.recipient.deviceToken ||
+      '';
+
+    const media = request.media?.map((m) => ({
+      url: m.url || m.content || '',
+      contentType: m.mimeType,
+      filename: m.filename,
+    }));
+
+    return {
+      channel: request.channel,
+      recipient: {
+        address,
+        name: request.recipient.name,
+      },
+      content: {
+        subject: request.content.subject,
+        body: request.content.body,
+        ...(media && media.length > 0 ? { media } : {}),
+      },
+      metadata: {
+        notificationId: request.notificationId,
+        correlationId: request.metadata?.correlationId,
+        cycleId: request.metadata?.cycleId,
+        priority: request.priority,
+      },
+    };
   }
 
   async checkHealth(adapterUrl: string): Promise<AdapterHealthResponse> {

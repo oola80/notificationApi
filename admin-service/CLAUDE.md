@@ -1,6 +1,6 @@
 # Admin Service
 
-Backoffice administration — aggregates management operations across downstream services; user management, rule management, event mapping CRUD, channel configuration, recipient groups, system settings, SAML IdP management.
+Backoffice administration — aggregates management operations across downstream services; rule management, event mapping CRUD, channel configuration, recipient groups, system settings, dashboard aggregation. JWT validation via auth-rbac-service-backend RS256 public key.
 
 ## Service Info
 
@@ -14,7 +14,7 @@ Backoffice administration — aggregates management operations across downstream
 
 ## Database Tables
 
-- Defined in the design doc: admin users, system configurations, SAML IdP settings
+- `system_configs` — global platform configuration key-value pairs
 
 ## RabbitMQ
 
@@ -26,12 +26,13 @@ Backoffice administration — aggregates management operations across downstream
 ## Dependencies
 
 - PostgreSQL, RabbitMQ
+- auth-rbac-service-backend (:3160) — JWT validation via RS256 public key (`GET /auth/public-key`)
 - Downstream services via HTTP: event-ingestion-service (:3151), notification-engine-service (:3152), template-service (:3153), channel-router-service (:3154), audit-service (:3156)
 
 ## Related Services
 
-- Proxied through: notification-gateway (:3150)
-- Frontend consumer: notification-admin-ui (:3159)
+- Frontend consumer: notification-admin-ui (:3159) — connects directly (no gateway proxy)
+- Auth: auth-rbac-service-backend (:3160) — validates app-scoped JWTs, extracts roles/permissions
 - Publishes config changes consumed by: event-ingestion-service, notification-engine-service
 
 ## Key References
@@ -47,7 +48,8 @@ Backoffice administration — aggregates management operations across downstream
 - Cross-service calls use HTTP with circuit breaker
 - Validate operations across services before persisting (e.g., validate template exists before creating a rule)
 - Publish RabbitMQ config change events after successful writes
-- Role-based access: Viewer, Operator, Admin, Super Admin
+- JWT validation guard extracts roles/permissions from app-scoped token claims
+- Role-based access: Viewer, Operator, Admin, Super Admin (roles defined in auth-rbac-service-backend)
 
 ## Coding Standards
 
@@ -76,7 +78,7 @@ admin-service/
   src/
     main.ts
     app.module.ts
-    users/                   # User management module
+    auth/                    # JWT validation guard (RS256 public key from auth-rbac-service-backend)
     rules/                   # Rule management module (proxied to engine)
     event-mappings/          # Event mapping CRUD module
     templates/               # Template management (proxied to template-service)
@@ -84,7 +86,6 @@ admin-service/
     recipient-groups/        # Recipient group management module
     dashboard/               # Dashboard aggregation module
     system-config/           # System configuration module
-    saml/                    # SAML IdP management module
     audit-logs/              # Audit log proxy module
     config/                  # Configuration module
     health/                  # Health check module

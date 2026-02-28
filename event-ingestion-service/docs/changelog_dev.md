@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Bugfix: SQL parameter binding in findDuplicate() dedup query (2026-02-27)
+
+- Fixed `EventsRepository.findDuplicate()` where `INTERVAL ':hours hours'` had the parameter inside a string literal, causing PostgreSQL to expect only 2 bind parameters while 3 were provided
+- Changed to `INTERVAL '1 hour' * :hours` which correctly parameterizes the hours multiplier
+- Bug only triggered when `sourceEventId` was provided in the webhook request (dedup path)
+
 ### Bugfix: LoggingInterceptor crash on non-HTTP contexts (2026-02-24)
 
 - Added guard in `LoggingInterceptor.intercept()`: when `context.getType() !== 'http'`, returns `next.handle()` immediately (skips logging). Fixes crash when RabbitMQ consumers pass through the interceptor pipeline (no `request`/`response` objects available).

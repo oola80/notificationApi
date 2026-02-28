@@ -164,6 +164,36 @@ Deep-dive into the Audit Service — event sourcing model with append-only immut
 
 [Read Audit Service](16-audit-service.md)
 
+### 17 — Provider Adapter Services
+
+Deep-dive into the Provider Adapter Services — NestJS monorepo with 4 stateless adapter microservices (Mailgun, Braze, WhatsApp/Meta, AWS SES), standardized HTTP contract (SendRequest/SendResult), webhook architecture with signature verification and event normalization, shared infrastructure library, error classification, media handling per adapter, and registration in core services.
+
+[Read Provider Adapter Services](17-provider-adapters.md)
+
+### 18 — Auth/RBAC Architecture Addendum
+
+Addendum documenting the decoupling of authentication and RBAC into a standalone multi-application service. Covers motivation, architectural changes summary, new services (3), gateway removal with responsibility redistribution, admin-service simplification, auth token flow (platform + app-scoped JWTs), RS256 key distribution, impact on existing services, updated port table, and webhook routing migration.
+
+[Read Auth/RBAC Architecture Addendum](18-auth-rbac-architecture-addendum.md)
+
+### 19 — Auth RBAC Service Backend
+
+Deep-dive into the Auth RBAC Service Backend — multi-application authentication and RBAC hub with RS256 JWT issuance, user lifecycle management, application registration, per-application roles with hierarchy and permissions as resource+action pairs, refresh token rotation with replay detection, password policy enforcement with history tracking, database design with 9 tables, 35+ REST API endpoints, and 4 sequence diagrams.
+
+[Read Auth RBAC Service Backend](19-auth-rbac-service-backend.md)
+
+### 20 — Auth RBAC Service Frontend
+
+Deep-dive into the Auth RBAC Service Frontend — Next.js 14 admin interface for managing the centralized auth/RBAC system, self-authenticating via app-scoped JWT, application management with role/permission tabs, user management with application assignment, 7 page specifications with wireframes.
+
+[Read Auth RBAC Service Frontend](20-auth-rbac-service-frontend.md)
+
+### 21 — eCommerce Backoffice
+
+Deep-dive into the eCommerce Backoffice — Next.js 14 login portal and application launcher serving as the single entry point for all platform users, two-token authentication flow, proactive session management, password recovery, 4 page specifications with wireframes.
+
+[Read eCommerce Backoffice](21-ecommerce-backoffice.md)
+
 ---
 
-*Notification API Documentation v2.3 -- Architecture Team -- 2026*
+*Notification API Documentation v2.4 -- Architecture Team -- 2026*

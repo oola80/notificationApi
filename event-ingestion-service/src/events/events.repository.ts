@@ -83,8 +83,10 @@ export class EventsRepository extends PgBaseRepository<Event> {
       .createQueryBuilder('event')
       .where('event.source_id = :sourceId', { sourceId })
       .andWhere('event.source_event_id = :sourceEventId', { sourceEventId })
-      .andWhere("event.created_at > NOW() - INTERVAL ':hours hours'")
-      .setParameter('hours', windowHours)
+      .andWhere(
+        "event.created_at > NOW() - INTERVAL '1 hour' * :hours",
+        { hours: windowHours },
+      )
       .getOne();
   }
 

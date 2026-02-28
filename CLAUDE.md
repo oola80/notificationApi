@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Design documentation phase. Service folders and database scripts scaffolded. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). **template-service** Phase 5 complete (foundation, template CRUD & versioning, rendering engine with caching & preview, RabbitMQ audit publishing, rollback endpoint, enhanced health checks, E2E tests, Prometheus metrics, channel query filter, HTML sanitization, render timeout; 247 unit tests across 21 suites, 4 E2E test files). **channel-router-service** Phase 4 complete (foundation, data layer, health checks, Prometheus metrics, structured logging, channel & provider CRUD, adapter HTTP client, provider cache, circuit breaker per provider, token bucket rate limiter, retry engine with exponential backoff, media processor per channel, RabbitMQ integration with 3 exchanges and 8 priority-tiered queues, 8 consumers with abstract base class, 7-step delivery pipeline orchestrator, fire-and-forget audit publishing, single-level fallback, adapter health monitoring with CB integration; 432 unit tests across 46 suites, 5 E2E test files). **provider-adapters/adapter-mailgun** Phase 3 complete (monorepo foundation, shared library with DTOs/errors/metrics/RabbitMQ/health, Mailgun HTTP client, send pipeline with attachments and error classification, webhook verification with HMAC-SHA256 and replay protection, event normalization, fire-and-forget RabbitMQ publishing; 204 unit tests across 28 suites, 17 E2E tests across 3 files). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
+Design documentation phase. Service folders and database scripts scaffolded. **Auth/RBAC decoupled** — authentication, user management, and RBAC extracted into standalone `auth-rbac-service-backend` (:3160) with `auth-rbac-service-frontend` (:3161) and `ecommerce-backoffice` (:3162) login portal; `notification-gateway` (:3150) deprecated and removed; `admin-service` simplified (user/SAML management removed, JWT validation guard added); `notification-admin-ui` connects directly to `admin-service`. **event-ingestion-service** Step 4 complete (foundation, data layer, event-mappings CRUD, normalization module, webhook pipeline, RabbitMQ integration with consumers, publisher, retry/DLQ, health checks, mapping cache, rate limiting, Prometheus metrics, structured logging; 264 unit tests across 33 suites). **notification-engine-service** Phase 7 complete (rules engine, recipient groups, customer preferences, critical overrides, notification lifecycle, suppression engine, RabbitMQ consumers/publishers, template client with circuit breaker, Prometheus metrics, structured logging, performance optimizations, DB maintenance; ~504 unit tests across ~51 suites). **template-service** Phase 5 complete (foundation, template CRUD & versioning, rendering engine with caching & preview, RabbitMQ audit publishing, rollback endpoint, enhanced health checks, E2E tests, Prometheus metrics, channel query filter, HTML sanitization, render timeout; 247 unit tests across 21 suites, 4 E2E test files). **channel-router-service** Phase 4 complete (foundation, data layer, health checks, Prometheus metrics, structured logging, channel & provider CRUD, adapter HTTP client, provider cache, circuit breaker per provider, token bucket rate limiter, retry engine with exponential backoff, media processor per channel, RabbitMQ integration with 3 exchanges and 8 priority-tiered queues, 8 consumers with abstract base class, 7-step delivery pipeline orchestrator, fire-and-forget audit publishing, single-level fallback, adapter health monitoring with CB integration; 432 unit tests across 46 suites, 5 E2E test files). **provider-adapters/adapter-mailgun** Phase 3 complete (monorepo foundation, shared library with DTOs/errors/metrics/RabbitMQ/health, Mailgun HTTP client, send pipeline with attachments and error classification, webhook verification with HMAC-SHA256 and replay protection, event normalization, fire-and-forget RabbitMQ publishing; 204 unit tests across 28 suites, 17 E2E tests across 3 files). **bulk-upload-service** Phase 4 complete (foundation, data layer, TypeORM entities, upload CRUD with 8-step XLSX validation pipeline, XLSX parsing with type coercion, event ingestion HTTP client, background processing worker with 9-step pipeline and configurable batch/concurrency, result XLSX generation with _notification_status column and cell styling, result download endpoint, group mode processing with composite key grouping and conflict detection, in-memory circuit breaker with CLOSED/OPEN/HALF_OPEN state machine, token bucket rate limiter, retry endpoint for failed/partial uploads, RabbitMQ fire-and-forget audit publishing with 6 lifecycle events, enhanced health checks with liveness/readiness split and 3 custom indicators, Prometheus metrics, E2E tests; 387 unit tests across 23 suites, 24 E2E tests across 4 files). All other services have folder structure only (CLAUDE.md, dbscripts/, docs/) with no application code.
 
 ## Tech Stack (Planned)
 
@@ -19,16 +19,19 @@ Design documentation phase. Service folders and database scripts scaffolded. **e
 
 | Service | Port | Purpose |
 |---|---|---|
-| notification-gateway | 3150 | BFF / API Gateway (auth, routing, rate limiting) |
+| notification-gateway | 3150 | **Deprecated** — BFF / API Gateway (auth, routing, rate limiting). Responsibilities redistributed: auth → auth-rbac-service-backend, RBAC → per-service JWT validation, rate limiting → infrastructure proxy, proxying → direct frontend-to-backend. |
 | event-ingestion-service | 3151 | Receives and normalizes events from source systems via runtime field mappings; assigns priority tier (normal/critical) per mapping config |
 | notification-engine-service | 3152 | Core orchestrator — rules, recipients, lifecycle; priority-aware processing via tiered queues |
 | template-service | 3153 | Template CRUD, Handlebars rendering, versioning |
 | channel-router-service | 3154 | Routes to delivery providers via decoupled provider adapter microservices (Mailgun, Braze, WhatsApp/Meta, AWS SES); core orchestration (circuit breaker, rate limiting, retry, fallback, media processing); all providers are dumb pipes (pre-rendered content); priority-tiered delivery queues per channel; fire-and-forget audit logging. V2 design docs reflect the decoupled adapter architecture. |
-| admin-service | 3155 | Backoffice administration |
+| admin-service | 3155 | Backoffice administration — configuration management (rules, mappings, channels, templates, recipients, system config). JWT validation via auth-rbac-service-backend RS256 public key. |
 | audit-service | 3156 | Notification tracking, delivery receipts, analytics |
 | email-ingest-service | 3157/2525 | SMTP ingest — receives emails, parses, generates events |
 | bulk-upload-service | 3158 | XLSX bulk upload — async file processing, result file with per-row status, fire-and-forget audit logging |
-| notification-admin-ui | 3159 | Next.js admin frontend |
+| notification-admin-ui | 3159 | Next.js admin frontend — connects directly to admin-service (:3155) |
+| auth-rbac-service-backend | 3160 | Multi-application authentication, user management, RBAC, JWT issuance (RS256 platform + app-scoped tokens) |
+| auth-rbac-service-frontend | 3161 | Next.js admin UI for auth/RBAC management (applications, users, roles, permissions) |
+| ecommerce-backoffice | 3162 | Next.js login portal and application launcher — centralized entry point for all platform applications |
 
 ### Service Folders
 
@@ -221,17 +224,72 @@ email-ingest-service/           # NestJS — port 3157/2525
     email-ingest-service-spec.md
     changelog_dev.md
 
-bulk-upload-service/            # NestJS — port 3158
+bulk-upload-service/            # NestJS — port 3158 (Phase 4 complete)
   CLAUDE.md
+  .env                          # Local environment variables (git-ignored)
+  .gitignore                    # Node/NestJS ignores (dist, node_modules, .env, coverage, etc.)
+  .prettierrc                   # Prettier config (singleQuote, trailingComma: all)
+  eslint.config.mjs             # ESLint flat config (typescript-eslint + prettier)
+  nest-cli.json                 # NestJS CLI config (sourceRoot: src, deleteOutDir)
+  package.json                  # NestJS 11, TypeScript 5.7, Jest 30
+  package-lock.json
+  tsconfig.json                 # ES2023 target, nodenext modules, decorators enabled
+  tsconfig.build.json
+  src/
+    main.ts                     # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3158
+    app.module.ts               # Root module: Config, Logger, TypeORM, Common, Metrics, Uploads, CircuitBreaker, RateLimiter, RabbitMQ, Health
+    common/                     # @Global() module: errors, filters, pipes, interceptors, base repo
+    config/                     # ConfigModule.forRoot: app, database, rabbitmq configs, env validation
+    uploads/                    # Upload CRUD (controller, service, repositories, DTOs, entities), 8-step XLSX validation
+    parsing/                    # XLSX parsing (parseHeaders, parseRows, detectMode, group extraction, type coercion)
+    event-ingestion/            # HTTP client for event-ingestion-service POST /webhooks/events
+    circuit-breaker/            # @Global() in-memory circuit breaker (CLOSED/OPEN/HALF_OPEN state machine)
+    rate-limiter/               # @Global() token bucket rate limiter
+    processing/                 # Background worker (polling, standard + group mode pipeline, CB/RL integration)
+    results/                    # Result XLSX generation (_notification_status column, cell styling)
+    metrics/                    # @Global() MetricsModule: 18 custom metrics, GET /metrics
+    rabbitmq/                   # @golevelup/nestjs-rabbitmq (fire-and-forget audit publishing, 6 routing keys)
+    health/                     # Health controller (GET /health liveness, GET /ready readiness with 3 custom indicators)
+  test/
+    test-utils.ts               # Shared E2E helper (createTestApp, mock factories)
+    app.e2e-spec.ts             # E2E: health, ready, metrics
+    processing.e2e-spec.ts      # E2E: standard mode, results, audit publishing
+    group-mode.e2e-spec.ts      # E2E: group mode auto-detection, grouping, conflicts
+    retry.e2e-spec.ts           # E2E: uploads CRUD + retry lifecycle
+    jest-e2e.json               # Jest E2E config
   dbscripts/
+    schema-bulk-upload-service.sql       # Schema/role/user/grants only
+    bulk-upload-service-dbscripts.sql    # uploads, upload_rows tables, indexes, purge function, trigger
   docs/
-    09-bulk-upload-service.md
+    09-bulk-upload-service.md            # Convenience copy of design doc
+    template-order-delay.md              # order.delay XLSX template reference
     changelog_dev.md
 
 notification-admin-ui/          # Next.js — port 3159
   CLAUDE.md
   docs/
     15-notification-admin-ui.md
+    changelog_dev.md
+
+auth-rbac-service-backend/      # NestJS — port 3160
+  CLAUDE.md
+  dbscripts/
+    schema-auth-rbac-service-backend.sql
+    auth-rbac-service-backend-dbscripts.sql
+  docs/
+    19-auth-rbac-service-backend.md   # Convenience copy of design doc
+    changelog_dev.md
+
+auth-rbac-service-frontend/     # Next.js — port 3161
+  CLAUDE.md
+  docs/
+    20-auth-rbac-service-frontend.md  # Convenience copy of design doc
+    changelog_dev.md
+
+ecommerce-backoffice/           # Next.js — port 3162
+  CLAUDE.md
+  docs/
+    21-ecommerce-backoffice.md        # Convenience copy of design doc
     changelog_dev.md
 
 provider-adapters/              # NestJS monorepo — ports 3171-3174 (adapter-mailgun, adapter-braze, adapter-whatsapp, adapter-aws-ses)
@@ -260,7 +318,7 @@ The root `endpoints/` folder contains one file per service documenting all plann
 
 ```
 endpoints/
-  endpoints-notification-gateway.md
+  endpoints-notification-gateway.md          # Deprecated — all endpoints marked as Deprecated
   endpoints-event-ingestion-service.md
   endpoints-notification-engine-service.md
   endpoints-template-service.md
@@ -272,6 +330,9 @@ endpoints/
   endpoints-bulk-upload-service.md
   endpoints-notification-admin-ui.md
   endpoints-provider-adapters.md   # Standardized contract (4 adapters × 5 endpoints)
+  endpoints-auth-rbac-service-backend.md   # Auth, applications, users, roles, permissions, health (35+ endpoints)
+  endpoints-auth-rbac-service-frontend.md  # Route reference (7 pages)
+  endpoints-ecommerce-backoffice.md        # Route reference (4 pages)
 ```
 
 ### Database Scripts
@@ -280,7 +341,7 @@ Each backend service (all except `notification-admin-ui`) contains a `dbscripts/
 - **`schema-{service-name}.sql`** — Schema creation script (schema, role, user, grants). Run once per environment.
 - **`{service-name}-dbscripts.sql`** — Database object definitions (tables, indexes, functions, triggers, views, etc.). **Must be updated every time a database change is made to the service.** This is the single source of truth for the service's database structure.
 
-The schema creation script follows the naming convention `schema-{service-name}.sql`. Each script creates the schema, role, user, and grants all necessary privileges (schema-per-service pattern). Schema/role/user names use snake_case derived from the folder name. The `event-ingestion-service` script also creates the `event_mappings` table for runtime field mapping configuration (keyed by `source_id` + `event_type`) with a `priority` column (`normal`/`critical`, default `normal`), the `event_sources` table for registered source system configurations, and the `events` table for storing all ingested events (raw and normalized) with a required `cycle_id` column for business cycle tracking. A `purge_event_payloads()` PL/pgSQL function NULLs out `raw_payload` and `normalized_payload` on rows older than a configurable threshold (default 90 days) for scheduled retention. The `notification-engine-service` script also creates the `notification_rules` table for rule definitions (UUID PK, JSONB conditions/actions/suppression, priority ordering, exclusive flag), the `recipient_groups` and `recipient_group_members` tables for group-based recipient management, the `customer_channel_preferences` table for per-customer per-channel opt-in/opt-out preferences (keyed by `customer_id`, FILLFACTOR 90, with autovacuum tuning), the `critical_channel_overrides` table for configurable forced-channel rules per event type (UUID PK, partial index on active overrides), the `notifications` table for core notification records (BIGSERIAL PK, UUID notification_id, status state machine, dedup hash, FILLFACTOR 80), the `notification_status_log` table for immutable status transition audit log, the `notification_recipients` table for per-notification recipient details, and a `purge_notification_content()` PL/pgSQL function for batch content retention. The `bulk-upload-service` script also creates the `uploads` table for tracking XLSX file uploads (UUID PK, status state machine, aggregate row counters, `total_events` for group mode event count, result file path), the `upload_rows` table for per-row processing tracking (FK to uploads with ON DELETE CASCADE, raw data, mapped payload, event ID, status, `group_key` for multi-item row grouping with partial index), and a `purge_old_uploads()` PL/pgSQL function that deletes terminal-state uploads and cascading rows older than a configurable threshold (default 90 days). The `audit-service` script also creates the `audit_events` table for immutable notification lifecycle event logging (UUID PK, notification_id, correlation_id, cycle_id, event type taxonomy, actor, metadata JSONB, payload snapshot JSONB, tsvector search vector), the `delivery_receipts` table for provider-reported delivery outcomes correlated via provider_message_id, the `notification_analytics` table for pre-aggregated hourly/daily rollups with idempotent upsert, the `dlq_entries` table for dead-letter queue monitoring with status tracking (pending/investigated/reprocessed/discarded), and a `purge_audit_payloads()` PL/pgSQL function that NULLs payload data older than a configurable threshold (default 90 days). The `template-service` script also creates the `templates` table for master template records (UUID PK, unique slug, current version pointer), the `template_versions` table for immutable version snapshots (FK to templates, unique version number per template), the `template_channels` table for channel-specific content per version (FK to template_versions, unique channel per version, Handlebars body), and the `template_variables` table for auto-detected template variables (FK to templates, unique variable name per template, optional defaults and required flag).
+The schema creation script follows the naming convention `schema-{service-name}.sql`. Each script creates the schema, role, user, and grants all necessary privileges (schema-per-service pattern). Schema/role/user names use snake_case derived from the folder name. The `event-ingestion-service` script also creates the `event_mappings` table for runtime field mapping configuration (keyed by `source_id` + `event_type`) with a `priority` column (`normal`/`critical`, default `normal`), the `event_sources` table for registered source system configurations, and the `events` table for storing all ingested events (raw and normalized) with a required `cycle_id` column for business cycle tracking. A `purge_event_payloads()` PL/pgSQL function NULLs out `raw_payload` and `normalized_payload` on rows older than a configurable threshold (default 90 days) for scheduled retention. The `notification-engine-service` script also creates the `notification_rules` table for rule definitions (UUID PK, JSONB conditions/actions/suppression, priority ordering, exclusive flag), the `recipient_groups` and `recipient_group_members` tables for group-based recipient management, the `customer_channel_preferences` table for per-customer per-channel opt-in/opt-out preferences (keyed by `customer_id`, FILLFACTOR 90, with autovacuum tuning), the `critical_channel_overrides` table for configurable forced-channel rules per event type (UUID PK, partial index on active overrides), the `notifications` table for core notification records (BIGSERIAL PK, UUID notification_id, status state machine, dedup hash, FILLFACTOR 80), the `notification_status_log` table for immutable status transition audit log, the `notification_recipients` table for per-notification recipient details, and a `purge_notification_content()` PL/pgSQL function for batch content retention. The `bulk-upload-service` script also creates the `uploads` table for tracking XLSX file uploads (UUID PK, status state machine, aggregate row counters, `total_events` for group mode event count, result file path), the `upload_rows` table for per-row processing tracking (FK to uploads with ON DELETE CASCADE, raw data, mapped payload, event ID, status, `group_key` for multi-item row grouping with partial index), and a `purge_old_uploads()` PL/pgSQL function that deletes terminal-state uploads and cascading rows older than a configurable threshold (default 90 days). The `audit-service` script also creates the `audit_events` table for immutable notification lifecycle event logging (UUID PK, notification_id, correlation_id, cycle_id, event type taxonomy, actor, metadata JSONB, payload snapshot JSONB, tsvector search vector), the `delivery_receipts` table for provider-reported delivery outcomes correlated via provider_message_id, the `notification_analytics` table for pre-aggregated hourly/daily rollups with idempotent upsert, the `dlq_entries` table for dead-letter queue monitoring with status tracking (pending/investigated/reprocessed/discarded), and a `purge_audit_payloads()` PL/pgSQL function that NULLs payload data older than a configurable threshold (default 90 days). The `template-service` script also creates the `templates` table for master template records (UUID PK, unique slug, current version pointer), the `template_versions` table for immutable version snapshots (FK to templates, unique version number per template), the `template_channels` table for channel-specific content per version (FK to template_versions, unique channel per version, Handlebars body), and the `template_variables` table for auto-detected template variables (FK to templates, unique variable name per template, optional defaults and required flag). The `auth-rbac-service-backend` script creates the `applications` table for registered applications (UUID PK, name UNIQUE, code UNIQUE, frontend_url), the `users` table for user accounts (UUID PK, email UNIQUE, password_hash bcrypt, status CHECK ACTIVE/LOCKED/DEACTIVATED, failed_login_attempts, locked_until), the `roles` table for per-application roles with hierarchy levels (UUID PK, application_id FK, UNIQUE(app_id, name), is_system flag), the `permissions` table for per-application resource+action pairs (UUID PK, application_id FK, UNIQUE(app_id, resource, action)), the `role_permissions` join table (composite PK, CASCADE deletes), the `user_applications` table for user-to-application access grants (UUID PK, UNIQUE(user_id, app_id)), the `user_application_roles` table for role assignments within user-app access (UUID PK, UNIQUE(user_application_id, role_id)), the `refresh_tokens` table for token rotation with replay detection (UUID PK, user_id FK, token_hash, is_revoked, replaced_by_id self-reference), the `password_history` table for reuse prevention (UUID PK, user_id FK, password_hash), and a `purge_expired_refresh_tokens()` PL/pgSQL function that removes expired/revoked tokens older than a configurable threshold (default 30 days).
 
 | Service Folder | Schema | Role | User |
 |---|---|---|---|
@@ -293,6 +354,7 @@ The schema creation script follows the naming convention `schema-{service-name}.
 | audit-service | `audit_service` | `audit_service_user_role` | `audit_service_user` |
 | email-ingest-service | `email_ingest_service` | `email_ingest_service_user_role` | `email_ingest_service_user` |
 | bulk-upload-service | `bulk_upload_service` | `bulk_upload_service_user_role` | `bulk_upload_service_user` |
+| auth-rbac-service-backend | `auth_rbac_service_backend` | `auth_rbac_service_backend_user_role` | `auth_rbac_service_backend_user` |
 
 ### RabbitMQ Definitions
 
@@ -328,6 +390,10 @@ docs/
   16-audit-service.md               # Audit Service detailed spec (v1)
   16-audit-service-v2.md            # Audit Service (v2 — adapter actor references, webhook correlation)
   17-provider-adapters.md           # Provider Adapter Services detailed spec (Mailgun, Braze, WhatsApp/Meta, AWS SES)
+  18-auth-rbac-architecture-addendum.md  # Auth/RBAC decoupling addendum (architectural changes, token flow, impact)
+  19-auth-rbac-service-backend.md   # Auth RBAC Service Backend detailed spec (auth, users, roles, permissions, JWT)
+  20-auth-rbac-service-frontend.md  # Auth RBAC Service Frontend detailed spec (Next.js admin UI)
+  21-ecommerce-backoffice.md        # eCommerce Backoffice detailed spec (login portal, app launcher)
 ```
 
 ### Markdown docs
@@ -348,7 +414,7 @@ All NestJS backend services follow these standards (documented in each service's
 
 3. **Standardized Error Responses** — All errors follow a consistent JSON schema:
    - Schema: `{ code: string, details: string, message: string, status: number, stack?: string }`
-   - **Error Registry (`errors.ts`)** — Centralized error code definitions with HTTP status, message, and details. Error codes use domain-specific prefixes per service (e.g., `GW-` for Gateway, `EIS-` for Event Ingestion, `NES-` for Notification Engine, `TS-` for Template, `CRS-` for Channel Router, `ADM-` for Admin, `AUD-` for Audit, `EMI-` for Email Ingest, `BUS-` for Bulk Upload). No duplicates.
+   - **Error Registry (`errors.ts`)** — Centralized error code definitions with HTTP status, message, and details. Error codes use domain-specific prefixes per service (e.g., `GW-` for Gateway, `EIS-` for Event Ingestion, `NES-` for Notification Engine, `TS-` for Template, `CRS-` for Channel Router, `ADM-` for Admin, `AUD-` for Audit, `EMI-` for Email Ingest, `BUS-` for Bulk Upload, `ARS-` for Auth RBAC Service, `ECB-` for eCommerce Backoffice). No duplicates.
    - **Global Exception Filter** — A single `@Catch(HttpException)` filter maps every thrown exception to the standardized JSON response `{ code, details, message, status }`.
 
 4. **Global Middleware via NestJS Bootstrap (`main.ts`)** — Cross-cutting concerns applied once at the application level:

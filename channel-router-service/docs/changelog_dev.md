@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Bugfix: Adapter send request contract mismatch (2026-02-27)
+
+- Added private `toAdapterPayload()` method in `AdapterClientService` to transform the internal CRS `SendRequest` into the format expected by the provider adapter `SendRequestDto`
+- Transforms: `notificationId` and `priority` moved from root to `metadata` object, `recipient.email`/`phone`/`deviceToken` resolved to `recipient.address`, `media` array moved from root into `content.media` with `mimeType` → `contentType` rename
+- Without this transform, the adapter's `DtoValidationPipe` rejected the request with HTTP 400 (`property notificationId should not exist`)
+
 ### 2026-02-26 — Phase 4: RabbitMQ, Consumers, Delivery Pipeline, Fallback, Audit Publishing, Adapter Health Monitoring
 
 **RabbitMQ module (`src/rabbitmq/`):**

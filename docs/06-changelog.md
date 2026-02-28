@@ -14,6 +14,7 @@
 ## Table of Contents
 
 - [About This Changelog](#about-this-changelog)
+- [Version 3.9](#version-39--2026-02-27) — Auth/RBAC Decoupling & Architecture Restructuring
 - [Version 3.8](#version-38--2026-02-26) — Provider Adapter Services & Adapter Replacement
 - [Version 3.7](#version-37--2026-02-21) — Audit Service Deep-Dive
 - [Version 3.6](#version-36--2026-02-21) — Notification Admin UI Deep-Dive
@@ -53,6 +54,30 @@ This document tracks all notable changes to the Notification API documentation a
 > **Info:** **Change Types**
 >
 > Each entry is categorized using one of the following types: **Added**, **Changed**, **Fixed**, **Removed**, **Deprecated**.
+
+---
+
+## Version 3.9 — 2026-02-27
+
+**Auth/RBAC Decoupling & Architecture Restructuring**
+
+Decouples authentication, user management, and RBAC from admin-service and notification-gateway into a standalone multi-application auth service (auth-rbac-service-backend :3160). Introduces two-token JWT model (RS256 platform + app-scoped tokens) with refresh token rotation and replay detection. Adds auth admin frontend (auth-rbac-service-frontend :3161) and centralized login portal with application launcher (ecommerce-backoffice :3162). Deprecates notification-gateway (:3150) — responsibilities redistributed to auth service, per-service JWT validation, and infrastructure reverse proxy. Simplifies admin-service by removing user/SAML management and adding JWT validation guard. Updates notification-admin-ui to connect directly to admin-service instead of gateway.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | 18 — Auth/RBAC Architecture Addendum document (MD) — purpose, motivation, architectural changes summary table (before/after), new services table, gateway removal with responsibility redistribution, admin-service modifications, auth token flow with ASCII sequence diagrams (login, app launch, token validation), JWT architecture (platform + application tokens, refresh token rotation, JWKS endpoint), RS256 key distribution, impact on all existing services, updated port table, new error code prefixes (ARS-, ECB-), webhook routing migration to infrastructure proxy | 18-auth-rbac-architecture-addendum |
+| **Added** | 19 — Auth RBAC Service Backend Deep-Dive document (MD) with 17 sections — service overview, architecture with integration diagram, authentication flow (login, refresh with replay detection, logout, forgot/reset/change password), password policy (12+ chars, bcrypt cost 12, history of 5, 90-day max age, lockout), application management, user lifecycle (ACTIVE/LOCKED/DEACTIVATED), role management with hierarchy and system roles, permission management (resource + action pairs), user-application access model, JWT architecture (RS256, JWKS), REST API (35+ endpoints), database design (9 tables with ER diagram), 4 sequence diagrams, 24 error codes, security considerations, monitoring/health, configuration | 19-auth-rbac-service-backend |
+| **Added** | 20 — Auth RBAC Service Frontend Deep-Dive document (MD) — Next.js 14 admin UI for auth management, self-authenticating via app-scoped JWT, 7 page specifications with ASCII wireframes (application list/create/detail, user list/create/detail), component architecture, routing table, API integration mapping | 20-auth-rbac-service-frontend |
+| **Added** | 21 — eCommerce Backoffice Deep-Dive document (MD) — Next.js 14 login portal and application launcher, authentication flow with ASCII sequence diagram, session management (proactive refresh, expiry detection), 4 page specifications with ASCII wireframes (login, forgot password, reset password, app launcher grid), component architecture, routing table, security considerations | 21-ecommerce-backoffice |
+| **Added** | auth-rbac-service-backend/ folder scaffold — CLAUDE.md (port 3160, NestJS, 9 DB tables, no RabbitMQ, ARS- prefix, planned folder structure), dbscripts/ (schema SQL + objects SQL with 9 tables, indexes, purge function), docs/ (convenience copy + changelog) | auth-rbac-service-backend/ |
+| **Added** | auth-rbac-service-frontend/ folder scaffold — CLAUDE.md (port 3161, Next.js 14, SWR, planned folder structure), docs/ (convenience copy + changelog) | auth-rbac-service-frontend/ |
+| **Added** | ecommerce-backoffice/ folder scaffold — CLAUDE.md (port 3162, Next.js 14, planned folder structure), docs/ (convenience copy + changelog) | ecommerce-backoffice/ |
+| **Added** | Endpoint reference files for 3 new services — endpoints-auth-rbac-service-backend.md (35+ endpoints), endpoints-auth-rbac-service-frontend.md (7 routes), endpoints-ecommerce-backoffice.md (4 routes) | endpoints/ |
+| **Changed** | Root CLAUDE.md — added 3 new services to Microservices table, marked notification-gateway as Deprecated, added auth-rbac-service-backend to Database Scripts table, added 3 service folder entries, added 3 endpoint files, added 4 doc entries (18-21), added error prefixes (ARS-, ECB-), updated Project Status | CLAUDE.md |
+| **Changed** | admin-service CLAUDE.md — removed "Proxied through: notification-gateway" from Related Services, removed user management and SAML from description, updated Database Tables (only system_configs), added auth-rbac-service-backend dependency for JWT validation, updated planned folder structure (removed users/, saml/, added auth/) | admin-service/CLAUDE.md |
+| **Changed** | notification-admin-ui CLAUDE.md — changed API Backend from notification-gateway (:3150) to admin-service (:3155), updated Dependencies and Related Services | notification-admin-ui/CLAUDE.md |
+| **Deprecated** | All notification-gateway endpoints marked as "Deprecated — service removed" | endpoints-notification-gateway |
+| **Deprecated** | Admin Service user management endpoints (POST/GET/PUT /admin/users, POST /admin/users/:id/reset-password) and SAML IdP endpoints marked as "Deprecated — moved to auth-rbac-service-backend" | endpoints-admin-service |
 
 ---
 

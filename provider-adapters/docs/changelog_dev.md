@@ -4,6 +4,15 @@
 
 ---
 
+## [Unreleased]
+
+### Bugfix: TypeScript isolatedModules compilation errors (2026-02-27)
+
+- **libs/common/src/index.ts:** Changed `export { ErrorResponse }` to `export type { ErrorResponse }` and separated `ErrorDefinition` into its own `export type` statement (TS1205: re-exporting a type requires `export type` when `isolatedModules` is enabled)
+- **apps/adapter-mailgun/src/webhooks/webhooks.controller.ts:** Changed `import { MailgunWebhookPayload }` to `import type { MailgunWebhookPayload }` (TS1272: type in decorated signature must use `import type` when `isolatedModules` and `emitDecoratorMetadata` are enabled)
+
+---
+
 ## 2026-02-26 — Phase 3: adapter-mailgun Webhook Verification + Normalization + RabbitMQ Publishing (POST /webhooks/inbound)
 
 ### webhooks/ — Inbound Webhook Processing

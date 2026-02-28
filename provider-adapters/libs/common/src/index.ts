@@ -16,9 +16,9 @@ export { AdapterHealthResponseDto } from './dto/health-response.dto.js';
 export { AdapterCapabilitiesResponseDto } from './dto/capabilities-response.dto.js';
 
 // Errors
-export { ErrorResponse } from './errors/error-response.interface.js';
+export type { ErrorResponse } from './errors/error-response.interface.js';
+export type { ErrorDefinition } from './errors/base-errors.js';
 export {
-  ErrorDefinition,
   BASE_ERROR_CODES,
   createErrorResponse,
 } from './errors/base-errors.js';

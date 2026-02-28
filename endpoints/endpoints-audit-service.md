@@ -42,5 +42,5 @@
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/health` | Basic liveness check | Not Started |
-| GET | `/health/ready` | Readiness check verifying database and RabbitMQ connectivity | Not Started |
+| GET | `/health` | Basic liveness check | Done |
+| GET | `/health/ready` | Readiness check verifying database and RabbitMQ connectivity | Done |

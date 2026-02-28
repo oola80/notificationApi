@@ -6,10 +6,10 @@
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| POST | `/admin/users` | Create a new admin user | Not Started |
-| GET | `/admin/users` | List admin users with pagination and filtering | Not Started |
-| PUT | `/admin/users/:id` | Update an admin user's profile, role, or status | Not Started |
-| POST | `/admin/users/:id/reset-password` | Trigger a password reset for a specific user | Not Started |
+| POST | `/admin/users` | Create a new admin user | Deprecated — moved to auth-rbac-service-backend |
+| GET | `/admin/users` | List admin users with pagination and filtering | Deprecated — moved to auth-rbac-service-backend |
+| PUT | `/admin/users/:id` | Update an admin user's profile, role, or status | Deprecated — moved to auth-rbac-service-backend |
+| POST | `/admin/users/:id/reset-password` | Trigger a password reset for a specific user | Deprecated — moved to auth-rbac-service-backend |
 
 ## Notification Rules
 
@@ -80,10 +80,10 @@
 
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
-| GET | `/admin/saml/idp` | List configured SAML Identity Providers (Super Admin only) | Not Started |
-| POST | `/admin/saml/idp` | Register a new SAML Identity Provider by importing IdP metadata XML | Not Started |
-| PUT | `/admin/saml/idp/:id` | Update an existing IdP configuration | Not Started |
-| DELETE | `/admin/saml/idp/:id` | Deactivate a SAML IdP | Not Started |
+| GET | `/admin/saml/idp` | List configured SAML Identity Providers (Super Admin only) | Deprecated — moved to auth-rbac-service-backend |
+| POST | `/admin/saml/idp` | Register a new SAML Identity Provider by importing IdP metadata XML | Deprecated — moved to auth-rbac-service-backend |
+| PUT | `/admin/saml/idp/:id` | Update an existing IdP configuration | Deprecated — moved to auth-rbac-service-backend |
+| DELETE | `/admin/saml/idp/:id` | Deactivate a SAML IdP | Deprecated — moved to auth-rbac-service-backend |
 
 ## Audit Logs
 

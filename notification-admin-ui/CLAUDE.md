@@ -12,15 +12,17 @@ Next.js admin frontend — backoffice interface for managing the notification pl
 
 ## API Backend
 
-All data is fetched from the Notification Gateway (:3150) API at `/api/v1/*`.
+All data is fetched from the admin-service (:3155) API directly. Authentication via app-scoped JWT from ecommerce-backoffice (:3162).
 
 ## Dependencies
 
-- notification-gateway (:3150) — sole API backend
+- admin-service (:3155) — API backend for notification management operations
+- ecommerce-backoffice (:3162) — login portal, provides app-scoped JWT via redirect
 
 ## Related Services
 
-- Consumes API from: notification-gateway (:3150)
+- Consumes API from: admin-service (:3155)
+- Authenticated via: ecommerce-backoffice (:3162) → auth-rbac-service-backend (:3160)
 - No direct access to any other microservice
 
 ## Key References
