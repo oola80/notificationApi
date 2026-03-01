@@ -16,6 +16,7 @@ async function bootstrap() {
   const loggingInterceptor = app.get(LoggingInterceptor);
   app.useGlobalInterceptors(loggingInterceptor);
 
+  app.setGlobalPrefix('api/v1', { exclude: ['health', 'metrics'] });
   app.enableCors();
 
   const config = app.get(ConfigService);

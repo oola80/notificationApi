@@ -30,31 +30,43 @@ export class ChannelsService implements OnModuleInit {
     const result: Record<string, any>[] = [];
 
     for (const channel of channels) {
-      const providers =
-        await this.providerConfigsRepository.findActiveByChannel(channel.type);
-
-      result.push({
-        id: channel.id,
-        name: channel.name,
-        type: channel.type,
-        isActive: channel.isActive,
-        routingMode: channel.routingMode,
-        fallbackChannelId: channel.fallbackChannelId,
-        providers: providers.map((p) => ({
-          id: p.id,
-          providerName: p.providerName,
-          providerId: p.providerId,
-          adapterUrl: p.adapterUrl,
-          isActive: p.isActive,
-          routingWeight: p.routingWeight,
-          circuitBreakerState: p.circuitBreakerState,
-        })),
-        createdAt: channel.createdAt,
-        updatedAt: channel.updatedAt,
-      });
+      result.push(await this.enrichChannel(channel));
     }
 
     return result;
+  }
+
+  async findById(id: string): Promise<Record<string, any>> {
+    const channel = await this.channelsRepository.findById(id);
+    if (!channel) {
+      throw createErrorResponse('CRS-008');
+    }
+    return this.enrichChannel(channel);
+  }
+
+  private async enrichChannel(channel: Channel): Promise<Record<string, any>> {
+    const providers =
+      await this.providerConfigsRepository.findActiveByChannel(channel.type);
+
+    return {
+      id: channel.id,
+      name: channel.name,
+      type: channel.type,
+      isActive: channel.isActive,
+      routingMode: channel.routingMode,
+      fallbackChannelId: channel.fallbackChannelId,
+      providers: providers.map((p) => ({
+        id: p.id,
+        providerName: p.providerName,
+        providerId: p.providerId,
+        adapterUrl: p.adapterUrl,
+        isActive: p.isActive,
+        routingWeight: p.routingWeight,
+        circuitBreakerState: p.circuitBreakerState,
+      })),
+      createdAt: channel.createdAt,
+      updatedAt: channel.updatedAt,
+    };
   }
 
   async updateConfig(

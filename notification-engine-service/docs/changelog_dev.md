@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### Feature: Recipient group GET/DELETE + member endpoints (2026-03-01)
+
+- `src/recipients/recipient-groups.controller.ts` — Added 4 new endpoints:
+  - `@Get(':id')` — Get recipient group by ID with members
+  - `@Delete(':id')` with `@HttpCode(204)` — Soft-delete recipient group
+  - `@Get(':id/members')` — List active members for a group
+  - `@Post(':id/members')` — Add a single member to a group
+  - `@Delete(':id/members/:memberId')` with `@HttpCode(204)` — Remove a member from a group
+- `src/recipients/recipient-groups.service.ts` — Added 4 new methods: `softDelete(id)` (sets isActive=false), `findMembers(groupId)`, `addMember(groupId, dto)`, `removeMember(groupId, memberId)`. All methods validate group existence first via `findById()`.
+- Unblocks frontend hooks: `useRecipientGroup(id)`, `useDeleteRecipientGroup(id)`, `useRecipientGroupMembers(groupId)`, `useAddRecipientGroupMember(groupId)`, `useRemoveRecipientGroupMember(groupId, memberId)`.
+
 ### 2026-02-25 — Fix: Template Render Response Mapping & Delivery Content
 
 **Fixed:**

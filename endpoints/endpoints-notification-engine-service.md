@@ -27,7 +27,12 @@
 |--------|------|-------------|--------|
 | GET | `/recipient-groups` | List recipient groups with pagination | Done |
 | POST | `/recipient-groups` | Create a new recipient group | Done |
+| GET | `/recipient-groups/:id` | Get a recipient group by ID with active members | Done |
 | PUT | `/recipient-groups/:id` | Update a recipient group (name, description, members) | Done |
+| DELETE | `/recipient-groups/:id` | Soft-delete a recipient group (sets isActive=false) | Done |
+| GET | `/recipient-groups/:id/members` | List active members for a recipient group | Done |
+| POST | `/recipient-groups/:id/members` | Add a single member to a recipient group | Done |
+| DELETE | `/recipient-groups/:id/members/:memberId` | Remove (deactivate) a member from a recipient group | Done |
 
 ## Customer Preference Endpoints
 

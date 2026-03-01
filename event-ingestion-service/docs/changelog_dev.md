@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Fix: Global prefix + controller path dedup (2026-03-01)
+
+- `src/main.ts` — Added `app.setGlobalPrefix('api/v1', { exclude: ['health', 'metrics'] })` so all EIS routes are served under `/api/v1/` consistently.
+- `src/event-mappings/event-mappings.controller.ts` — Changed `@Controller('api/v1/event-mappings')` → `@Controller('event-mappings')` to avoid double prefix (`/api/v1/api/v1/event-mappings`). The global prefix now provides the `api/v1` segment.
+- Unblocks BUS inter-service calls to `POST /api/v1/webhooks/events` and frontend calls to `/api/v1/event-mappings`.
+
 ### Bugfix: SQL parameter binding in findDuplicate() dedup query (2026-02-27)
 
 - Fixed `EventsRepository.findDuplicate()` where `INTERVAL ':hours hours'` had the parameter inside a string literal, causing PostgreSQL to expect only 2 bind parameters while 3 were provided

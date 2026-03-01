@@ -40,7 +40,7 @@ export class EventIngestionClient {
   }
 
   async submitEvent(payload: SubmitEventPayload): Promise<SubmitEventResult> {
-    const url = `${this.baseUrl}/webhooks/events`;
+    const url = `${this.baseUrl}/api/v1/webhooks/events`;
 
     try {
       const response = await firstValueFrom(

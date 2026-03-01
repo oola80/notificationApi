@@ -17,7 +17,7 @@ import { UpdateEventMappingDto } from './dto/update-event-mapping.dto.js';
 import { ListEventMappingsQueryDto } from './dto/list-event-mappings-query.dto.js';
 import { TestMappingDto } from './dto/test-mapping.dto.js';
 
-@Controller('api/v1/event-mappings')
+@Controller('event-mappings')
 export class EventMappingsController {
   constructor(private readonly eventMappingsService: EventMappingsService) {}
 

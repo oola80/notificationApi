@@ -18,6 +18,11 @@ export class ChannelsController {
     return this.channelsService.findAll();
   }
 
+  @Get(':id')
+  findById(@Param('id', ParseUUIDPipe) id: string) {
+    return this.channelsService.findById(id);
+  }
+
   @Put(':id/config')
   updateConfig(
     @Param('id', ParseUUIDPipe) id: string,

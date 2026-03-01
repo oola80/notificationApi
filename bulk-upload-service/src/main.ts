@@ -17,6 +17,9 @@ async function bootstrap() {
   app.useGlobalInterceptors(loggingInterceptor);
 
   app.enableCors();
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['health', 'ready', 'metrics'],
+  });
 
   const config = app.get(ConfigService);
   const port = config.get<number>('app.port', 3158);

@@ -22,6 +22,7 @@ Provider webhook endpoints have moved to individual adapter services. The Notifi
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
 | GET | `/channels` | List all channel configurations with current status, active provider, routing mode, and health indicators | Done |
+| GET | `/channels/:id` | Get a single channel by ID with provider info | Done |
 | PUT | `/channels/:id/config` | Update channel configuration (active provider, routing mode, weights, fallback); validates provider connectivity | Done |
 | GET | `/providers` | List all registered provider adapter services with status, supported channels, adapter URL, circuit breaker state, and rate limit config | Done |
 | PUT | `/providers/:id/config` | Update provider adapter service configuration (adapter URL, routing weight, rate limits). Note: provider credentials are managed by each adapter service independently, not by the core. | Done |

@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Version:** | 2.5 |
-| **Date:** | 2026-02-26 |
+| **Version:** | 2.6 |
+| **Date:** | 2026-02-28 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
 
@@ -14,6 +14,8 @@
 ## Table of Contents
 
 - [About This Changelog](#about-this-changelog)
+- [Version 4.1](#version-41--2026-02-28) — Notification Admin UI Implementation Complete
+- [Version 4.0](#version-40--2026-02-28) — Notification Admin UI v2.0 (Architectural Simplification)
 - [Version 3.9](#version-39--2026-02-27) — Auth/RBAC Decoupling & Architecture Restructuring
 - [Version 3.8](#version-38--2026-02-26) — Provider Adapter Services & Adapter Replacement
 - [Version 3.7](#version-37--2026-02-21) — Audit Service Deep-Dive
@@ -54,6 +56,34 @@ This document tracks all notable changes to the Notification API documentation a
 > **Info:** **Change Types**
 >
 > Each entry is categorized using one of the following types: **Added**, **Changed**, **Fixed**, **Removed**, **Deprecated**.
+
+---
+
+## Version 4.1 — 2026-02-28
+
+**Notification Admin UI — Implementation Complete (All Phases)**
+
+All planned phases (1–13) of the Notification Admin UI are now implemented. The final phase adds Audit Trail with tabbed view (Audit Logs + DLQ management), CSV export, expandable rows with JSON metadata viewer, dead letter queue status management with state machine transitions and reprocess capability. Polish includes: error boundaries for all route groups, loading skeletons for all routes, per-page metadata titles, removal of test-components page, and DLQ status variants in StatusBadge. Authentication remains deferred per v2.0 design.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Changed** | Notification Admin UI endpoint reference — `/audit` route status updated from "In Progress" to "Done" | endpoints-notification-admin-ui |
+| **Changed** | notification-admin-ui CLAUDE.md — updated Implementation Status to show Phase 13 complete, `/audit` route status updated to Done | notification-admin-ui/CLAUDE.md |
+
+---
+
+## Version 4.0 — 2026-02-28
+
+**Notification Admin UI v2.0 — Architectural Simplification**
+
+Rewrites the Notification Admin UI design document (15) to v2.0. Defers authentication entirely (no login, no JWT, no RBAC) since auth-rbac-service is not yet implemented. Replaces the single-gateway BFF communication pattern with direct microservice communication — the UI connects to 7 backend services individually (event-ingestion-service, notification-engine-service, template-service, channel-router-service, admin-service, audit-service, bulk-upload-service) via per-service environment variables. Removes auth-related pages (login, forgot-password, reset-password), user management pages (moved to auth-rbac-service-frontend), and SAML IdP settings. Simplifies the component hierarchy by removing SessionProvider, AuthGuard, and RBACProvider wrappers. Updates the API integration layer to a multi-service client with service-key routing. All notification management functionality (dashboard, rules, templates, channels, mappings, logs, bulk upload, recipient groups, system settings) remains unchanged.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Changed** | 15 — Notification Admin UI rewritten to v2.0 (20 sections) — updated service overview (no auth, 7 direct microservice dependencies), new architecture diagram with multi-service integration, authentication deferred (§5) with future integration path referencing doc 18, direct microservice communication with service routing map, multi-service API client with per-service base URLs, removed auth/user/SAML pages and components, simplified component hierarchy (no auth wrappers), updated routing (23 routes, all public), updated sequence diagrams (dashboard, template preview, rule save — no gateway), updated environment variables (7 per-service URLs), updated Docker Compose, updated security/testing/monitoring sections | 15-notification-admin-ui |
+| **Changed** | notification-admin-ui CLAUDE.md — updated to reflect direct microservice communication (7 services), no authentication, multi-service API client, updated dependencies list, updated folder structure (no auth components) | notification-admin-ui/CLAUDE.md |
+| **Changed** | notification-admin-ui convenience copy (docs/15-notification-admin-ui.md) — updated with v2.0 summary, service routing map, table of contents | notification-admin-ui/docs/ |
+| **Changed** | Notification Admin UI endpoint reference — removed 7 auth/user/SAML routes (login, forgot-password, reset-password, users, users/:id, identity-providers, identity-providers/:id), added v2 note header, added Removed Routes section with reasons | endpoints-notification-admin-ui |
 
 ---
 

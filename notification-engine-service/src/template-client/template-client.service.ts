@@ -58,7 +58,7 @@ export class TemplateClientService {
       try {
         const response = await firstValueFrom(
           this.httpService.post<TemplateServiceRenderResponse>(
-            `/templates/${templateId}/render`,
+            `/api/v1/templates/${templateId}/render`,
             { channel, data },
           ),
         );

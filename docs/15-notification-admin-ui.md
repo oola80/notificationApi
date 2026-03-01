@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Version:** | 1.0 |
-| **Date:** | 2026-02-21 |
+| **Version:** | 2.0 |
+| **Date:** | 2026-02-28 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
 
@@ -18,117 +18,127 @@
 3. [Technology Stack & Libraries](#3-technology-stack--libraries)
 4. [Application Structure](#4-application-structure)
 5. [Authentication & Session Management](#5-authentication--session-management)
-6. [Role-Based Access Control (RBAC) in the UI](#6-role-based-access-control-rbac-in-the-ui)
-7. [Data Fetching & State Management](#7-data-fetching--state-management)
-8. [Page Specifications](#8-page-specifications)
-9. [Component Architecture](#9-component-architecture)
-10. [API Integration Layer](#10-api-integration-layer)
-11. [Routing & Navigation](#11-routing--navigation)
-12. [Flowcharts](#12-flowcharts)
-13. [Sequence Diagrams](#13-sequence-diagrams)
-14. [Entity Relationship: UI Data Model](#14-entity-relationship-ui-data-model)
-15. [Error Handling & User Feedback](#15-error-handling--user-feedback)
-16. [Accessibility & Responsive Design](#16-accessibility--responsive-design)
-17. [Testing Strategy](#17-testing-strategy)
-18. [Security Considerations](#18-security-considerations)
-19. [Monitoring & Observability](#19-monitoring--observability)
-20. [Configuration & Environment Variables](#20-configuration--environment-variables)
-21. [Deployment](#21-deployment)
+6. [Data Fetching & State Management](#6-data-fetching--state-management)
+7. [Page Specifications](#7-page-specifications)
+8. [Component Architecture](#8-component-architecture)
+9. [API Integration Layer](#9-api-integration-layer)
+10. [Routing & Navigation](#10-routing--navigation)
+11. [Flowcharts](#11-flowcharts)
+12. [Sequence Diagrams](#12-sequence-diagrams)
+13. [Entity Relationship: UI Data Model](#13-entity-relationship-ui-data-model)
+14. [Error Handling & User Feedback](#14-error-handling--user-feedback)
+15. [Accessibility & Responsive Design](#15-accessibility--responsive-design)
+16. [Testing Strategy](#16-testing-strategy)
+17. [Security Considerations](#17-security-considerations)
+18. [Monitoring & Observability](#18-monitoring--observability)
+19. [Configuration & Environment Variables](#19-configuration--environment-variables)
+20. [Deployment](#20-deployment)
 
 ---
 
 ## 1. Service Overview
 
-The Notification Admin UI is the self-service Next.js backoffice application that enables the operative team to configure, manage, and monitor every aspect of the Notification API platform. It is the only user-facing frontend in the system — all other microservices are headless APIs.
+The Notification Admin UI is the self-service Next.js backoffice application that enables the operative team to configure, manage, and monitor every aspect of the Notification API platform. It is an independent frontend application with no authentication — all pages are public and all features are available to any user who can reach the application.
 
 | Attribute | Value |
 |---|---|
 | **Technology** | Next.js 14 (App Router) with TypeScript |
 | **Port** | `3159` |
 | **Database** | None — all data through API |
-| **Dependencies** | Notification Gateway (BFF) only — port `3150` |
+| **Dependencies** | 7 backend microservices (direct communication) |
+| **Authentication** | None (deferred) |
 | **Source Repo Folder** | `notification-admin-ui/` |
-| **Authentication** | JWT bearer tokens (access + refresh via HTTP-only cookie) |
 
 ### Responsibilities
 
-1. **Authentication Interface:** Login page with local credentials (email/password) and SAML 2.0 SSO button. Password reset flow. Session management with automatic token refresh.
-2. **Dashboard & Analytics:** Real-time notification volume charts, delivery success rates, channel breakdowns, failure analysis, top triggered rules, and system health indicators — with graceful degradation for partial data.
-3. **Notification Rule Management:** List, create, edit, and delete notification rules with a visual condition builder, template picker, channel selector, recipient configuration, suppression settings, and delivery priority override.
-4. **Template Management:** WYSIWYG editor for HTML email templates, plain text editors for SMS and WhatsApp, push notification previewer. Live preview with variable interpolation, version history, and rollback.
-5. **Channel Configuration:** Channel health cards, provider configuration forms (SendGrid, Mailgun, Braze, Twilio, FCM), connection testing, and credential rotation workflows.
-6. **Event Mapping Management:** Visual mapping builder for runtime field mapping configurations. Mapping test panel with sample payload input and normalized output preview. Priority configuration.
-7. **Notification Logs & Tracing:** Searchable, filterable log table with expandable detail rows. Full notification lifecycle timeline, rendered content preview, and delivery attempt history.
-8. **Bulk Upload:** Drag-and-drop XLSX upload, real-time processing progress, upload history, error detail panel with export, and sample template download.
-9. **User Management:** Admin user CRUD with role assignment, password reset, deactivation, and activity log. Restricted to Super Admin and Admin roles.
-10. **System Configuration:** Global platform settings management (retention, feature flags, rate limits). Super Admin only.
-11. **SAML Identity Provider Settings:** IdP metadata import, attribute mapping, auto-provisioning toggle, SP metadata download, and certificate expiry warnings. Super Admin only.
-12. **Recipient Group Management:** Create and manage static and dynamic recipient groups for use in notification rules.
+1. **Dashboard & Analytics:** Real-time notification volume charts, delivery success rates, channel breakdowns, failure analysis, top triggered rules, and system health indicators — with graceful degradation for partial data. Data sourced from audit-service (:3156).
+2. **Notification Rule Management:** List, create, edit, and delete notification rules with a visual condition builder, template picker, channel selector, recipient configuration, suppression settings, and delivery priority override. Data sourced from notification-engine-service (:3152).
+3. **Template Management:** WYSIWYG editor for HTML email templates, plain text editors for SMS and WhatsApp, push notification previewer. Live preview with variable interpolation, version history, and rollback. Data sourced from template-service (:3153).
+4. **Channel Configuration:** Channel health cards, provider configuration forms (Mailgun, Braze, WhatsApp/Meta, AWS SES), connection testing, and credential rotation workflows. Data sourced from channel-router-service (:3154).
+5. **Event Mapping Management:** Visual mapping builder for runtime field mapping configurations. Mapping test panel with sample payload input and normalized output preview. Priority configuration. Data sourced from event-ingestion-service (:3151).
+6. **Notification Logs & Tracing:** Searchable, filterable log table with expandable detail rows. Full notification lifecycle timeline, rendered content preview, and delivery attempt history. Data sourced from audit-service (:3156).
+7. **Bulk Upload:** Drag-and-drop XLSX upload, real-time processing progress, upload history, error detail panel with export, and sample template download. Data sourced from bulk-upload-service (:3158).
+8. **System Configuration:** Global platform settings management (retention, feature flags, rate limits). Data sourced from admin-service (:3155).
+9. **Recipient Group Management:** Create and manage static and dynamic recipient groups for use in notification rules. Data sourced from notification-engine-service (:3152).
 
-> **Info:** **BFF-Only Communication**
+> **Info:** **Direct Microservice Communication**
 >
-> The Notification Admin UI communicates **exclusively** through the Notification Gateway (BFF) on port `3150`. It never calls internal microservices directly. This provides a single security boundary, consistent API surface, and allows the gateway to handle authentication, rate limiting, and response transformation. All API calls flow through a single integration layer that prepends the gateway base URL and attaches authentication headers.
+> The Notification Admin UI communicates **directly with each backend microservice** that owns the data it needs. There is no BFF proxy, no gateway, and no single aggregation service between the UI and the backends. Each page talks to the specific microservice responsible for its domain. This keeps the architecture simple and eliminates proxy latency. A reverse proxy or API gateway can be added at the infrastructure level later if needed for cross-cutting concerns (rate limiting, CORS, TLS termination) without changing the UI code — only the environment variables would change.
 
 ---
 
 ## 2. Architecture & Integration Points
 
-The Admin UI sits in the Edge Layer of the platform architecture, alongside the Notification Gateway. It is a pure presentation-tier application with no backend state — every piece of data is fetched from and persisted through the Gateway API.
+The Admin UI sits in the Edge Layer of the platform architecture. It is a pure presentation-tier application with no backend state — every piece of data is fetched from and persisted through the backend microservice APIs directly.
 
 ### Figure 2.1 — Integration Context
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                       Notification Admin UI :3159                              │
-│                                                                               │
-│  ┌──────────────────────────────────────────────────────────────────────────┐ │
-│  │                         Next.js App Router                               │ │
-│  │                                                                          │ │
-│  │   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐ │ │
-│  │   │Dashboard │ │Rules     │ │Templates │ │Channels  │ │Notification  │ │ │
-│  │   │Page      │ │Page      │ │Page      │ │Page      │ │Logs Page     │ │ │
-│  │   └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────────┘ │ │
-│  │   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐ │ │
-│  │   │Event     │ │Bulk      │ │Users     │ │Settings  │ │Recipient     │ │ │
-│  │   │Mappings  │ │Upload    │ │Page      │ │Page      │ │Groups Page   │ │ │
-│  │   └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────────┘ │ │
-│  │                                                                          │ │
-│  │   ┌─────────────────────────────────────────────────────────────────┐   │ │
-│  │   │                    API Integration Layer                         │   │ │
-│  │   │  apiClient (fetch wrapper) · SWR hooks · Auth interceptor       │   │ │
-│  │   └────────────────────────────────┬────────────────────────────────┘   │ │
-│  └────────────────────────────────────┼────────────────────────────────────┘ │
-└───────────────────────────────────────┼──────────────────────────────────────┘
-                                        │ HTTPS (all API calls)
-                                        │ Authorization: Bearer {JWT}
-                                        │ Cookie: refreshToken=...
-                                        ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                      Notification Gateway :3150 (BFF)                         │
-│                                                                               │
-│  Auth · RBAC · Rate Limiting · Validation · Service Proxy                    │
-│                                                                               │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ │
-│  │Admin Svc   │ │Notif Engine│ │Template Svc│ │Channel Rtr │ │Audit Svc   │ │
-│  │:3155       │ │:3152       │ │:3153       │ │:3154       │ │:3156       │ │
-│  └────────────┘ └────────────┘ └────────────┘ └────────────┘ └────────────┘ │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐                               │
-│  │Event Ingest│ │Bulk Upload │ │Email Ingest│                               │
-│  │:3151       │ │:3158       │ │:3157       │                               │
-│  └────────────┘ └────────────┘ └────────────┘                               │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Notification Admin UI :3159                             │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                        Next.js App Router                              │ │
+│  │                                                                        │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐ │ │
+│  │  │Dashboard │ │Rules     │ │Templates │ │Channels  │ │Notification│ │ │
+│  │  │Page      │ │Page      │ │Page      │ │Page      │ │Logs Page   │ │ │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────────┘ │ │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐           │ │
+│  │  │Event     │ │Bulk      │ │Recipient │ │System        │           │ │
+│  │  │Mappings  │ │Upload    │ │Groups    │ │Settings Page │           │ │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────────┘           │ │
+│  │                                                                        │ │
+│  │  ┌──────────────────────────────────────────────────────────────────┐ │ │
+│  │  │               Multi-Service API Integration Layer                │ │ │
+│  │  │  apiClient (fetch wrapper) · SWR hooks · per-service routing    │ │ │
+│  │  └───┬──────────┬──────────┬──────────┬──────────┬─────────────────┘ │ │
+│  └──────┼──────────┼──────────┼──────────┼──────────┼───────────────────┘ │
+└─────────┼──────────┼──────────┼──────────┼──────────┼─────────────────────┘
+          │          │          │          │          │
+          ▼          ▼          ▼          ▼          ▼
+    ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+    │Event     │ │Notif     │ │Template  │ │Channel   │ │Audit     │
+    │Ingestion │ │Engine    │ │Service   │ │Router    │ │Service   │
+    │:3151     │ │:3152     │ │:3153     │ │:3154     │ │:3156     │
+    └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+    ┌──────────┐ ┌──────────┐
+    │Admin     │ │Bulk      │
+    │Service   │ │Upload    │
+    │:3155     │ │:3158     │
+    └──────────┘ └──────────┘
 ```
+
+### Service Routing Map
+
+Each UI feature area routes to the microservice that owns the domain:
+
+| UI Feature Area | Target Service | Port | API Base Path |
+|---|---|---|---|
+| **Event Mappings** | event-ingestion-service | 3151 | `/api/v1/event-mappings` |
+| **Notification Rules** | notification-engine-service | 3152 | `/api/v1/rules` |
+| **Recipient Groups** | notification-engine-service | 3152 | `/api/v1/recipient-groups` |
+| **Templates** | template-service | 3153 | `/api/v1/templates` |
+| **Channels & Providers** | channel-router-service | 3154 | `/api/v1/channels`, `/api/v1/providers` |
+| **System Configuration** | admin-service | 3155 | `/api/v1/system-configs` |
+| **Dashboard Analytics** | audit-service | 3156 | `/api/v1/analytics/summary` |
+| **Notification Logs** | audit-service | 3156 | `/api/v1/logs` |
+| **Audit Log Viewer** | audit-service | 3156 | `/api/v1/logs` |
+| **Notification Tracing** | audit-service | 3156 | `/api/v1/trace` |
+| **Bulk Upload** | bulk-upload-service | 3158 | `/api/v1/uploads` |
 
 ### Communication Pattern
 
 | Direction | Target | Protocol | Description |
 |---|---|---|---|
-| **Outbound** | Notification Gateway :3150 | HTTPS (REST) | All API calls — CRUD, dashboard, logs, authentication |
-| **Inbound** | User's browser | HTTPS | Serves SSR pages and static assets |
-
-> **Info:** **No Direct Backend Access**
->
-> The Admin UI has zero knowledge of internal microservice addresses. It communicates with a single endpoint (the Gateway). This design means the frontend can be deployed and scaled independently from all backend services, and internal service topology changes (new ports, new services) are transparent to the UI.
+| **Outbound** | event-ingestion-service :3151 | HTTP (REST) | Event mapping CRUD, mapping test |
+| **Outbound** | notification-engine-service :3152 | HTTP (REST) | Rules CRUD, recipient groups CRUD |
+| **Outbound** | template-service :3153 | HTTP (REST) | Template CRUD, rendering, preview |
+| **Outbound** | channel-router-service :3154 | HTTP (REST) | Channel list, provider config |
+| **Outbound** | admin-service :3155 | HTTP (REST) | System configuration |
+| **Outbound** | audit-service :3156 | HTTP (REST) | Dashboard analytics, logs, search, trace, receipts |
+| **Outbound** | bulk-upload-service :3158 | HTTP (REST) | Upload CRUD, file upload, result download |
+| **Inbound** | User's browser | HTTP | Serves SSR pages and static assets |
 
 ---
 
@@ -172,14 +182,8 @@ The project follows the Next.js 14 App Router convention with feature-based fold
 notification-admin-ui/
 ├── src/
 │   ├── app/                          # Next.js App Router pages
-│   │   ├── layout.tsx                # Root layout — providers, sidebar, auth guard
+│   │   ├── layout.tsx                # Root layout — sidebar, SWR provider (no auth)
 │   │   ├── page.tsx                  # Redirect to /dashboard
-│   │   ├── login/
-│   │   │   └── page.tsx              # Login page (public)
-│   │   ├── forgot-password/
-│   │   │   └── page.tsx              # Password reset request (public)
-│   │   ├── reset-password/
-│   │   │   └── page.tsx              # Password reset form (public, token-gated)
 │   │   ├── dashboard/
 │   │   │   └── page.tsx              # Dashboard with metrics and charts
 │   │   ├── rules/
@@ -222,22 +226,13 @@ notification-admin-ui/
 │   │   │   │   └── page.tsx          # Create group
 │   │   │   └── [id]/
 │   │   │       └── page.tsx          # Group detail with members
-│   │   ├── users/
-│   │   │   ├── page.tsx              # User list
-│   │   │   └── [id]/
-│   │   │       └── page.tsx          # User detail / edit
 │   │   ├── audit/
 │   │   │   └── page.tsx              # Audit log viewer
 │   │   └── settings/
-│   │       ├── page.tsx              # System configuration
-│   │       └── identity-providers/
-│   │           ├── page.tsx          # SAML IdP list
-│   │           └── [id]/
-│   │               └── page.tsx      # IdP detail / edit
+│   │       └── page.tsx              # System configuration
 │   ├── components/
 │   │   ├── ui/                       # Primitive UI components (Button, Input, Table, etc.)
 │   │   ├── layout/                   # Sidebar, Header, Breadcrumbs, PageContainer
-│   │   ├── auth/                     # LoginForm, SSOButton, AuthGuard, SessionProvider
 │   │   ├── dashboard/                # MetricCard, VolumeChart, DeliveryRateGauge, etc.
 │   │   ├── rules/                    # RuleForm, ConditionBuilder, ChannelSelector, etc.
 │   │   ├── templates/                # TemplateEditor, ChannelTabPanel, VariableToolbar, etc.
@@ -245,12 +240,9 @@ notification-admin-ui/
 │   │   ├── logs/                     # LogTable, NotificationTimeline, ContentPreview
 │   │   ├── mappings/                 # MappingBuilder, FieldMappingRow, MappingTestPanel
 │   │   ├── bulk-upload/              # UploadDropzone, ProgressBar, ErrorTable
-│   │   ├── users/                    # UserForm, RoleSelector, ActivityLog
 │   │   ├── recipient-groups/         # GroupForm, MemberList, CriteriaBuilder
 │   │   └── shared/                   # Pagination, StatusBadge, ConfirmDialog, EmptyState
 │   ├── hooks/                        # Custom React hooks
-│   │   ├── useAuth.ts                # Authentication state and actions
-│   │   ├── useRBAC.ts                # Permission checks
 │   │   ├── useDashboard.ts           # Dashboard data fetching
 │   │   ├── useRules.ts               # Rule CRUD operations
 │   │   ├── useTemplates.ts           # Template CRUD operations
@@ -258,26 +250,22 @@ notification-admin-ui/
 │   │   ├── useMappings.ts            # Event mapping operations
 │   │   ├── useNotifications.ts       # Notification log queries
 │   │   ├── useBulkUpload.ts          # Upload lifecycle management
-│   │   ├── useUsers.ts               # User management operations
 │   │   ├── useRecipientGroups.ts     # Recipient group operations
 │   │   ├── useAuditLogs.ts           # Audit log queries
 │   │   └── useToast.ts               # Toast notification helper
 │   ├── lib/
-│   │   ├── api-client.ts             # Fetch wrapper with auth interceptor
-│   │   ├── auth.ts                   # Token management (storage, refresh, decode)
-│   │   ├── permissions.ts            # RBAC permission constants and check utilities
+│   │   ├── api-client.ts             # Multi-service fetch wrapper (no auth)
+│   │   ├── service-config.ts         # Service URL registry from env vars
 │   │   ├── validators.ts             # Zod schemas for form validation
 │   │   └── formatters.ts             # Date, number, and status formatting utilities
 │   ├── types/
 │   │   ├── api.ts                    # API response envelope types
-│   │   ├── auth.ts                   # User, session, and token types
 │   │   ├── rules.ts                  # Rule, condition, action types
 │   │   ├── templates.ts              # Template, version, channel content types
 │   │   ├── channels.ts               # Channel, provider config types
 │   │   ├── mappings.ts               # Event mapping, field mapping types
 │   │   ├── notifications.ts          # Notification, status log, trace types
 │   │   ├── uploads.ts                # Upload, upload row types
-│   │   ├── users.ts                  # Admin user, role types
 │   │   └── dashboard.ts              # Dashboard metric types
 │   └── styles/
 │       └── globals.css               # Tailwind imports and global styles
@@ -296,185 +284,36 @@ notification-admin-ui/
 
 ## 5. Authentication & Session Management
 
-The Admin UI implements a complete authentication flow supporting both local credentials and SAML 2.0 SSO. All authentication state is managed client-side with JWT tokens validated by the Gateway on every API call.
+Authentication is **deferred** in this version of the Notification Admin UI. The application is open access — all pages and features are available without login. There is no JWT token management, no session state, and no RBAC enforcement.
 
-### 5.1 Token Storage Strategy
+### Why Deferred
 
-| Token | Storage | Lifetime | Refresh |
-|---|---|---|---|
-| **Access Token** | In-memory (React context) | 15 minutes | Auto-refresh via refresh token |
-| **Refresh Token** | HTTP-only, Secure, SameSite=Strict cookie | 7 days | Rotation on each use |
+- The auth-rbac-service ecosystem (backend :3160, frontend :3161, ecommerce-backoffice :3162) is designed but not yet implemented (see [18 — Auth/RBAC Architecture Addendum](18-auth-rbac-architecture-addendum.md)).
+- Implementing auth in the Admin UI before the auth services exist would create a circular dependency.
+- For the initial development and testing phase, an unauthenticated UI accelerates iteration.
 
-> **Warning:** **No localStorage for Tokens**
->
-> Access tokens are never stored in localStorage or sessionStorage to prevent XSS-based token theft. The access token is held in a React context variable and is lost on page refresh — the `SessionProvider` component automatically uses the refresh token cookie to obtain a new access token on mount. This design provides the best balance of security and user experience.
+### Future Integration Path
 
-### 5.2 Authentication Flow
+When authentication is added later, the integration follows the pattern defined in [18 — Auth/RBAC Architecture Addendum §8](18-auth-rbac-architecture-addendum.md#8-auth-token-flow):
 
-```
-    ┌──────────────────────────┐
-    │  1. User visits any page │
-    └────────────┬─────────────┘
-                 ▼
-    ┌──────────────────────────┐
-    │  2. AuthGuard checks     │  ◄── Wraps all authenticated routes
-    │     for valid access     │
-    │     token in memory      │
-    └────────────┬─────────────┘
-                 ▼
-     ◆ Token present & valid?  ◆
-                 │
-        ┌────── No ──────┐              ┌────── Yes ──────┐
-        ▼                │              ▼                  │
-    ┌────────────┐       │     ┌────────────────┐         │
-    │ 3a. Try    │       │     │ 4. Render page │         │
-    │ refresh    │       │     │ with user ctx  │         │
-    │ token      │       │     └────────────────┘         │
-    └─────┬──────┘       │                                │
-          ▼              │                                │
-     ◆ Refresh OK?  ◆   │                                │
-          │              │                                │
-    ┌── Yes ──┐   ┌── No ──┐                             │
-    ▼         │   ▼        │                              │
-┌────────┐   │ ┌────────────┐                             │
-│ Store  │   │ │ Redirect   │                             │
-│ new    │   │ │ to /login  │                             │
-│ access │   │ │            │                             │
-│ token  │───┘ └────────────┘                             │
-│ → step │                                                │
-│ 4      │                                                │
-└────────┘                                                │
-```
+1. User authenticates via ecommerce-backoffice (:3162).
+2. ecommerce-backoffice requests an app-scoped JWT for the notification-admin-ui application.
+3. ecommerce-backoffice redirects to `notification-admin-ui?token={appToken}`.
+4. The Admin UI stores the app-scoped JWT and attaches it to all API requests via an `Authorization: Bearer {token}` interceptor.
+5. Each backend microservice validates the JWT locally using the RS256 public key.
 
-### 5.3 Token Refresh Mechanism
-
-The `SessionProvider` component implements proactive token refresh:
-
-1. **On mount:** Calls `POST /api/v1/auth/refresh` using the HTTP-only refresh cookie. If successful, stores the new access token in context and schedules the next refresh.
-2. **Proactive refresh:** A timer is set to refresh the token 2 minutes before expiry (at the 13-minute mark for a 15-minute token). This ensures uninterrupted user sessions.
-3. **On API 401:** If any API call returns `401 Unauthorized`, the interceptor attempts a single refresh. If the refresh fails, the user is redirected to `/login` with a `sessionExpired` query parameter.
-4. **Replay detection:** If the Gateway detects a replayed refresh token, all sessions for the user are invalidated. The UI shows a "Your session has been terminated for security reasons" message and redirects to login.
-
-### 5.4 Login Page Options
-
-```
-┌───────────────────────────────────────────────┐
-│                                               │
-│              Notification API                 │
-│                                               │
-│  ┌─────────────────────────────────────────┐  │
-│  │  Email                                  │  │
-│  │  ┌───────────────────────────────────┐  │  │
-│  │  │ user@company.com                  │  │  │
-│  │  └───────────────────────────────────┘  │  │
-│  │                                         │  │
-│  │  Password                               │  │
-│  │  ┌───────────────────────────────────┐  │  │
-│  │  │ ••••••••••••                      │  │  │
-│  │  └───────────────────────────────────┘  │  │
-│  │                                         │  │
-│  │  [ Forgot password? ]                   │  │
-│  │                                         │  │
-│  │  ┌───────────────────────────────────┐  │  │
-│  │  │          Sign In                  │  │  │
-│  │  └───────────────────────────────────┘  │  │
-│  │                                         │  │
-│  │  ──────────── or ────────────           │  │
-│  │                                         │  │
-│  │  ┌───────────────────────────────────┐  │  │
-│  │  │       Sign in with SSO            │  │  │ ◄── Only shown when
-│  │  └───────────────────────────────────┘  │  │     active SAML IdP
-│  └─────────────────────────────────────────┘  │     is configured
-│                                               │
-└───────────────────────────────────────────────┘
-```
-
-> **Info:** **SSO Button Visibility**
->
-> The "Sign in with SSO" button is only rendered when the Gateway's `GET /api/v1/auth/saml/status` endpoint returns at least one active SAML Identity Provider. This is a lightweight public endpoint (no auth required) called on login page mount. When multiple IdPs are configured, a dropdown selector appears above the SSO button. See [04 — Authentication & Identity §8](04-authentication-identity.md#8-frontend-integration) for the complete frontend integration specification.
+This future integration will require:
+- Adding `SessionProvider`, `AuthGuard`, and `RBACProvider` wrapper components.
+- Adding an authentication interceptor to the API client.
+- Adding JWT validation guards to each backend microservice (currently only admin-service has this planned).
+- Adding conditional UI rendering based on user roles and permissions (RBAC enforcement).
+- Re-adding login/password pages if the UI should handle auth flows itself, or relying on ecommerce-backoffice redirect.
 
 ---
 
-## 6. Role-Based Access Control (RBAC) in the UI
+## 6. Data Fetching & State Management
 
-RBAC enforcement happens at two levels: the Gateway rejects unauthorized API calls (server-side), and the UI hides or disables elements the user cannot interact with (client-side). Client-side enforcement is a UX optimization — the Gateway remains the security boundary.
-
-### 6.1 Permission Check Utility
-
-The `useRBAC` hook exposes permission-checking functions derived from the JWT claims:
-
-```
-useRBAC() → {
-  role: string                          // "super_admin" | "admin" | "operator" | "viewer"
-  can(resource, action): boolean        // Check single permission
-  canAny(checks[]): boolean             // At least one permission matches
-  canAll(checks[]): boolean             // All permissions match
-  isAtLeast(role): boolean              // Role hierarchy check
-}
-```
-
-### 6.2 UI Visibility Matrix
-
-| UI Element | Super Admin | Admin | Operator | Viewer |
-|---|---|---|---|---|
-| Dashboard | Full | Full | Full | Full |
-| Rules — List | Full | Full | Full | Read-only |
-| Rules — Create / Edit | Yes | Yes | Yes | Hidden |
-| Rules — Delete / Toggle | Yes | Yes | Hidden | Hidden |
-| Templates — List / Preview | Full | Full | Full | Read-only |
-| Templates — Create / Edit | Yes | Yes | Yes | Hidden |
-| Templates — Delete / Rollback | Yes | Yes | Hidden | Hidden |
-| Channels — View status | Full | Full | Full | Full |
-| Channels — Update config | Yes | Yes | Hidden | Hidden |
-| Event Mappings — List | Full | Full | Full | Read-only |
-| Event Mappings — Create / Edit / Test | Yes | Yes | Yes | Hidden |
-| Event Mappings — Delete | Yes | Yes | Hidden | Hidden |
-| Notification Logs | Full | Full | Full | Full |
-| Bulk Upload — Upload / Retry | Yes | Yes | Yes | Hidden |
-| Bulk Upload — Cancel / Delete | Yes | Yes | Hidden | Hidden |
-| Recipient Groups — List | Full | Full | Full | Read-only |
-| Recipient Groups — Create / Edit | Yes | Yes | Yes | Hidden |
-| Recipient Groups — Delete | Yes | Yes | Hidden | Hidden |
-| User Management | Full | Full (not Super Admins) | Hidden | Hidden |
-| Audit Logs | Full | Full | Full | Full |
-| System Configuration | Full | Hidden | Hidden | Hidden |
-| Identity Provider Settings | Full | Hidden | Hidden | Hidden |
-| API Key Management | Yes | Yes | Hidden | Hidden |
-
-### 6.3 Client-Side Enforcement Pattern
-
-```
-    ┌──────────────────────────┐
-    │  1. Component renders    │
-    └────────────┬─────────────┘
-                 ▼
-    ┌──────────────────────────┐
-    │  2. Call useRBAC()       │  ◄── Reads role from AuthContext (JWT claims)
-    │     to get permissions   │
-    └────────────┬─────────────┘
-                 ▼
-     ◆ can(resource, action)?  ◆
-                 │
-        ┌────── No ──────┐         ┌────── Yes ──────┐
-        ▼                │         ▼                  │
-    ┌────────────┐       │    ┌────────────────────┐  │
-    │ 3a. Hide   │       │    │ 3b. Render element │  │
-    │ element or │       │    │ (button, form,     │  │
-    │ render as  │       │    │  menu item, etc.)  │  │
-    │ disabled   │       │    └────────────────────┘  │
-    └────────────┘       │                            │
-                         │                            │
-                         └────────────────────────────┘
-
-    Note: If a user bypasses the UI (e.g., browser devtools) and
-    calls a restricted API endpoint, the Gateway returns 403 Forbidden.
-```
-
----
-
-## 7. Data Fetching & State Management
-
-### 7.1 SWR (stale-while-revalidate) Strategy
+### 6.1 SWR (stale-while-revalidate) Strategy
 
 All read operations use SWR hooks for efficient data fetching with built-in caching, background revalidation, and error retry.
 
@@ -487,67 +326,67 @@ All read operations use SWR hooks for efficient data fetching with built-in cach
 | **Error retry** | 3 attempts with exponential backoff (1s, 3s, 5s) |
 | **Polling intervals** | Configurable per resource (dashboard: 30s, bulk upload status: 5s) |
 
-### 7.2 Data Flow Architecture
+### 6.2 Data Flow Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                      React Components                         │
-│                                                               │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐                 │
-│  │ Page     │   │ Page     │   │ Page     │                 │
-│  │ Component│   │ Component│   │ Component│                 │
-│  └────┬─────┘   └────┬─────┘   └────┬─────┘                 │
-│       │              │              │                        │
-│       ▼              ▼              ▼                        │
-│  ┌──────────────────────────────────────────────────┐       │
-│  │              Custom SWR Hooks                      │       │
-│  │  useRules() · useTemplates() · useDashboard()     │       │
-│  │  useChannels() · useMappings() · useNotifications()│       │
-│  └──────────────────────┬───────────────────────────┘       │
-│                         │                                    │
-│                         ▼                                    │
-│  ┌──────────────────────────────────────────────────┐       │
-│  │                 SWR Cache Layer                     │       │
-│  │  In-memory cache · Deduplication · Revalidation    │       │
-│  └──────────────────────┬───────────────────────────┘       │
-│                         │                                    │
-│                         ▼                                    │
-│  ┌──────────────────────────────────────────────────┐       │
-│  │              API Client (fetch wrapper)             │       │
-│  │  Base URL · Auth headers · Error handling          │       │
-│  │  Token refresh interceptor · Response parsing      │       │
-│  └──────────────────────┬───────────────────────────┘       │
-└─────────────────────────┼────────────────────────────────────┘
-                          │ HTTPS
-                          ▼
-              Notification Gateway :3150
+┌──────────────────────────────────────────────────────────────────┐
+│                      React Components                              │
+│                                                                    │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐                      │
+│  │ Page     │   │ Page     │   │ Page     │                      │
+│  │ Component│   │ Component│   │ Component│                      │
+│  └────┬─────┘   └────┬─────┘   └────┬─────┘                      │
+│       │              │              │                             │
+│       ▼              ▼              ▼                             │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │                   Custom SWR Hooks                            ││
+│  │  useRules() · useTemplates() · useDashboard()                ││
+│  │  useChannels() · useMappings() · useNotifications()          ││
+│  └────────────────────────┬─────────────────────────────────────┘│
+│                            │                                      │
+│                            ▼                                      │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │                    SWR Cache Layer                             ││
+│  │  In-memory cache · Deduplication · Revalidation               ││
+│  └────────────────────────┬─────────────────────────────────────┘│
+│                            │                                      │
+│                            ▼                                      │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │            Multi-Service API Client (fetch wrapper)           ││
+│  │  Service routing · Error handling · Response parsing          ││
+│  │  No auth interceptor                                          ││
+│  └───┬─────────┬─────────┬─────────┬─────────┬─────────┬───────┘│
+└──────┼─────────┼─────────┼─────────┼─────────┼─────────┼────────┘
+       │ HTTP    │ HTTP    │ HTTP    │ HTTP    │ HTTP    │ HTTP
+       ▼         ▼         ▼         ▼         ▼         ▼
+     :3151     :3152     :3153     :3154     :3155/:3156  :3158
 ```
 
-### 7.3 Mutation Pattern
+### 6.3 Mutation Pattern
 
 Write operations (create, update, delete) use a consistent mutation pattern:
 
 1. **Optimistic update** (optional): Update the SWR cache immediately for responsive UX.
-2. **API call**: Send the mutation request to the Gateway.
+2. **API call**: Send the mutation request to the target microservice.
 3. **Revalidation**: On success, mutate the SWR cache to trigger revalidation of affected keys.
 4. **Rollback**: On failure, revert the optimistic update and show an error toast.
 
-### 7.4 Server Components vs. Client Components
+### 6.4 Server Components vs. Client Components
 
 | Component Type | Used For | Data Fetching |
 |---|---|---|
-| **Server Components** | Page shells, layout, metadata, initial data prefetch | `fetch()` with `cookies()` for auth during SSR |
+| **Server Components** | Page shells, layout, metadata, initial data prefetch | `fetch()` during SSR |
 | **Client Components** | Interactive elements (forms, charts, editors, modals) | SWR hooks for client-side fetching and revalidation |
 
 > **Info:** **SSR Data Prefetch**
 >
-> Server components in the Next.js App Router fetch initial data during SSR through the Gateway using the refresh token cookie. This data is serialized into the page HTML as a SWR `fallback`, allowing the client-side SWR hooks to hydrate instantly without a loading state on first paint. Subsequent interactions use client-side SWR for real-time updates.
+> Server components in the Next.js App Router fetch initial data during SSR directly from the backend microservices. This data is serialized into the page HTML as a SWR `fallback`, allowing the client-side SWR hooks to hydrate instantly without a loading state on first paint. Subsequent interactions use client-side SWR for real-time updates.
 
 ---
 
-## 8. Page Specifications
+## 7. Page Specifications
 
-### 8.1 Dashboard (`/dashboard`)
+### 7.1 Dashboard (`/dashboard`)
 
 The dashboard provides at-a-glance operational visibility across the entire notification platform.
 
@@ -577,16 +416,16 @@ The dashboard provides at-a-glance operational visibility across the entire noti
 │  ┌────────────────────────────────────┐  ┌────────────────────────┐  │
 │  │  Delivery Rates by Channel         │  │  Channel Health        │  │
 │  │  (Bar Chart — stacked)             │  │                        │  │
-│  │                                    │  │  Email    [SendGrid]   │  │
+│  │                                    │  │  Email    [Mailgun]    │  │
 │  │  Email    █████████░ 98%           │  │  ● Healthy             │  │
 │  │  SMS      ████████░░ 95%           │  │                        │  │
-│  │  WhatsApp ████████░░ 97%           │  │  SMS      [Twilio]     │  │
+│  │  WhatsApp ████████░░ 97%           │  │  SMS      [Braze]      │  │
 │  │  Push     ███████░░░ 92%           │  │  ● Healthy             │  │
 │  │                                    │  │                        │  │
-│  └────────────────────────────────────┘  │  WhatsApp [Twilio]     │  │
+│  └────────────────────────────────────┘  │  WhatsApp [Meta]       │  │
 │                                          │  ● Healthy             │  │
 │  ┌────────────────────────────────────┐  │                        │  │
-│  │  Top Triggered Rules (7 days)      │  │  Push     [FCM]        │  │
+│  │  Top Triggered Rules (7 days)      │  │  Push     [Braze]      │  │
 │  │                                    │  │  ● Healthy             │  │
 │  │  1. Order Shipped — Email+SMS  521 │  └────────────────────────┘  │
 │  │  2. Payment Confirmed — Email  410 │                              │
@@ -602,19 +441,19 @@ The dashboard provides at-a-glance operational visibility across the entire noti
 
 #### Data Sources
 
-| Widget | Gateway Endpoint | Refresh |
+| Widget | Service Endpoint | Refresh |
 |---|---|---|
-| Metric cards | `GET /api/v1/dashboard/stats?period={period}` | 30s polling |
-| Notification volume chart | `GET /api/v1/dashboard/stats?period={period}` | 30s polling |
-| Channel breakdown | `GET /api/v1/dashboard/stats?period={period}` | 30s polling |
-| Delivery rates by channel | `GET /api/v1/dashboard/stats?period={period}` | 30s polling |
-| Channel health | `GET /api/v1/channels` | 60s polling |
-| Top triggered rules | `GET /api/v1/dashboard/stats?period=7d` | 60s polling |
-| Recent failures | `GET /api/v1/dashboard/stats?period=today` | 30s polling |
+| Metric cards | audit-service `GET /api/v1/analytics/summary` | 30s polling |
+| Notification volume chart | audit-service `GET /api/v1/analytics/summary` | 30s polling |
+| Channel breakdown | audit-service `GET /api/v1/analytics/summary` | 30s polling |
+| Delivery rates by channel | audit-service `GET /api/v1/analytics/summary` | 30s polling |
+| Channel health | channel-router-service `GET /api/v1/channels` | 60s polling |
+| Top triggered rules | audit-service `GET /api/v1/analytics/summary` | 60s polling |
+| Recent failures | audit-service `GET /api/v1/analytics/summary` | 30s polling |
 
 #### Graceful Degradation
 
-When the Admin Service reports a degraded dashboard response (`meta.degraded: true`), the UI renders available widgets normally and replaces unavailable sections with a warning banner:
+When any backend service is unreachable, the UI renders available widgets normally and replaces unavailable sections with a warning banner:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -626,7 +465,7 @@ When the Admin Service reports a degraded dashboard response (`meta.degraded: tr
 
 ---
 
-### 8.2 Notification Rule Management (`/rules`)
+### 7.2 Notification Rule Management (`/rules`)
 
 #### Rule List Page
 
@@ -684,7 +523,7 @@ When the Admin Service reports a degraded dashboard response (`meta.degraded: tr
 
 #### Cross-Service Validation Feedback
 
-When saving a rule, the Admin Service validates against multiple downstream services. If any check fails, the UI displays specific, actionable error messages:
+When saving a rule, the notification-engine-service validates against multiple downstream services. If any check fails, the UI displays specific, actionable error messages:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -697,7 +536,7 @@ When saving a rule, the Admin Service validates against multiple downstream serv
 
 ---
 
-### 8.3 Template Editor (`/templates`)
+### 7.3 Template Editor (`/templates`)
 
 #### Template List Page
 
@@ -766,7 +605,7 @@ When saving a rule, the Admin Service validates against multiple downstream serv
 
 ---
 
-### 8.4 Channel Configuration (`/channels`)
+### 7.4 Channel Configuration (`/channels`)
 
 #### Channel Cards Layout
 
@@ -776,7 +615,7 @@ When saving a rule, the Admin Service validates against multiple downstream serv
 │                                                                      │
 │  ┌────────────────────┐  ┌────────────────────┐                     │
 │  │  Email              │  │  SMS                │                     │
-│  │  Provider: SendGrid │  │  Provider: Twilio   │                     │
+│  │  Provider: Mailgun  │  │  Provider: Braze    │                     │
 │  │  ● Healthy          │  │  ● Healthy          │                     │
 │  │  Rate: 98.2%        │  │  Rate: 95.1%        │                     │
 │  │  Sent (24h): 845    │  │  Sent (24h): 234    │                     │
@@ -785,7 +624,7 @@ When saving a rule, the Admin Service validates against multiple downstream serv
 │                                                                      │
 │  ┌────────────────────┐  ┌────────────────────┐                     │
 │  │  WhatsApp           │  │  Push               │                     │
-│  │  Provider: Twilio   │  │  Provider: FCM      │                     │
+│  │  Provider: Meta     │  │  Provider: Braze    │                     │
 │  │  ● Healthy          │  │  ○ Not configured   │                     │
 │  │  Rate: 97.0%        │  │                     │                     │
 │  │  Sent (24h): 56     │  │  [Configure]        │                     │
@@ -800,7 +639,7 @@ Each channel has a provider-specific configuration form with common patterns:
 
 | Section | Fields |
 |---|---|
-| **Provider** | Provider type selector (e.g., SendGrid, Mailgun for email) |
+| **Provider** | Provider type selector (e.g., Mailgun for email, Braze for SMS/push) |
 | **Credentials** | API key (masked input with reveal toggle), auth token, webhook secret |
 | **Sender Identity** | From email, from name, reply-to (email); sender ID (SMS); business number (WhatsApp) |
 | **Advanced** | Retry settings, rate limit overrides, custom headers |
@@ -808,7 +647,7 @@ Each channel has a provider-specific configuration form with common patterns:
 
 ---
 
-### 8.5 Notification Logs (`/logs`)
+### 7.5 Notification Logs (`/logs`)
 
 #### Log List Page
 
@@ -841,7 +680,7 @@ Each channel has a provider-specific configuration form with common patterns:
 │  │       │                                                         │ │
 │  │  10:30:00.789  ● RENDERING      Template rendering (email)     │ │
 │  │       │                                                         │ │
-│  │  10:30:01.234  ● DELIVERING     Dispatched to SendGrid         │ │
+│  │  10:30:01.234  ● DELIVERING     Dispatched to Mailgun          │ │
 │  │       │                                                         │ │
 │  │  10:30:01.567  ● SENT           Provider accepted (msg-id:...) │ │
 │  │       │                                                         │ │
@@ -858,14 +697,14 @@ Each channel has a provider-specific configuration form with common patterns:
 │                                                                      │
 │  ┌─── Delivery Attempts ───────────────────────────────────────────┐ │
 │  │  Attempt  Provider   Status      Duration   Provider Msg ID     │ │
-│  │  1        SendGrid   Delivered   340ms      sg-msg-abc123       │ │
+│  │  1        Mailgun    Delivered   340ms      mg-msg-abc123       │ │
 │  └─────────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### 8.6 Event Mappings (`/event-mappings`)
+### 7.6 Event Mappings (`/event-mappings`)
 
 #### Mapping Editor Page
 
@@ -915,7 +754,7 @@ Each channel has a provider-specific configuration form with common patterns:
 
 ---
 
-### 8.7 Bulk Upload (`/bulk-upload`)
+### 7.7 Bulk Upload (`/bulk-upload`)
 
 #### Upload Page
 
@@ -948,7 +787,7 @@ Each channel has a provider-specific configuration form with common patterns:
 
 #### Upload Progress (Real-Time Polling)
 
-When an upload is processing, the UI polls `GET /api/v1/bulk-upload/uploads/:id` every 5 seconds:
+When an upload is processing, the UI polls `GET /api/v1/uploads/:id` on bulk-upload-service every 5 seconds:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -965,22 +804,7 @@ When an upload is processing, the UI polls `GET /api/v1/bulk-upload/uploads/:id`
 
 ---
 
-### 8.8 User Management (`/users`)
-
-Restricted to Super Admin and Admin roles.
-
-| Feature | Description |
-|---|---|
-| **List** | Name, Email, Role (badge), Status (active/locked/deactivated), Last Login, Actions |
-| **Create** | Full name, email, role selector, temporary password |
-| **Edit** | Update name, role, deactivate/reactivate |
-| **Password reset** | Admin-triggered password reset (sends email, invalidates sessions) |
-| **Activity log** | Per-user activity timeline from audit logs |
-| **Protection** | Admin users cannot modify Super Admin accounts (unless they are Super Admin) |
-
----
-
-### 8.9 Recipient Groups (`/recipient-groups`)
+### 7.8 Recipient Groups (`/recipient-groups`)
 
 | Feature | Description |
 |---|---|
@@ -992,7 +816,7 @@ Restricted to Super Admin and Admin roles.
 
 ---
 
-### 8.10 Audit Log Viewer (`/audit`)
+### 7.9 Audit Log Viewer (`/audit`)
 
 | Feature | Description |
 |---|---|
@@ -1003,9 +827,7 @@ Restricted to Super Admin and Admin roles.
 
 ---
 
-### 8.11 System Configuration (`/settings`)
-
-Super Admin only.
+### 7.10 System Configuration (`/settings`)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1033,44 +855,31 @@ Super Admin only.
 
 ---
 
-### 8.12 Identity Provider Settings (`/settings/identity-providers`)
+## 8. Component Architecture
 
-Super Admin only. See [04 — Authentication & Identity §8.2](04-authentication-identity.md#82-identity-provider-settings-page) for the detailed specification.
-
-| Feature | Description |
-|---|---|
-| **IdP list** | Name, Entity ID, Status (active/inactive), Users linked, Certificate expiry |
-| **Add IdP** | Metadata XML upload (drag-and-drop or paste), name, auto-provision toggle, default role, attribute mapping |
-| **IdP detail** | Parsed metadata, SP metadata download, test connection, certificate expiry warning |
-| **Certificate warnings** | Banner at 30/14/7 days before IdP certificate expiry |
-
----
-
-## 9. Component Architecture
-
-### 9.1 Component Hierarchy
+### 8.1 Component Hierarchy
 
 ```
 <RootLayout>
-  <SessionProvider>                    ← Token management, auto-refresh
-    <AuthGuard>                        ← Redirects to /login if unauthenticated
-      <RBACProvider>                   ← Provides useRBAC() context
-        <SidebarLayout>                ← Sidebar navigation + header
-          <Breadcrumbs />
-          <PageContent>                ← Route-specific page component
-            <DataTable />              ← Reusable sortable, filterable table
-            <FormDialog />             ← Modal forms for create/edit
-            <ConfirmDialog />          ← Destructive action confirmation
-            <Toast />                  ← Success/error notifications
-          </PageContent>
-        </SidebarLayout>
-      </RBACProvider>
-    </AuthGuard>
-  </SessionProvider>
+  <SWRConfig>                          ← Global SWR configuration
+    <SidebarLayout>                    ← Sidebar navigation + header
+      <Breadcrumbs />
+      <PageContent>                    ← Route-specific page component
+        <DataTable />                  ← Reusable sortable, filterable table
+        <FormDialog />                 ← Modal forms for create/edit
+        <ConfirmDialog />              ← Destructive action confirmation
+        <Toast />                      ← Success/error notifications
+      </PageContent>
+    </SidebarLayout>
+  </SWRConfig>
 </RootLayout>
 ```
 
-### 9.2 Shared Component Library
+> **Info:** **No Auth Wrappers**
+>
+> There are no `SessionProvider`, `AuthGuard`, or `RBACProvider` components in this version. All UI elements are rendered unconditionally. When authentication is added in the future, these wrappers will be inserted between `<RootLayout>` and `<SidebarLayout>`.
+
+### 8.2 Shared Component Library
 
 | Component | Purpose | Props (key) |
 |---|---|---|
@@ -1086,71 +895,43 @@ Super Admin only. See [04 — Authentication & Identity §8.2](04-authentication
 
 ---
 
-## 10. API Integration Layer
+## 9. API Integration Layer
 
-### 10.1 API Client
+### 9.1 Multi-Service API Client
 
-The `apiClient` is a thin `fetch` wrapper that provides:
+The `apiClient` is a thin `fetch` wrapper that routes requests to the appropriate backend service based on a service key:
 
-1. **Base URL prefixing**: All requests are prefixed with `NEXT_PUBLIC_GATEWAY_URL` (default: `http://localhost:3150/api/v1`).
-2. **Authentication headers**: Automatically attaches `Authorization: Bearer {accessToken}` from the auth context.
-3. **Response parsing**: Unwraps the Gateway's standard response envelope (`{ data, meta, errors }`).
-4. **Error handling**: Throws typed errors (`ApiError`) with status code, message, and field-level details.
-5. **Token refresh interceptor**: On `401`, attempts a token refresh before retrying the original request (once).
+```
+apiClient.get(service, path, options?)  →  GET  {baseUrl}/{path}
+apiClient.post(service, path, body?)    →  POST {baseUrl}/{path}
+apiClient.put(service, path, body?)     →  PUT  {baseUrl}/{path}
+apiClient.delete(service, path)         →  DELETE {baseUrl}/{path}
+```
 
-### 10.2 Gateway Endpoint Map
+The `service` parameter selects the base URL from environment configuration:
 
-The Admin UI consumes the following Gateway API endpoints, organized by feature area:
+```
+const SERVICE_URLS = {
+  eventIngestion:     process.env.NEXT_PUBLIC_EVENT_INGESTION_URL,      // :3151
+  notificationEngine: process.env.NEXT_PUBLIC_NOTIFICATION_ENGINE_URL,  // :3152
+  template:           process.env.NEXT_PUBLIC_TEMPLATE_SERVICE_URL,     // :3153
+  channelRouter:      process.env.NEXT_PUBLIC_CHANNEL_ROUTER_URL,       // :3154
+  admin:              process.env.NEXT_PUBLIC_ADMIN_SERVICE_URL,        // :3155
+  audit:              process.env.NEXT_PUBLIC_AUDIT_SERVICE_URL,        // :3156
+  bulkUpload:         process.env.NEXT_PUBLIC_BULK_UPLOAD_URL,          // :3158
+};
+```
 
-#### Authentication
+### 9.2 API Client Features
 
-| Method | Endpoint | UI Feature |
-|---|---|---|
-| `POST` | `/api/v1/auth/login` | Login form submission |
-| `POST` | `/api/v1/auth/refresh` | Automatic token refresh |
-| `POST` | `/api/v1/auth/logout` | Logout action |
-| `POST` | `/api/v1/auth/forgot-password` | Password reset request |
-| `POST` | `/api/v1/auth/reset-password` | Password reset form submission |
-| `GET` | `/api/v1/auth/saml/status` | SSO button visibility check |
-| `GET` | `/api/v1/auth/saml/login` | SSO redirect initiation |
+1. **Service routing**: Selects the correct base URL for each API call based on the service key.
+2. **Response parsing**: Parses JSON responses and extracts `data` from standard response envelopes.
+3. **Error handling**: Throws typed `ApiError` with status code, message, and field-level details (matching the backend standardized error schema: `{ code, details, message, status }`).
+4. **No auth interceptor**: No token management, no 401 retry logic in this version.
 
-#### Dashboard
+### 9.3 Service Endpoint Map
 
-| Method | Endpoint | UI Feature |
-|---|---|---|
-| `GET` | `/api/v1/dashboard/stats?period={period}` | Dashboard metrics and charts |
-
-#### Notification Rules
-
-| Method | Endpoint | UI Feature |
-|---|---|---|
-| `GET` | `/api/v1/rules` | Rule list with filters |
-| `GET` | `/api/v1/rules/:id` | Rule detail / edit form |
-| `POST` | `/api/v1/rules` | Create rule |
-| `PUT` | `/api/v1/rules/:id` | Update rule |
-| `DELETE` | `/api/v1/rules/:id` | Delete (deactivate) rule |
-
-#### Templates
-
-| Method | Endpoint | UI Feature |
-|---|---|---|
-| `GET` | `/api/v1/templates` | Template list |
-| `GET` | `/api/v1/templates/:id` | Template editor with versions |
-| `POST` | `/api/v1/templates` | Create template |
-| `PUT` | `/api/v1/templates/:id` | Update template (new version) |
-| `DELETE` | `/api/v1/templates/:id` | Soft-delete template |
-| `POST` | `/api/v1/templates/:id/preview` | Live preview with sample data |
-| `PUT` | `/api/v1/templates/:id/rollback` | Rollback to previous version |
-
-#### Channels
-
-| Method | Endpoint | UI Feature |
-|---|---|---|
-| `GET` | `/api/v1/channels` | Channel list with health |
-| `GET` | `/api/v1/channels/:id` | Channel configuration detail |
-| `PUT` | `/api/v1/channels/:id/config` | Update channel configuration |
-
-#### Event Mappings
+#### Event Mappings (event-ingestion-service :3151)
 
 | Method | Endpoint | UI Feature |
 |---|---|---|
@@ -1161,37 +942,17 @@ The Admin UI consumes the following Gateway API endpoints, organized by feature 
 | `DELETE` | `/api/v1/event-mappings/:id` | Delete mapping |
 | `POST` | `/api/v1/event-mappings/:id/test` | Test mapping with sample payload |
 
-#### Notifications & Tracing
+#### Notification Rules (notification-engine-service :3152)
 
 | Method | Endpoint | UI Feature |
 |---|---|---|
-| `GET` | `/api/v1/notifications` | Notification log list |
-| `GET` | `/api/v1/notifications/:id` | Notification detail |
-| `GET` | `/api/v1/notifications/:id/trace` | Full lifecycle trace |
-| `POST` | `/api/v1/notifications/send` | Manual notification send |
+| `GET` | `/api/v1/rules` | Rule list with filters |
+| `GET` | `/api/v1/rules/:id` | Rule detail / edit form |
+| `POST` | `/api/v1/rules` | Create rule |
+| `PUT` | `/api/v1/rules/:id` | Update rule |
+| `DELETE` | `/api/v1/rules/:id` | Delete (deactivate) rule |
 
-#### Bulk Upload
-
-| Method | Endpoint | UI Feature |
-|---|---|---|
-| `POST` | `/api/v1/bulk-upload/uploads` | File upload (`multipart/form-data`) |
-| `GET` | `/api/v1/bulk-upload/uploads` | Upload history list |
-| `GET` | `/api/v1/bulk-upload/uploads/:id` | Upload status / progress |
-| `GET` | `/api/v1/bulk-upload/uploads/:id/errors` | Failed row details |
-| `POST` | `/api/v1/bulk-upload/uploads/:id/retry` | Retry failed rows |
-| `DELETE` | `/api/v1/bulk-upload/uploads/:id` | Cancel / delete upload |
-
-#### User Management
-
-| Method | Endpoint | UI Feature |
-|---|---|---|
-| `GET` | `/api/v1/users` | User list |
-| `GET` | `/api/v1/users/:id` | User detail |
-| `POST` | `/api/v1/users` | Create user |
-| `PUT` | `/api/v1/users/:id` | Update user |
-| `POST` | `/api/v1/users/:id/reset-password` | Admin-triggered password reset |
-
-#### Recipient Groups
+#### Recipient Groups (notification-engine-service :3152)
 
 | Method | Endpoint | UI Feature |
 |---|---|---|
@@ -1204,67 +965,92 @@ The Admin UI consumes the following Gateway API endpoints, organized by feature 
 | `POST` | `/api/v1/recipient-groups/:id/members` | Add members |
 | `DELETE` | `/api/v1/recipient-groups/:id/members/:memberId` | Remove member |
 
-#### Audit Logs
+#### Templates (template-service :3153)
 
 | Method | Endpoint | UI Feature |
 |---|---|---|
-| `GET` | `/api/v1/audit/logs` | Audit log viewer |
+| `GET` | `/api/v1/templates` | Template list |
+| `GET` | `/api/v1/templates/:id` | Template editor with versions |
+| `POST` | `/api/v1/templates` | Create template |
+| `PUT` | `/api/v1/templates/:id` | Update template (new version) |
+| `DELETE` | `/api/v1/templates/:id` | Soft-delete template |
+| `POST` | `/api/v1/templates/:id/preview` | Live preview with sample data |
+| `PUT` | `/api/v1/templates/:id/rollback` | Rollback to previous version |
 
-#### System Configuration
+#### Channels & Providers (channel-router-service :3154)
+
+| Method | Endpoint | UI Feature |
+|---|---|---|
+| `GET` | `/api/v1/channels` | Channel list with health |
+| `GET` | `/api/v1/channels/:id` | Channel configuration detail |
+| `PUT` | `/api/v1/channels/:id` | Update channel configuration |
+| `GET` | `/api/v1/providers` | Provider list |
+| `POST` | `/api/v1/providers` | Register provider |
+| `PUT` | `/api/v1/providers/:id` | Update provider |
+| `DELETE` | `/api/v1/providers/:id` | Deregister provider |
+
+#### System Configuration (admin-service :3155)
 
 | Method | Endpoint | UI Feature |
 |---|---|---|
 | `GET` | `/api/v1/system-configs` | System settings page |
 | `PUT` | `/api/v1/system-configs/:key` | Update configuration value |
 
-#### SAML Identity Providers
+#### Dashboard, Logs, Audit & Tracing (audit-service :3156)
 
 | Method | Endpoint | UI Feature |
 |---|---|---|
-| `GET` | `/api/v1/saml/idp` | IdP list |
-| `POST` | `/api/v1/saml/idp` | Register new IdP |
-| `PUT` | `/api/v1/saml/idp/:id` | Update IdP |
-| `DELETE` | `/api/v1/saml/idp/:id` | Deactivate IdP |
-| `GET` | `/api/v1/auth/saml/metadata` | Download SP metadata |
+| `GET` | `/api/v1/analytics/summary` | Dashboard metrics and charts |
+| `GET` | `/api/v1/logs` | Notification log list |
+| `GET` | `/api/v1/logs/:id` | Notification detail |
+| `GET` | `/api/v1/search` | Full-text search across audit events |
+| `GET` | `/api/v1/trace/:notificationId` | Full lifecycle trace |
+| `GET` | `/api/v1/receipts` | Delivery receipts |
+
+#### Bulk Upload (bulk-upload-service :3158)
+
+| Method | Endpoint | UI Feature |
+|---|---|---|
+| `POST` | `/api/v1/uploads` | File upload (`multipart/form-data`) |
+| `GET` | `/api/v1/uploads` | Upload history list |
+| `GET` | `/api/v1/uploads/:id` | Upload status / progress |
+| `POST` | `/api/v1/uploads/:id/retry` | Retry failed rows |
+| `DELETE` | `/api/v1/uploads/:id` | Cancel / delete upload |
+| `GET` | `/api/v1/uploads/:id/result` | Download result XLSX |
 
 ---
 
-## 11. Routing & Navigation
+## 10. Routing & Navigation
 
-### 11.1 Route Structure
+### 10.1 Route Structure
 
 | Route | Page | Auth | Min Role |
 |---|---|---|---|
-| `/login` | Login | Public | — |
-| `/forgot-password` | Password reset request | Public | — |
-| `/reset-password` | Password reset form | Public (token-gated) | — |
-| `/dashboard` | Dashboard | Required | Viewer |
-| `/rules` | Rule list | Required | Viewer |
-| `/rules/new` | Create rule | Required | Operator |
-| `/rules/:id` | Rule detail / edit | Required | Viewer (view) / Operator (edit) |
-| `/templates` | Template list | Required | Viewer |
-| `/templates/new` | Create template | Required | Operator |
-| `/templates/:id` | Template editor | Required | Viewer (view) / Operator (edit) |
-| `/channels` | Channel list | Required | Viewer |
-| `/channels/:id` | Channel configuration | Required | Admin |
-| `/logs` | Notification log list | Required | Viewer |
-| `/logs/:id` | Notification detail / trace | Required | Viewer |
-| `/event-mappings` | Mapping list | Required | Viewer |
-| `/event-mappings/new` | Create mapping | Required | Operator |
-| `/event-mappings/:id` | Mapping editor / test | Required | Viewer (view) / Operator (edit) |
-| `/bulk-upload` | Upload zone + history | Required | Viewer (view) / Operator (upload) |
-| `/bulk-upload/:id` | Upload detail | Required | Viewer |
-| `/recipient-groups` | Group list | Required | Viewer |
-| `/recipient-groups/new` | Create group | Required | Operator |
-| `/recipient-groups/:id` | Group detail | Required | Viewer (view) / Operator (edit) |
-| `/users` | User management | Required | Admin |
-| `/users/:id` | User detail / edit | Required | Admin |
-| `/audit` | Audit log viewer | Required | Viewer |
-| `/settings` | System configuration | Required | Super Admin |
-| `/settings/identity-providers` | SAML IdP management | Required | Super Admin |
-| `/settings/identity-providers/:id` | IdP detail | Required | Super Admin |
+| `/dashboard` | Dashboard | None | — |
+| `/rules` | Rule list | None | — |
+| `/rules/new` | Create rule | None | — |
+| `/rules/:id` | Rule detail / edit | None | — |
+| `/rules/:id/history` | Rule change history | None | — |
+| `/templates` | Template list | None | — |
+| `/templates/new` | Create template | None | — |
+| `/templates/:id` | Template editor | None | — |
+| `/templates/:id/versions` | Version history | None | — |
+| `/channels` | Channel list | None | — |
+| `/channels/:id` | Channel configuration | None | — |
+| `/logs` | Notification log list | None | — |
+| `/logs/:id` | Notification detail / trace | None | — |
+| `/event-mappings` | Mapping list | None | — |
+| `/event-mappings/new` | Create mapping | None | — |
+| `/event-mappings/:id` | Mapping editor / test | None | — |
+| `/bulk-upload` | Upload zone + history | None | — |
+| `/bulk-upload/:id` | Upload detail | None | — |
+| `/recipient-groups` | Group list | None | — |
+| `/recipient-groups/new` | Create group | None | — |
+| `/recipient-groups/:id` | Group detail | None | — |
+| `/audit` | Audit log viewer | None | — |
+| `/settings` | System configuration | None | — |
 
-### 11.2 Sidebar Navigation
+### 10.2 Sidebar Navigation
 
 ```
 ┌─────────────────────────┐
@@ -1284,28 +1070,19 @@ The Admin UI consumes the following Gateway API endpoints, organized by feature 
 │  ├─ Bulk Upload          │
 │  └─ Audit Logs           │
 │                          │
-│  ADMINISTRATION ────────┤ ← Visible to Admin+ only
-│  ├─ Users                │
-│  └─ Settings             │ ← Super Admin only
-│     └─ Identity Providers│ ← Super Admin only
+│  SYSTEM                  │
+│  └─ Settings             │
 │                          │
-│  ─────────────────────── │
-│  Jane Smith              │
-│  Operator                │
-│  [ Logout ]              │
 └─────────────────────────┘
 ```
 
-The sidebar sections are conditionally rendered based on the user's role:
-- **MANAGEMENT** and **OPERATIONS**: Visible to all roles (with read-only access for Viewer)
-- **ADMINISTRATION**: Visible to Admin and Super Admin only
-- **Settings / Identity Providers**: Visible to Super Admin only
+All sidebar items are visible unconditionally — no role-based hiding. When authentication is added in the future, conditional rendering based on RBAC permissions will be applied.
 
 ---
 
-## 12. Flowcharts
+## 11. Flowcharts
 
-### 12.1 Rule Creation Flow (End-to-End)
+### 11.1 Rule Creation Flow (End-to-End)
 
 ```
     ┌─────────────────────────┐
@@ -1340,7 +1117,7 @@ The sidebar sections are conditionally rendered based on the user's role:
                 Yes
                  ▼
     ┌─────────────────────────┐
-    │  5. POST /api/v1/rules   │  ◄── API call via apiClient
+    │  5. POST /api/v1/rules   │  ◄── To notification-engine-service
     └────────────┬─────────────┘
                  ▼
      ◆ Server validation       ◆
@@ -1363,7 +1140,7 @@ The sidebar sections are conditionally rendered based on the user's role:
                          └────────────────────────────┘
 ```
 
-### 12.2 Template Save & Version Flow
+### 11.2 Template Save & Version Flow
 
 ```
     ┌─────────────────────────┐
@@ -1386,7 +1163,7 @@ The sidebar sections are conditionally rendered based on the user's role:
                 Yes
                  ▼
     ┌─────────────────────────┐
-    │  3. PUT /api/v1/         │
+    │  3. PUT /api/v1/         │  ◄── To template-service
     │     templates/:id        │
     └────────────┬─────────────┘
                  ▼
@@ -1404,7 +1181,7 @@ The sidebar sections are conditionally rendered based on the user's role:
     └─────────────────────────┘
 ```
 
-### 12.3 Bulk Upload Processing Flow
+### 11.3 Bulk Upload Processing Flow
 
 ```
     ┌─────────────────────────┐
@@ -1423,8 +1200,8 @@ The sidebar sections are conditionally rendered based on the user's role:
                 Yes
                  ▼
     ┌─────────────────────────┐
-    │  3. POST /api/v1/        │  ◄── multipart/form-data
-    │     bulk-upload/uploads  │
+    │  3. POST /api/v1/        │  ◄── To bulk-upload-service
+    │     uploads              │      multipart/form-data
     └────────────┬─────────────┘
                  ▼
     ┌─────────────────────────┐
@@ -1433,8 +1210,8 @@ The sidebar sections are conditionally rendered based on the user's role:
     └────────────┬─────────────┘
                  ▼
     ┌─────────────────────────┐
-    │  5. Start polling:       │  ◄── GET /api/v1/bulk-upload/
-    │     every 5 seconds      │      uploads/:id
+    │  5. Start polling:       │  ◄── GET /api/v1/uploads/:id
+    │     every 5 seconds      │      on bulk-upload-service
     └────────────┬─────────────┘
                  ▼
      ◆ Status?                 ◆
@@ -1454,7 +1231,7 @@ The sidebar sections are conditionally rendered based on the user's role:
                                                  └───────────────┘
 ```
 
-### 12.4 Mapping Test Flow
+### 11.4 Mapping Test Flow
 
 ```
     ┌─────────────────────────┐
@@ -1478,7 +1255,7 @@ The sidebar sections are conditionally rendered based on the user's role:
                 Yes
                  ▼
     ┌─────────────────────────┐
-    │  4. POST /api/v1/        │
+    │  4. POST /api/v1/        │  ◄── To event-ingestion-service
     │     event-mappings/      │
     │     :id/test             │
     │     { samplePayload }    │
@@ -1494,131 +1271,29 @@ The sidebar sections are conditionally rendered based on the user's role:
 
 ---
 
-## 13. Sequence Diagrams
+## 12. Sequence Diagrams
 
-### 13.1 Login Flow (Local Authentication)
-
-```
-Browser              Admin UI (Next.js)     Gateway :3150     Admin Service :3155
-   │                      │                      │                      │
-   │  Submit login form   │                      │                      │
-   │  (email, password)   │                      │                      │
-   │─────────────────────▶│                      │                      │
-   │                      │                      │                      │
-   │                      │  POST /api/v1/       │                      │
-   │                      │  auth/login          │                      │
-   │                      │  { email, pwd }      │                      │
-   │                      │─────────────────────▶│                      │
-   │                      │                      │  Forward to Admin    │
-   │                      │                      │  Service (no auth    │
-   │                      │                      │  check — login is    │
-   │                      │                      │  public endpoint)    │
-   │                      │                      │─────────────────────▶│
-   │                      │                      │                      │
-   │                      │                      │  Validate credentials│
-   │                      │                      │  (bcrypt compare)    │
-   │                      │                      │                      │
-   │                      │                      │  200 OK              │
-   │                      │                      │  { accessToken,      │
-   │                      │                      │    user: {...} }     │
-   │                      │                      │  Set-Cookie:         │
-   │                      │                      │  refreshToken=...    │
-   │                      │                      │◄─────────────────────│
-   │                      │  200 OK              │                      │
-   │                      │  + Set-Cookie        │                      │
-   │                      │◄─────────────────────│                      │
-   │                      │                      │                      │
-   │                      │  Store accessToken   │                      │
-   │                      │  in React context    │                      │
-   │                      │  (in-memory)         │                      │
-   │                      │                      │                      │
-   │  Redirect to         │                      │                      │
-   │  /dashboard          │                      │                      │
-   │◄─────────────────────│                      │                      │
-```
-
-### 13.2 SSO Login Flow (SAML 2.0)
+### 12.1 Dashboard Data Loading (with SSR Prefetch)
 
 ```
-Browser              Admin UI             Gateway :3150      Azure AD (IdP)
-   │                      │                      │                │
-   │  Click "SSO" button  │                      │                │
-   │─────────────────────▶│                      │                │
-   │                      │                      │                │
-   │  window.location =   │                      │                │
-   │  /api/v1/auth/saml/  │                      │                │
-   │  login               │                      │                │
-   │────────────────────────────────────────────▶│                │
-   │                      │                      │                │
-   │                      │  302 Redirect to     │                │
-   │                      │  Azure AD SSO URL    │                │
-   │                      │  (with AuthnRequest) │                │
-   │◄────────────────────────────────────────────│                │
-   │                      │                      │                │
-   │  Follow redirect to Azure AD login page     │                │
-   │────────────────────────────────────────────────────────────▶│
-   │                      │                      │                │
-   │                      │                      │  User logs in  │
-   │                      │                      │  at Azure AD   │
-   │                      │                      │                │
-   │  SAML Response (POST to ACS endpoint)       │                │
-   │◄────────────────────────────────────────────────────────────│
-   │                      │                      │                │
-   │  POST /api/v1/auth/  │                      │                │
-   │  saml/acs            │                      │                │
-   │  (SAMLResponse)      │                      │                │
-   │────────────────────────────────────────────▶│                │
-   │                      │                      │                │
-   │                      │  Validate assertion  │                │
-   │                      │  Link/create user    │                │
-   │                      │  Issue JWT tokens    │                │
-   │                      │                      │                │
-   │  302 Redirect to     │                      │                │
-   │  /dashboard          │                      │                │
-   │  + Set-Cookie:       │                      │                │
-   │  accessToken (query) │                      │                │
-   │  refreshToken (cookie)                      │                │
-   │◄────────────────────────────────────────────│                │
-   │                      │                      │                │
-   │  Load /dashboard     │                      │                │
-   │─────────────────────▶│                      │                │
-   │                      │  Extract accessToken │                │
-   │                      │  from URL, store in  │                │
-   │                      │  React context       │                │
-```
-
-### 13.3 Dashboard Data Loading (with SSR Prefetch)
-
-```
-Browser              Next.js Server         Gateway :3150     Admin Service :3155
+Browser              Next.js Server         Audit Service :3156   Channel Router :3154
    │                      │                      │                      │
    │  GET /dashboard      │                      │                      │
    │─────────────────────▶│                      │                      │
    │                      │                      │                      │
    │                      │  [Server Component]  │                      │
-   │                      │  Read refreshToken   │                      │
-   │                      │  from cookie         │                      │
    │                      │                      │                      │
-   │                      │  POST /api/v1/       │                      │
-   │                      │  auth/refresh        │                      │
-   │                      │  (Cookie: refresh)   │                      │
+   │                      │  GET /api/v1/        │                      │
+   │                      │  analytics/summary   │                      │
    │                      │─────────────────────▶│                      │
-   │                      │  { accessToken }     │                      │
+   │                      │  200 OK { data }     │                      │
    │                      │◄─────────────────────│                      │
    │                      │                      │                      │
    │                      │  GET /api/v1/        │                      │
-   │                      │  dashboard/stats     │                      │
-   │                      │  Authorization:      │                      │
-   │                      │  Bearer {token}      │                      │
-   │                      │─────────────────────▶│                      │
-   │                      │                      │  Proxy to Admin      │
-   │                      │                      │  Service (parallel   │
-   │                      │                      │  fan-out)            │
-   │                      │                      │─────────────────────▶│
-   │                      │                      │  Dashboard data      │
-   │                      │                      │◄─────────────────────│
-   │                      │  200 OK { data }     │                      │
-   │                      │◄─────────────────────│                      │
+   │                      │  channels            │                      │
+   │                      │─────────────────────────────────────────────▶│
+   │                      │  200 OK { channels } │                      │
+   │                      │◄─────────────────────────────────────────────│
    │                      │                      │                      │
    │  HTML with           │                      │                      │
    │  prefetched data     │                      │                      │
@@ -1635,105 +1310,71 @@ Browser              Next.js Server         Gateway :3150     Admin Service :315
    │   every 30 seconds]  │                      │                      │
 ```
 
-### 13.4 Template Preview (Live)
+### 12.2 Template Preview (Live)
 
 ```
-Browser              Admin UI             Gateway :3150      Template Service :3153
-   │                      │                      │                      │
-   │  Type in editor      │                      │                      │
-   │  (debounced 500ms)   │                      │                      │
-   │─────────────────────▶│                      │                      │
-   │                      │                      │                      │
-   │                      │  POST /api/v1/       │                      │
-   │                      │  templates/:id/      │                      │
-   │                      │  preview             │                      │
-   │                      │  { sampleData }      │                      │
-   │                      │─────────────────────▶│                      │
-   │                      │                      │  Proxy to Admin Svc  │
-   │                      │                      │  → Template Svc      │
-   │                      │                      │─────────────────────▶│
-   │                      │                      │                      │
-   │                      │                      │  Render Handlebars   │
-   │                      │                      │  with sample data    │
-   │                      │                      │                      │
-   │                      │                      │  200 OK              │
-   │                      │                      │  { renderedHtml,     │
-   │                      │                      │    renderedSms,      │
-   │                      │                      │    renderedPush }    │
-   │                      │                      │◄─────────────────────│
-   │                      │  200 OK              │                      │
-   │                      │◄─────────────────────│                      │
-   │                      │                      │                      │
-   │  Update preview      │                      │                      │
-   │  panel with rendered │                      │                      │
-   │  content             │                      │                      │
-   │◄─────────────────────│                      │                      │
+Browser              Admin UI             Template Service :3153
+   │                      │                      │
+   │  Type in editor      │                      │
+   │  (debounced 500ms)   │                      │
+   │─────────────────────▶│                      │
+   │                      │                      │
+   │                      │  POST /api/v1/       │
+   │                      │  templates/:id/      │
+   │                      │  preview             │
+   │                      │  { sampleData }      │
+   │                      │─────────────────────▶│
+   │                      │                      │
+   │                      │  Render Handlebars   │
+   │                      │  with sample data    │
+   │                      │                      │
+   │                      │  200 OK              │
+   │                      │  { renderedHtml,     │
+   │                      │    renderedSms,      │
+   │                      │    renderedPush }    │
+   │                      │◄─────────────────────│
+   │                      │                      │
+   │  Update preview      │                      │
+   │  panel with rendered │                      │
+   │  content             │                      │
+   │◄─────────────────────│                      │
 ```
 
-### 13.5 Token Refresh with 401 Recovery
+### 12.3 Rule Save with Cross-Service Validation
 
 ```
-Browser              Admin UI             Gateway :3150
+Browser              Admin UI             Notif Engine :3152
    │                      │                      │
    │  Click "Save Rule"   │                      │
    │─────────────────────▶│                      │
    │                      │                      │
-   │                      │  PUT /api/v1/        │
-   │                      │  rules/:id           │
-   │                      │  Authorization:      │
-   │                      │  Bearer {expired}    │
+   │                      │  POST /api/v1/rules  │
+   │                      │  { name, eventType,  │
+   │                      │    conditions, ...}  │
    │                      │─────────────────────▶│
    │                      │                      │
-   │                      │  401 Unauthorized    │
-   │                      │  (token expired)     │
-   │                      │◄─────────────────────│
+   │                      │  Validates rule:     │
+   │                      │  - Template exists   │
+   │                      │  - Channels valid    │
+   │                      │  - Event type mapped │
    │                      │                      │
-   │                      │  [Interceptor]       │
-   │                      │  POST /api/v1/       │
-   │                      │  auth/refresh        │
-   │                      │  (Cookie: refresh)   │
-   │                      │─────────────────────▶│
-   │                      │                      │
-   │                      │  200 OK              │
-   │                      │  { accessToken }     │
-   │                      │  Set-Cookie: refresh │
-   │                      │◄─────────────────────│
-   │                      │                      │
-   │                      │  [Retry original]    │
-   │                      │  PUT /api/v1/        │
-   │                      │  rules/:id           │
-   │                      │  Authorization:      │
-   │                      │  Bearer {new token}  │
-   │                      │─────────────────────▶│
-   │                      │                      │
-   │                      │  200 OK              │
+   │                      │  201 Created         │
+   │                      │  { rule: {...} }     │
    │                      │◄─────────────────────│
    │                      │                      │
    │  "Rule saved"        │                      │
-   │  toast shown         │                      │
+   │  toast + redirect    │                      │
+   │  to /rules           │                      │
    │◄─────────────────────│                      │
 ```
 
 ---
 
-## 14. Entity Relationship: UI Data Model
+## 13. Entity Relationship: UI Data Model
 
 The Admin UI does not have its own database, but it operates on a well-defined data model derived from the API responses. The following diagram shows the logical relationships between the primary entities as understood by the frontend.
 
 ```
-┌──────────────────────────────┐
-│          User (self)          │
-├──────────────────────────────┤
-│  id               UUID       │
-│  email            string     │
-│  fullName         string     │
-│  role             Role       │
-│  permissions      string[]   │
-│  isActive         boolean    │
-│  lastLoginAt      datetime   │
-└──────────┬───────────────────┘
-           │ manages
-           ▼
 ┌──────────────────────────────┐           ┌──────────────────────────────┐
 │     NotificationRule          │           │         Template              │
 ├──────────────────────────────┤           ├──────────────────────────────┤
@@ -1805,32 +1446,29 @@ Relationships:
 
 ---
 
-## 15. Error Handling & User Feedback
+## 14. Error Handling & User Feedback
 
-### 15.1 Error Categories
+### 14.1 Error Categories
 
 | Error Type | HTTP Status | UI Behavior |
 |---|---|---|
 | **Validation error** | 400 | Highlight specific form fields with error messages |
-| **Authentication failure** | 401 | Redirect to login (with auto-refresh attempt first) |
-| **Forbidden** | 403 | Show "insufficient permissions" message; do not show restricted UI elements |
 | **Not found** | 404 | Show "resource not found" empty state with back navigation |
-| **Conflict** | 409 | Show specific conflict message (e.g., "Email already in use") |
-| **Rate limited** | 429 | Show "Too many requests, please try again in X seconds" |
+| **Conflict** | 409 | Show specific conflict message (e.g., "Slug already in use") |
 | **Server error** | 500 | Show generic error message with retry option |
-| **Gateway timeout** | 504 | Show "Service temporarily unavailable" with retry |
+| **Service unavailable** | 503 | Show "Service temporarily unavailable" with retry |
 | **Network error** | — | Show offline banner with automatic reconnection detection |
 
-### 15.2 Toast Notifications
+### 14.2 Toast Notifications
 
 | Type | Duration | Use Case |
 |---|---|---|
 | **Success** | 3 seconds (auto-dismiss) | Resource created, updated, deleted |
 | **Error** | Persistent (manual dismiss) | API errors, validation failures |
-| **Warning** | 5 seconds | Degraded dashboard data, certificate expiry |
+| **Warning** | 5 seconds | Degraded dashboard data, service unreachable |
 | **Info** | 4 seconds | Background operation completed (e.g., bulk upload done) |
 
-### 15.3 Form Validation Pattern
+### 14.3 Form Validation Pattern
 
 All forms implement two-tier validation:
 
@@ -1872,9 +1510,9 @@ All forms implement two-tier validation:
 
 ---
 
-## 16. Accessibility & Responsive Design
+## 15. Accessibility & Responsive Design
 
-### 16.1 Accessibility Standards
+### 15.1 Accessibility Standards
 
 | Standard | Implementation |
 |---|---|
@@ -1886,7 +1524,7 @@ All forms implement two-tier validation:
 | **Error announcements** | Form validation errors announced via `aria-live="polite"` |
 | **Reduced motion** | Respects `prefers-reduced-motion` media query for animations |
 
-### 16.2 Responsive Breakpoints
+### 15.2 Responsive Breakpoints
 
 | Breakpoint | Width | Layout Behavior |
 |---|---|---|
@@ -1900,38 +1538,35 @@ All forms implement two-tier validation:
 
 ---
 
-## 17. Testing Strategy
+## 16. Testing Strategy
 
-### 17.1 Unit Tests (Jest)
+### 16.1 Unit Tests (Jest)
 
 | Scope | Coverage Target | Examples |
 |---|---|---|
-| **Custom hooks** | 90%+ | `useAuth`, `useRBAC`, `useRules`, `useBulkUpload` |
-| **Utility functions** | 95%+ | Date formatters, permission checks, validators |
+| **Custom hooks** | 90%+ | `useRules`, `useBulkUpload`, `useDashboard` |
+| **Utility functions** | 95%+ | Date formatters, validators, API error parsing |
 | **Zod schemas** | 100% | All form validation schemas |
-| **API client** | 90%+ | Error handling, token refresh, response parsing |
+| **API client** | 90%+ | Error handling, service routing, response parsing |
 
-### 17.2 Component Tests (Jest + React Testing Library)
+### 16.2 Component Tests (Jest + React Testing Library)
 
 | Scope | Coverage Target | Examples |
 |---|---|---|
 | **Form components** | 85%+ | RuleForm, TemplateEditor, MappingBuilder |
 | **Data display** | 80%+ | DataTable, StatusBadge, NotificationTimeline |
-| **Auth components** | 90%+ | LoginForm, AuthGuard, SessionProvider |
 
-### 17.3 End-to-End Tests (Playwright)
+### 16.3 End-to-End Tests (Playwright)
 
 | Flow | Browser Targets | Description |
 |---|---|---|
-| Login (local) | Chromium, Firefox, WebKit | Email/password login, token storage, redirect to dashboard |
-| Login (SSO) | Chromium | SAML SSO redirect and callback (mocked IdP) |
+| Dashboard | Chromium | Verify all widgets render, period selector changes data |
 | Rule CRUD | Chromium | Create, edit, toggle, delete a notification rule |
 | Template editing | Chromium, Firefox | Create template, edit content, preview, save new version |
 | Bulk upload | Chromium | Upload XLSX, monitor progress, download result |
-| Dashboard | Chromium | Verify all widgets render, period selector changes data |
-| RBAC enforcement | Chromium | Verify Viewer cannot see edit buttons, Operator cannot see user management |
+| Mapping test | Chromium | Create mapping, run test with sample payload |
 
-### 17.4 Test Configuration
+### 16.4 Test Configuration
 
 ```
 Playwright config:
@@ -1946,43 +1581,45 @@ See [05 — Testing Strategy](05-testing-strategy.md) for the full testing frame
 
 ---
 
-## 18. Security Considerations
+## 17. Security Considerations
 
 | Concern | Mitigation |
 |---|---|
 | **XSS prevention** | React's default JSX escaping; DOMPurify for any `dangerouslySetInnerHTML` (template preview only); Content-Security-Policy headers |
-| **CSRF protection** | SameSite=Strict cookies for refresh tokens; no cookie-based auth for API calls (Bearer token in Authorization header) |
-| **Token storage** | Access tokens in memory only (React context); refresh tokens in HTTP-only, Secure, SameSite=Strict cookies |
 | **Input sanitization** | Zod validation on all form inputs before submission; server-side validation as final authority |
 | **Sensitive data masking** | Channel credentials displayed as masked values (`SG.***...xYz`); passwords never shown |
 | **Clickjacking** | `X-Frame-Options: DENY` and `frame-ancestors 'none'` in CSP |
 | **Dependency security** | `npm audit` in CI pipeline; Dependabot for automated dependency updates |
-| **Content Security Policy** | Strict CSP headers: `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (Tailwind); `img-src 'self' data: https:`; `connect-src 'self' {GATEWAY_URL}` |
+| **Content Security Policy** | Strict CSP headers: `default-src 'self'`; `script-src 'self'`; `style-src 'self' 'unsafe-inline'` (Tailwind); `img-src 'self' data: https:`; `connect-src 'self' {SERVICE_URLS}` |
 | **HTTPS only** | `Strict-Transport-Security: max-age=31536000; includeSubDomains` in production |
+
+> **Info:** **Authentication Deferred**
+>
+> Token storage (access tokens in memory, refresh tokens in HTTP-only cookies) and CSRF protection will be added when authentication is integrated. See §5 for the future integration path.
 
 ---
 
-## 19. Monitoring & Observability
+## 18. Monitoring & Observability
 
-### 19.1 Client-Side Metrics
+### 18.1 Client-Side Metrics
 
 | Metric | Description | Collection Method |
 |---|---|---|
 | **Page load time** | Time to interactive for each page | `Performance` API + custom reporting |
-| **API call latency** | Request duration per endpoint | API client interceptor |
-| **API error rate** | Failed API calls by status code | API client interceptor |
-| **Auth refresh count** | Token refresh frequency | Session provider tracking |
+| **API call latency** | Request duration per endpoint per service | API client interceptor |
+| **API error rate** | Failed API calls by status code and target service | API client interceptor |
 | **User actions** | CRUD operations by type and outcome | Event logging in mutation hooks |
 
-### 19.2 Error Tracking
+### 18.2 Error Tracking
 
 | Category | Approach |
 |---|---|
 | **Unhandled errors** | Global error boundary component captures React render errors; displays fallback UI |
 | **API errors** | Centralized error handler in API client; structured logging for debugging |
 | **Network failures** | Online/offline detection via `navigator.onLine` and `window` events |
+| **Service health** | Per-service connectivity tracking in the API client; degraded mode when services are unreachable |
 
-### 19.3 Health Monitoring
+### 18.3 Health Monitoring
 
 The Admin UI reports its own health via a lightweight endpoint for container orchestration:
 
@@ -1992,17 +1629,20 @@ The Admin UI reports its own health via a lightweight endpoint for container orc
 
 ---
 
-## 20. Configuration & Environment Variables
+## 19. Configuration & Environment Variables
 
 | Variable | Description | Default |
 |---|---|---|
-| `NEXT_PUBLIC_GATEWAY_URL` | Notification Gateway base URL | `http://localhost:3150` |
-| `NEXT_PUBLIC_API_PREFIX` | API path prefix | `/api/v1` |
+| `NEXT_PUBLIC_EVENT_INGESTION_URL` | Event Ingestion Service base URL | `http://localhost:3151` |
+| `NEXT_PUBLIC_NOTIFICATION_ENGINE_URL` | Notification Engine Service base URL | `http://localhost:3152` |
+| `NEXT_PUBLIC_TEMPLATE_SERVICE_URL` | Template Service base URL | `http://localhost:3153` |
+| `NEXT_PUBLIC_CHANNEL_ROUTER_URL` | Channel Router Service base URL | `http://localhost:3154` |
+| `NEXT_PUBLIC_ADMIN_SERVICE_URL` | Admin Service base URL | `http://localhost:3155` |
+| `NEXT_PUBLIC_AUDIT_SERVICE_URL` | Audit Service base URL | `http://localhost:3156` |
+| `NEXT_PUBLIC_BULK_UPLOAD_URL` | Bulk Upload Service base URL | `http://localhost:3158` |
 | `NEXT_PUBLIC_APP_NAME` | Application name in header/title | `Notification API` |
-| `NEXT_PUBLIC_SSO_ENABLED` | Show SSO login button (also checked dynamically) | `true` |
 | `NEXT_PUBLIC_POLLING_INTERVAL_DASHBOARD` | Dashboard metrics polling interval (ms) | `30000` |
 | `NEXT_PUBLIC_POLLING_INTERVAL_UPLOAD` | Bulk upload status polling interval (ms) | `5000` |
-| `NEXT_PUBLIC_TOKEN_REFRESH_BUFFER_MS` | Time before expiry to proactively refresh token (ms) | `120000` (2 min) |
 | `NEXT_PUBLIC_MAX_UPLOAD_SIZE_MB` | Maximum XLSX file size | `10` |
 | `NEXT_PUBLIC_MAX_UPLOAD_ROWS` | Maximum rows per XLSX upload | `5000` |
 | `NEXT_PUBLIC_DEBOUNCE_SEARCH_MS` | Search input debounce delay (ms) | `300` |
@@ -2013,9 +1653,9 @@ The Admin UI reports its own health via a lightweight endpoint for container orc
 
 ---
 
-## 21. Deployment
+## 20. Deployment
 
-### 21.1 Docker Configuration
+### 20.1 Docker Configuration
 
 ```
 FROM node:20-alpine AS builder
@@ -2036,7 +1676,7 @@ ENV PORT=3159
 CMD ["node", "server.js"]
 ```
 
-### 21.2 Docker Compose Entry
+### 20.2 Docker Compose Entry
 
 ```yaml
 notification-admin-ui:
@@ -2044,10 +1684,22 @@ notification-admin-ui:
   ports:
     - "3159:3159"
   environment:
-    - NEXT_PUBLIC_GATEWAY_URL=http://notification-gateway:3150
+    - NEXT_PUBLIC_EVENT_INGESTION_URL=http://event-ingestion-service:3151
+    - NEXT_PUBLIC_NOTIFICATION_ENGINE_URL=http://notification-engine-service:3152
+    - NEXT_PUBLIC_TEMPLATE_SERVICE_URL=http://template-service:3153
+    - NEXT_PUBLIC_CHANNEL_ROUTER_URL=http://channel-router-service:3154
+    - NEXT_PUBLIC_ADMIN_SERVICE_URL=http://admin-service:3155
+    - NEXT_PUBLIC_AUDIT_SERVICE_URL=http://audit-service:3156
+    - NEXT_PUBLIC_BULK_UPLOAD_URL=http://bulk-upload-service:3158
     - NODE_ENV=production
   depends_on:
-    - notification-gateway
+    - event-ingestion-service
+    - notification-engine-service
+    - template-service
+    - channel-router-service
+    - admin-service
+    - audit-service
+    - bulk-upload-service
   healthcheck:
     test: ["CMD", "wget", "--spider", "-q", "http://localhost:3159/api/health"]
     interval: 30s
@@ -2055,7 +1707,7 @@ notification-admin-ui:
     retries: 3
 ```
 
-### 21.3 Build & Deployment Pipeline
+### 20.3 Build & Deployment Pipeline
 
 | Stage | Action | Tools |
 |---|---|---|
@@ -2067,7 +1719,7 @@ notification-admin-ui:
 | **Docker** | Build and push container image | `docker build -t notification-admin-ui:latest .` |
 | **Deploy** | Rolling update with health check | Docker Compose or Kubernetes |
 
-### 21.4 Performance Optimization
+### 20.4 Performance Optimization
 
 | Technique | Description |
 |---|---|
@@ -2080,4 +1732,4 @@ notification-admin-ui:
 
 ---
 
-*Notification API Documentation v1.0 -- Architecture Team -- 2026*
+*Notification API Documentation v2.0 -- Architecture Team -- 2026*

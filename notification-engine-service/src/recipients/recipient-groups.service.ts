@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RecipientGroupsRepository } from './recipient-groups.repository.js';
 import { RecipientGroup } from './entities/recipient-group.entity.js';
+import { RecipientGroupMember } from './entities/recipient-group-member.entity.js';
 import {
   CreateRecipientGroupDto,
   UpdateRecipientGroupDto,
   ListRecipientGroupsQueryDto,
+  RecipientGroupMemberDto,
 } from './dto/index.js';
 import { createErrorResponse } from '../common/errors.js';
 import { PaginatedResult } from '../common/base/pg-base.repository.js';
@@ -100,5 +102,45 @@ export class RecipientGroupsService {
     const updated = await this.repository.findWithMembers(id);
     this.logger.log(`Recipient group updated: ${id}`);
     return updated!;
+  }
+
+  async softDelete(id: string): Promise<void> {
+    const group = await this.repository.findById(id);
+    if (!group) {
+      throw createErrorResponse('NES-004');
+    }
+    group.isActive = false;
+    await this.repository.save(group);
+    this.logger.log(`Recipient group soft-deleted: ${id}`);
+  }
+
+  async findMembers(groupId: string): Promise<RecipientGroupMember[]> {
+    await this.findById(groupId);
+    return this.repository.findActiveMembers(groupId);
+  }
+
+  async addMember(
+    groupId: string,
+    dto: RecipientGroupMemberDto,
+  ): Promise<RecipientGroupMember> {
+    await this.findById(groupId);
+    const members = await this.repository.addMembers(groupId, [
+      {
+        email: dto.email,
+        phone: dto.phone ?? null,
+        deviceToken: dto.deviceToken ?? null,
+        memberName: dto.memberName ?? null,
+      },
+    ]);
+    this.logger.log(`Member added to recipient group ${groupId}`);
+    return members[0];
+  }
+
+  async removeMember(groupId: string, memberId: number): Promise<void> {
+    await this.findById(groupId);
+    await this.repository.deactivateMembers([memberId]);
+    this.logger.log(
+      `Member ${memberId} removed from recipient group ${groupId}`,
+    );
   }
 }

@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Feature: GET channel by ID endpoint (2026-03-01)
+
+- `src/channels/channels.controller.ts` — Added `@Get(':id')` endpoint delegating to `channelsService.findById(id)`.
+- `src/channels/channels.service.ts` — Added `findById(id)` method returning a single channel enriched with provider info. Extracted shared `enrichChannel()` private method used by both `findAll()` and `findById()`.
+- Unblocks frontend `useChannel(id)` hook which calls `GET /api/v1/channels/:id`.
+
 ### Bugfix: Adapter send request contract mismatch (2026-02-27)
 
 - Added private `toAdapterPayload()` method in `AdapterClientService` to transform the internal CRS `SendRequest` into the format expected by the provider adapter `SendRequestDto`
