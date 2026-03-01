@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+### Fix: Turbopack dev server OOM crash (2026-03-01)
+
+- `.env.local` — Added `NODE_OPTIONS=--max-old-space-size=4096` to increase Node.js heap limit from default ~1.4GB to 4GB. Fixes "Jest worker encountered 2 child process exceptions, exceeding retry limit" runtime error caused by Turbopack worker processes exhausting memory during dev.
+- `CLAUDE.md` — Added `NODE_ENV` and `NODE_OPTIONS` to environment variables table.
+
 ### Fix: Frontend-to-backend API call mismatches (2026-03-01)
 
 - `hooks/use-mappings.ts` — Changed `pageSize` → `limit` in params to match EIS `ListEventMappingsQueryDto`. Removed `sortBy`, `sortOrder`, `search` params (not supported by backend DTO, rejected by `forbidNonWhitelisted`).

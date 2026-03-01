@@ -272,6 +272,8 @@ Configured via `.env.local` file in the service root (git-ignored). Required for
 | `NEXT_PUBLIC_DEBOUNCE_PREVIEW_MS` | Template preview debounce delay (ms) | `500` |
 | `NEXT_PUBLIC_DEFAULT_PAGE_SIZE` | Default pagination size | `50` |
 | `PORT` | Server listening port | `3159` |
+| `NODE_ENV` | Node environment | `development` |
+| `NODE_OPTIONS` | Node.js runtime flags (heap size for Turbopack) | `--max-old-space-size=4096` |
 
 ## Related Services
 
