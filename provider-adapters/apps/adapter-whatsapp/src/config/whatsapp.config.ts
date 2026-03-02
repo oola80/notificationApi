@@ -15,5 +15,8 @@ export default registerAs('whatsapp', () => {
     defaultTemplateLanguage:
       process.env.META_DEFAULT_TEMPLATE_LANGUAGE ?? 'en',
     baseUrl: `https://graph.facebook.com/${apiVersion}/${phoneNumberId}`,
+    testMode: process.env.WHATSAPP_TEST_MODE === 'true',
+    tlsRejectUnauthorized:
+      process.env.WHATSAPP_TLS_REJECT_UNAUTHORIZED !== 'false',
   };
 });

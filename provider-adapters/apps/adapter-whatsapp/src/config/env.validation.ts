@@ -1,5 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsNumber,
   IsOptional,
@@ -45,6 +46,14 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   META_DEFAULT_TEMPLATE_LANGUAGE?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  WHATSAPP_TEST_MODE?: boolean = false;
+
+  @IsString()
+  @IsOptional()
+  WHATSAPP_TLS_REJECT_UNAUTHORIZED?: string = 'true';
 
   @IsString()
   @IsOptional()

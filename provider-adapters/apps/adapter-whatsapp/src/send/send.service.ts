@@ -23,6 +23,7 @@ const CHANNEL = 'whatsapp';
 export class SendService {
   private readonly logger = new Logger(SendService.name);
   private readonly defaultTemplateLanguage: string;
+  private readonly testMode: boolean;
 
   constructor(
     private readonly whatsappClient: WhatsAppClientService,
@@ -33,6 +34,10 @@ export class SendService {
     this.defaultTemplateLanguage = this.configService.get<string>(
       'whatsapp.defaultTemplateLanguage',
       'en',
+    );
+    this.testMode = this.configService.get<boolean>(
+      'whatsapp.testMode',
+      false,
     );
   }
 
@@ -121,6 +126,22 @@ export class SendService {
   }
 
   private buildMessage(request: SendRequestDto, to: string): WhatsAppMessage {
+    // Test mode: send static hello_world template, preserving only the 'to' number
+    if (this.testMode) {
+      this.logger.warn(
+        `WHATSAPP_TEST_MODE is active — sending hello_world test template to ${to} instead of original message`,
+      );
+      return {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+          name: 'hello_world',
+          language: { code: 'en_US' },
+        },
+      };
+    }
+
     // Priority 1: Explicit template metadata from upstream pipeline
     if (request.metadata.templateName) {
       return this.buildTemplateFromMetadata(request, to);

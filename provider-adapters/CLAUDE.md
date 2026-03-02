@@ -17,7 +17,7 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 |---|---|---|---|---|
 | adapter-mailgun | 3171 | Mailgun | Email | HTTP REST (axios, v3 API) |
 | adapter-braze | 3172 | Braze | Email, SMS, WhatsApp, Push | HTTP REST (axios, Braze REST API) |
-| adapter-whatsapp | 3173 | WhatsApp (Meta Cloud API) | WhatsApp | HTTP REST (axios, Graph API v21.0) |
+| adapter-whatsapp | 3173 | WhatsApp (Meta Cloud API) | WhatsApp | HTTP REST (axios, Graph API v22.0) |
 | adapter-aws-ses | 3174 | AWS SES | Email | `@aws-sdk/client-sesv2` (API) or Nodemailer (SMTP) |
 
 > **Note:** Port 3170 is unassigned and reserved for future use.
@@ -115,6 +115,8 @@ Configured via `.env` file in the monorepo root (git-ignored). Required for loca
 | `META_WEBHOOK_VERIFY_TOKEN` | Token for webhook URL verification | *(see .env)* |
 | `META_API_VERSION` | Graph API version | `v22.0` |
 | `META_DEFAULT_TEMPLATE_LANGUAGE` | Default template language | `en` |
+| `WHATSAPP_TEST_MODE` | Enable test mode (static hello_world payload) | `true` |
+| `WHATSAPP_TLS_REJECT_UNAUTHORIZED` | TLS certificate verification (`'false'` to skip for corporate proxy) | `false` |
 | `RABBITMQ_HOST` | RabbitMQ host | `localhost` |
 | `RABBITMQ_PORT` | RabbitMQ AMQP port | `5672` |
 | `RABBITMQ_VHOST` | RabbitMQ virtual host | `vhnotificationapi` |
@@ -188,13 +190,13 @@ provider-adapters/
         app.module.ts            # Root module: WhatsAppConfigModule, LoggerModule, MetricsModule, HealthModule, SendModule
         config/
           config.module.ts       # ConfigModule.forRoot (isGlobal, env validation, whatsapp + rabbitmq configs)
-          whatsapp.config.ts     # registerAs 'whatsapp': port, accessToken, phoneNumberId, appSecret, apiVersion, baseUrl
+          whatsapp.config.ts     # registerAs 'whatsapp': port, nodeEnv, accessToken, phoneNumberId, appSecret, apiVersion, defaultTemplateLanguage, baseUrl, testMode, tlsRejectUnauthorized
           rabbitmq.config.ts     # registerAs 'rabbitmq': host, port, vhost, user, password
           env.validation.ts      # class-validator EnvironmentVariables + validate()
         errors/
           whatsapp-errors.ts     # WHATSAPP_ERROR_CODES (10 WA-prefixed + inherited PA- base)
         whatsapp-client/
-          whatsapp-client.module.ts       # Imports HttpModule (10s timeout), provides WhatsAppClientService
+          whatsapp-client.module.ts       # HttpModule.registerAsync (10s timeout, https.Agent with configurable TLS rejectUnauthorized), provides WhatsAppClientService
           whatsapp-client.service.ts      # Meta Graph API HTTP client (sendMessage, getPhoneNumberInfo)
           interfaces/
             whatsapp.interfaces.ts        # WhatsAppTextMessage, WhatsAppTemplateMessage, WhatsAppMediaMessage, WhatsAppApiResponse, WhatsAppApiError

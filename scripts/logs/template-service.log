@@ -558,3 +558,187 @@
       }
     }
     [35mresponseTime[39m: 127
+[19:33:51.497] [34mDEBUG[39m (17684): [36mPublished audit event: template.render.completed[39m
+    [35mreq[39m: {
+      "id": 7,
+      "method": "POST",
+      "url": "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render",
+      "query": {},
+      "params": {
+        "path": [
+          "templates",
+          "fff60f43-59a9-4c75-80f2-ed7214e023be",
+          "render"
+        ]
+      },
+      "headers": {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json",
+        "user-agent": "axios/1.13.5",
+        "content-length": "1014",
+        "accept-encoding": "gzip, compress, deflate, br",
+        "host": "localhost:3153",
+        "connection": "keep-alive"
+      },
+      "remoteAddress": "::ffff:127.0.0.1",
+      "remotePort": 61193
+    }
+    [35mcontext[39m: "AuditPublisherService"
+[19:33:51.497] [32mINFO[39m (17684): [36mPOST /api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render 201 142ms[39m
+    [35mreq[39m: {
+      "id": 7,
+      "method": "POST",
+      "url": "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render",
+      "query": {},
+      "params": {
+        "path": [
+          "templates",
+          "fff60f43-59a9-4c75-80f2-ed7214e023be",
+          "render"
+        ]
+      },
+      "headers": {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json",
+        "user-agent": "axios/1.13.5",
+        "content-length": "1014",
+        "accept-encoding": "gzip, compress, deflate, br",
+        "host": "localhost:3153",
+        "connection": "keep-alive"
+      },
+      "remoteAddress": "::ffff:127.0.0.1",
+      "remotePort": 61193
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "POST"
+    [35murl[39m: "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render"
+    [35mstatusCode[39m: 201
+    [35mdurationMs[39m: 142
+[19:33:51.498] [32mINFO[39m (17684): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 7,
+      "method": "POST",
+      "url": "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render",
+      "query": {},
+      "params": {
+        "path": [
+          "templates",
+          "fff60f43-59a9-4c75-80f2-ed7214e023be",
+          "render"
+        ]
+      },
+      "headers": {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json",
+        "user-agent": "axios/1.13.5",
+        "content-length": "1014",
+        "accept-encoding": "gzip, compress, deflate, br",
+        "host": "localhost:3153",
+        "connection": "keep-alive"
+      },
+      "remoteAddress": "::ffff:127.0.0.1",
+      "remotePort": 61193
+    }
+    [35mres[39m: {
+      "statusCode": 201,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "3726",
+        "etag": "W/\"e8e-PYfUo/gbiULQcD2AKq5VfZxA6co\""
+      }
+    }
+    [35mresponseTime[39m: 144
+[19:33:51.577] [34mDEBUG[39m (17684): [36mPublished audit event: template.render.completed[39m
+    [35mreq[39m: {
+      "id": 8,
+      "method": "POST",
+      "url": "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render",
+      "query": {},
+      "params": {
+        "path": [
+          "templates",
+          "fff60f43-59a9-4c75-80f2-ed7214e023be",
+          "render"
+        ]
+      },
+      "headers": {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json",
+        "user-agent": "axios/1.13.5",
+        "content-length": "1017",
+        "accept-encoding": "gzip, compress, deflate, br",
+        "host": "localhost:3153",
+        "connection": "keep-alive"
+      },
+      "remoteAddress": "::ffff:127.0.0.1",
+      "remotePort": 61195
+    }
+    [35mcontext[39m: "AuditPublisherService"
+[19:33:51.578] [32mINFO[39m (17684): [36mPOST /api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render 201 99ms[39m
+    [35mreq[39m: {
+      "id": 8,
+      "method": "POST",
+      "url": "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render",
+      "query": {},
+      "params": {
+        "path": [
+          "templates",
+          "fff60f43-59a9-4c75-80f2-ed7214e023be",
+          "render"
+        ]
+      },
+      "headers": {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json",
+        "user-agent": "axios/1.13.5",
+        "content-length": "1017",
+        "accept-encoding": "gzip, compress, deflate, br",
+        "host": "localhost:3153",
+        "connection": "keep-alive"
+      },
+      "remoteAddress": "::ffff:127.0.0.1",
+      "remotePort": 61195
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "POST"
+    [35murl[39m: "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render"
+    [35mstatusCode[39m: 201
+    [35mdurationMs[39m: 99
+[19:33:51.578] [32mINFO[39m (17684): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 8,
+      "method": "POST",
+      "url": "/api/v1/templates/fff60f43-59a9-4c75-80f2-ed7214e023be/render",
+      "query": {},
+      "params": {
+        "path": [
+          "templates",
+          "fff60f43-59a9-4c75-80f2-ed7214e023be",
+          "render"
+        ]
+      },
+      "headers": {
+        "accept": "application/json, text/plain, */*",
+        "content-type": "application/json",
+        "user-agent": "axios/1.13.5",
+        "content-length": "1017",
+        "accept-encoding": "gzip, compress, deflate, br",
+        "host": "localhost:3153",
+        "connection": "keep-alive"
+      },
+      "remoteAddress": "::ffff:127.0.0.1",
+      "remotePort": 61195
+    }
+    [35mres[39m: {
+      "statusCode": 201,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "312",
+        "etag": "W/\"138-FTCHT2Sxw9VR4H1MiS4FoFzmB6Q\""
+      }
+    }
+    [35mresponseTime[39m: 99

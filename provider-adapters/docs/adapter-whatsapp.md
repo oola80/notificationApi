@@ -174,6 +174,44 @@ The adapter extracts `messages[0].id` (the `wamid.xxx` value) as the `providerMe
 | `WHATSAPP_TEMPLATE_LANGUAGE` | No | Default template language (default `en`) | `en` |
 | `WHATSAPP_API_VERSION` | No | Graph API version (default `v21.0`) | `v21.0` |
 | `WHATSAPP_TIMEOUT_MS` | No | HTTP timeout (default 10000) | `10000` |
+| `WHATSAPP_TEST_MODE` | No | When `true`, all messages use the static `hello_world` test template (default `false`) | `true` |
+
+---
+
+## Test Mode
+
+When `WHATSAPP_TEST_MODE=true` is set, the adapter bypasses all dynamic message building logic and sends Meta's built-in `hello_world` test template for every request. This is useful for quick integration testing against the live Meta Cloud API without needing a pre-approved custom template.
+
+**Behavior when active:**
+
+- The `to` phone number from the original request is preserved
+- The message payload is replaced with a static template:
+  ```json
+  {
+    "messaging_product": "whatsapp",
+    "to": "<original phone number>",
+    "type": "template",
+    "template": {
+      "name": "hello_world",
+      "language": { "code": "en_US" }
+    }
+  }
+  ```
+- A `WARN`-level log is emitted on every send so the override is clearly visible
+- All other adapter functionality (health checks, metrics, error classification) is unaffected
+
+**When to use:**
+
+- Local development: verifying end-to-end connectivity with the Meta Cloud API
+- Integration testing: confirming the adapter can authenticate and deliver a message
+- Smoke tests: quick validation after deployment
+
+**When NOT to use:**
+
+- Production environments (omit the variable or set to `false`)
+- When testing custom template rendering or parameter substitution
+
+> **Warning:** Never enable test mode in production. All outbound messages will be replaced with the `hello_world` template regardless of the original request content.
 
 ---
 

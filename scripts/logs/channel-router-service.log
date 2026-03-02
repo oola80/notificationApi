@@ -890,3 +890,149 @@ Node.js v24.13.0
     [35mcontext[39m: "AdapterClientService"
 [19:24:47.203] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=869ms[39m
     [35mcontext[39m: "AdapterClientService"
+[19:25:16.394] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=478ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:25:17.280] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=731ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:25:46.181] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=424ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:25:47.231] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=907ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:26:16.178] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=433ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:26:17.154] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=843ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:26:46.201] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=430ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:26:47.137] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=836ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:27:16.349] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=481ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:27:17.608] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1107ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:27:46.584] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=802ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:27:47.811] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1100ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:28:16.265] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=453ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:28:17.188] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=808ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:28:45.101] [32mINFO[39m (26212): [36mProvider cache loaded: 2 active providers across 2 channels[39m
+    [35mcontext[39m: "ProviderCacheService"
+[19:28:46.145] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=442ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:28:47.126] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=876ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:29:16.242] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=430ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:29:17.251] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=919ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:29:46.245] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=446ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:29:47.231] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=851ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:30:16.272] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=442ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:30:17.245] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=882ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:30:46.253] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=432ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:30:47.248] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=913ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:31:16.399] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=458ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:31:17.296] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=819ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:31:46.424] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=473ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:31:47.444] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=936ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:32:16.360] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=490ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:32:17.625] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1149ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:32:46.623] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=772ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:32:47.764] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1048ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:16.315] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=461ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:17.537] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1085ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:45.116] [32mINFO[39m (26212): [36mProvider cache loaded: 2 active providers across 2 channels[39m
+    [35mcontext[39m: "ProviderCacheService"
+[19:33:46.210] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=421ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:47.540] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1199ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:51.518] [32mINFO[39m (26212): [36mReceived message: 7ebbf596-cbf6-4599-93e6-59efc18ec89b channel=email priority=normal[39m
+    [35mcontext[39m: "EmailNormalConsumer"
+[19:33:51.518] [32mINFO[39m (26212): [36mPipeline started: 7ebbf596-cbf6-4599-93e6-59efc18ec89b channel=email attempt=1[39m
+    [35mcontext[39m: "DeliveryPipelineService"
+[19:33:51.521] [32mINFO[39m (26212): [36mSending to adapter: http://localhost:3171/send[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:51.590] [32mINFO[39m (26212): [36mReceived message: 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca channel=whatsapp priority=normal[39m
+    [35mcontext[39m: "WhatsappNormalConsumer"
+[19:33:51.590] [32mINFO[39m (26212): [36mPipeline started: 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca channel=whatsapp attempt=1[39m
+    [35mcontext[39m: "DeliveryPipelineService"
+[19:33:51.591] [32mINFO[39m (26212): [36mSending to adapter: http://localhost:3173/send[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:51.864] [32mINFO[39m (26212): [36mAdapter send completed: http://localhost:3173/send status=200 duration=273ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:51.865] [34mDEBUG[39m (26212): [36mPublished delivery status: 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca → FAILED[39m
+    [35mcontext[39m: "RabbitMQPublisherService"
+[19:33:51.865] [34mDEBUG[39m (26212): [36mPublished delivery attempt: 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca attempt=1 outcome=failed[39m
+    [35mcontext[39m: "RabbitMQPublisherService"
+[19:33:51.866] [33mWARN[39m (26212): [36mPipeline failed (non-retryable): 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca error=(#131030) Recipient phone number not in allowed list[39m
+    [35mcontext[39m: "DeliveryPipelineService"
+[19:33:52.008] [32mINFO[39m (26212): [36mAdapter send completed: http://localhost:3171/send status=200 duration=487ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:33:52.008] [34mDEBUG[39m (26212): [36mPublished delivery status: 7ebbf596-cbf6-4599-93e6-59efc18ec89b → SENT[39m
+    [35mcontext[39m: "RabbitMQPublisherService"
+[19:33:52.008] [34mDEBUG[39m (26212): [36mPublished delivery attempt: 7ebbf596-cbf6-4599-93e6-59efc18ec89b attempt=1 outcome=sent[39m
+    [35mcontext[39m: "RabbitMQPublisherService"
+[19:33:52.008] [32mINFO[39m (26212): [36mPipeline success: 7ebbf596-cbf6-4599-93e6-59efc18ec89b provider=Mailgun duration=490ms[39m
+    [35mcontext[39m: "DeliveryPipelineService"
+[19:34:16.289] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=408ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:34:17.158] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=784ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:34:46.352] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=424ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:34:47.263] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=827ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:35:16.386] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=455ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:35:17.448] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=979ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:35:46.348] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=429ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:35:47.250] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=805ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:36:16.461] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=529ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:36:17.500] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=956ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:36:46.391] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=432ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:36:47.680] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1102ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:37:16.316] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=312ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:37:17.336] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=909ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:37:46.538] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=555ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:37:47.701] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1082ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:38:16.287] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=270ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:38:17.486] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=1094ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:38:45.115] [32mINFO[39m (26212): [36mProvider cache loaded: 2 active providers across 2 channels[39m
+    [35mcontext[39m: "ProviderCacheService"
+[19:38:46.165] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3171/health status=ok duration=287ms[39m
+    [35mcontext[39m: "AdapterClientService"
+[19:38:47.149] [34mDEBUG[39m (26212): [36mAdapter health check: http://localhost:3173/health status=ok duration=878ms[39m
+    [35mcontext[39m: "AdapterClientService"

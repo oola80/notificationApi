@@ -441,3 +441,112 @@
     [35mroutingKey[39m: "notification.status.failed"
 [18:38:44.523] [32mINFO[39m (7444): [36mNotification fb4ef312-b625-4324-ad58-85423fb35ae4: SENT → FAILED[39m
     [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.187] [32mINFO[39m (7444): [36mProcessing normal event[39m
+    [35mcontext[39m: "NormalEventConsumer"
+    [35meventId[39m: "aa9a53d1-5adf-4487-8ead-d37370891112"
+    [35meventType[39m: "order.delay"
+    [35mqueue[39m: "q.engine.events.normal"
+    [35mroutingKey[39m: "event.normal.order.delay"
+    [35mretryCount[39m: 0
+[19:33:51.187] [32mINFO[39m (7444): [36mPipeline started[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "e38a2661-1b36-496f-88b3-2fe4861c2ece"
+    [35meventId[39m: "aa9a53d1-5adf-4487-8ead-d37370891112"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "parse"
+    [35mpriority[39m: "normal"
+[19:33:51.326] [34mDEBUG[39m (7444): [36mMatched 1 rules[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "e38a2661-1b36-496f-88b3-2fe4861c2ece"
+    [35meventId[39m: "aa9a53d1-5adf-4487-8ead-d37370891112"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "match"
+    [35mmatchCount[39m: 1
+    [35mruleIds[39m: [
+      "39587ed8-8a74-47aa-a117-321f7321d648"
+    ]
+[19:33:51.345] [32mINFO[39m (7444): [36mNotification 7ebbf596-cbf6-4599-93e6-59efc18ec89b: PENDING → PROCESSING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.473] [32mINFO[39m (7444): [36mNotification 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca: PENDING → PROCESSING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.498] [34mDEBUG[39m (7444): [36mTemplate rendered[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "e38a2661-1b36-496f-88b3-2fe4861c2ece"
+    [35meventId[39m: "aa9a53d1-5adf-4487-8ead-d37370891112"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "render"
+    [35mchannel[39m: "email"
+    [35mdurationMs[39m: 153
+    [35msuccess[39m: true
+    [35mtemplateId[39m: "fff60f43-59a9-4c75-80f2-ed7214e023be"
+    [35mnotificationId[39m: "7ebbf596-cbf6-4599-93e6-59efc18ec89b"
+[19:33:51.502] [32mINFO[39m (7444): [36mNotification 7ebbf596-cbf6-4599-93e6-59efc18ec89b: PROCESSING → RENDERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.510] [32mINFO[39m (7444): [36mNotification 7ebbf596-cbf6-4599-93e6-59efc18ec89b: RENDERING → DELIVERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.520] [34mDEBUG[39m (7444): [36mPublished deliver message: 7ebbf596-cbf6-4599-93e6-59efc18ec89b → notification.deliver.normal.email[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[19:33:51.520] [34mDEBUG[39m (7444): [36mNotification dispatched[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "e38a2661-1b36-496f-88b3-2fe4861c2ece"
+    [35meventId[39m: "aa9a53d1-5adf-4487-8ead-d37370891112"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "dispatch"
+    [35mchannel[39m: "email"
+    [35mpriority[39m: "normal"
+    [35mnotificationId[39m: "7ebbf596-cbf6-4599-93e6-59efc18ec89b"
+[19:33:51.524] [32mINFO[39m (7444): [36mNotification 7ebbf596-cbf6-4599-93e6-59efc18ec89b: DELIVERING → SENT[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.524] [34mDEBUG[39m (7444): [36mPublished status: 7ebbf596-cbf6-4599-93e6-59efc18ec89b DELIVERING→SENT[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[19:33:51.578] [34mDEBUG[39m (7444): [36mTemplate rendered[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "e38a2661-1b36-496f-88b3-2fe4861c2ece"
+    [35meventId[39m: "aa9a53d1-5adf-4487-8ead-d37370891112"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "render"
+    [35mchannel[39m: "whatsapp"
+    [35mdurationMs[39m: 105
+    [35msuccess[39m: true
+    [35mtemplateId[39m: "fff60f43-59a9-4c75-80f2-ed7214e023be"
+    [35mnotificationId[39m: "0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca"
+[19:33:51.581] [32mINFO[39m (7444): [36mNotification 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca: PROCESSING → RENDERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.588] [32mINFO[39m (7444): [36mNotification 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca: RENDERING → DELIVERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.593] [34mDEBUG[39m (7444): [36mPublished deliver message: 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca → notification.deliver.normal.whatsapp[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[19:33:51.593] [34mDEBUG[39m (7444): [36mNotification dispatched[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "e38a2661-1b36-496f-88b3-2fe4861c2ece"
+    [35meventId[39m: "aa9a53d1-5adf-4487-8ead-d37370891112"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "dispatch"
+    [35mchannel[39m: "whatsapp"
+    [35mpriority[39m: "normal"
+    [35mnotificationId[39m: "0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca"
+[19:33:51.596] [32mINFO[39m (7444): [36mNotification 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca: DELIVERING → SENT[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[19:33:51.596] [34mDEBUG[39m (7444): [36mPublished status: 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca DELIVERING→SENT[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[19:33:51.891] [32mINFO[39m (7444): [36mInbound status update[39m
+    [35mcontext[39m: "StatusInboundConsumer"
+    [35mnotificationId[39m: "0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca"
+    [35mfromStatus[39m: "DELIVERING"
+    [35mtoStatus[39m: "FAILED"
+    [35mqueue[39m: "q.engine.status.inbound"
+    [35mroutingKey[39m: "notification.status.failed"
+[19:33:51.905] [32mINFO[39m (7444): [36mNotification 0b3ad2fc-a92c-4a31-a9de-dbaae0e07cca: SENT → FAILED[39m
+    [35mcontext[39m: "NotificationLifecycleService"

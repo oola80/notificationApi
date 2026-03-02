@@ -373,3 +373,103 @@
       }
     }
     [35mresponseTime[39m: 138
+[19:33:51.191] [32mINFO[39m (27084): [36mPublished event aa9a53d1-5adf-4487-8ead-d37370891112 to xch.events.normalized [event.normal.order.delay][39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "e38a2661-1b36-496f-88b3-2fe4861c2ece",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "9deaee6e-9d68-4097-80b3-b1cab916a7eb",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1035"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 61188
+    }
+    [35mcontext[39m: "EventPublisherService"
+[19:33:51.202] [32mINFO[39m (27084): [36mPOST /api/v1/webhooks/events 202 156ms[39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "e38a2661-1b36-496f-88b3-2fe4861c2ece",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "9deaee6e-9d68-4097-80b3-b1cab916a7eb",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1035"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 61188
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "POST"
+    [35murl[39m: "/api/v1/webhooks/events"
+    [35mstatusCode[39m: 202
+    [35mdurationMs[39m: 156
+    [35mcorrelationId[39m: "e38a2661-1b36-496f-88b3-2fe4861c2ece"
+    [35msourceId[39m: "bulk-upload"
+[19:33:51.203] [32mINFO[39m (27084): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "e38a2661-1b36-496f-88b3-2fe4861c2ece",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "9deaee6e-9d68-4097-80b3-b1cab916a7eb",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1035"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 61188
+    }
+    [35mres[39m: {
+      "statusCode": 202,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "126",
+        "etag": "W/\"7e-KaaUT1rj5JFIFzXJsH9PGObsKOA\""
+      }
+    }
+    [35mresponseTime[39m: 158

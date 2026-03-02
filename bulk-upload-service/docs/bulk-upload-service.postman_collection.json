@@ -1,0 +1,353 @@
+{
+  "info": {
+    "name": "Bulk Upload Service",
+    "description": "Postman collection for the Bulk Upload Service (port 3158).\n\nAsync XLSX bulk upload — file processing, polling, result download, retry, and monitoring.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3158",
+      "type": "string"
+    },
+    {
+      "key": "uploadId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Upload Management",
+      "description": "CRUD and lifecycle operations for bulk XLSX uploads.",
+      "item": [
+        {
+          "name": "Upload XLSX File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('uploadId', body.uploadId);",
+                  "    pm.test('Status is 202 Accepted', () => pm.response.to.have.status(202));",
+                  "    pm.test('Status is queued', () => pm.expect(body.status).to.eql('queued'));",
+                  "    pm.test('uploadId is a UUID', () => pm.expect(body.uploadId).to.match(/^[0-9a-f-]{36}$/));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "XLSX file to upload (max 10 MB, max 5000 data rows). Must contain an 'eventType' header column."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads"]
+            },
+            "description": "Upload an XLSX file for bulk event submission. Returns 202 Accepted immediately; processing happens asynchronously.\n\n**File requirements:**\n- Extension: `.xlsx`\n- MIME: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`\n- Must contain header row with `eventType` column\n- If `item.*` prefixed columns exist, must also have group key column (default: `orderId`)\n- At least 1 data row\n- Max 10 MB / 5,000 rows"
+          }
+        },
+        {
+          "name": "List Uploads",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Response has data array', () => pm.expect(body.data).to.be.an('array'));",
+                  "pm.test('Response has meta', () => pm.expect(body.meta).to.have.property('total'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads?page=1&limit=20&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads"],
+              "query": [
+                { "key": "status", "value": "", "disabled": true, "description": "Filter: queued | processing | completed | partial | failed | cancelled" },
+                { "key": "uploadedBy", "value": "", "disabled": true, "description": "Filter by uploader UUID" },
+                { "key": "dateFrom", "value": "", "disabled": true, "description": "ISO8601 date — filter uploads from this date" },
+                { "key": "dateTo", "value": "", "disabled": true, "description": "ISO8601 date — filter uploads until this date" },
+                { "key": "page", "value": "1", "description": "Page number (min: 1)" },
+                { "key": "limit", "value": "20", "description": "Results per page (1–100)" },
+                { "key": "sortBy", "value": "createdAt", "description": "Sort field: createdAt | fileName | totalRows | status" },
+                { "key": "sortOrder", "value": "desc", "description": "Sort direction: asc | desc" }
+              ]
+            },
+            "description": "List all uploads with pagination and optional filtering by status, uploader, and date range."
+          }
+        },
+        {
+          "name": "Get Upload Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has uploadId', () => pm.expect(body).to.have.property('uploadId'));",
+                  "pm.test('Has status', () => pm.expect(body).to.have.property('status'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads/{{uploadId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads", "{{uploadId}}"]
+            },
+            "description": "Get detailed information for a specific upload including file metadata, progress counters, and timing."
+          }
+        },
+        {
+          "name": "Poll Upload Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has progressPercent', () => pm.expect(body).to.have.property('progressPercent'));",
+                  "pm.test('Has resultFileReady', () => pm.expect(body).to.have.property('resultFileReady'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads/{{uploadId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads", "{{uploadId}}", "status"]
+            },
+            "description": "Check the processing status of a specific upload. Designed for polling progress updates. Returns progressPercent (0–100) and estimatedTimeRemainingMs."
+          }
+        },
+        {
+          "name": "Download Result File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Content-Type is XLSX', () => {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('spreadsheetml');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads/{{uploadId}}/result",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads", "{{uploadId}}", "result"]
+            },
+            "description": "Download the result XLSX file with all original columns plus `_notification_status` column showing per-row submission status (`sent` or `failed: <reason>`).\n\nUpload must be in completed, partial, or failed status."
+          }
+        },
+        {
+          "name": "Get Failed Row Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Response has data array', () => pm.expect(body.data).to.be.an('array'));",
+                  "pm.test('Response has meta', () => pm.expect(body.meta).to.have.property('total'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads/{{uploadId}}/errors?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads", "{{uploadId}}", "errors"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number (min: 1)" },
+                { "key": "limit", "value": "50", "description": "Results per page (1–200)" }
+              ]
+            },
+            "description": "Get paginated list of failed rows for a specific upload with original row data and error messages."
+          }
+        },
+        {
+          "name": "Retry Failed Rows",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 202 Accepted', () => pm.response.to.have.status(202));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has retryableRows', () => pm.expect(body).to.have.property('retryableRows'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads/{{uploadId}}/retry",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads", "{{uploadId}}", "retry"]
+            },
+            "description": "Retry all failed rows for a specific upload. Resets failed/skipped rows and resubmits them to Event Ingestion Service. Only partial or failed uploads can be retried."
+          }
+        },
+        {
+          "name": "Cancel / Delete Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/uploads/{{uploadId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "uploads", "{{uploadId}}"]
+            },
+            "description": "Cancel an in-progress upload or delete a completed upload record. Returns 204 No Content on success."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health & Monitoring",
+      "description": "Liveness, readiness, and Prometheus metrics endpoints.",
+      "item": [
+        {
+          "name": "Liveness Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Status is ok', () => pm.expect(body.status).to.eql('ok'));",
+                  "pm.test('Database is up', () => pm.expect(body.info.database.status).to.eql('up'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness probe — checks database connectivity only."
+          }
+        },
+        {
+          "name": "Readiness Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Status is ok', () => pm.expect(body.status).to.eql('ok'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["ready"]
+            },
+            "description": "Readiness probe — checks database, RabbitMQ, Event Ingestion Service, and disk space."
+          }
+        },
+        {
+          "name": "Prometheus Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Content-Type is text/plain', () => {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/plain');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["metrics"]
+            },
+            "description": "Prometheus metrics endpoint (text/plain format). Exposes 18 metrics: upload counters, file size histogram, processing duration, row processing, Event Ingestion HTTP, RabbitMQ publish, circuit breaker state, and rate limiter metrics."
+          }
+        }
+      ]
+    }
+  ]
+}

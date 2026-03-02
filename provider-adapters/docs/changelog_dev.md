@@ -6,6 +6,25 @@
 
 ## [Unreleased]
 
+### Bugfix: WhatsApp adapter SSL certificate error behind corporate proxy (2026-03-02)
+
+#### apps/adapter-whatsapp/
+- `src/config/env.validation.ts` — Added `WHATSAPP_TLS_REJECT_UNAUTHORIZED` as `@IsOptional()` `@IsString()` field with default `'true'`. Uses `@IsString()` instead of `@IsBoolean()` because `enableImplicitConversion: true` in `plainToInstance` converts `'false'` via `Boolean('false')` → `true`, and `@nestjs/config` writes validated values back to `process.env`, corrupting the original string value.
+- `src/config/whatsapp.config.ts` — Exposed `tlsRejectUnauthorized: boolean` from `WHATSAPP_TLS_REJECT_UNAUTHORIZED` env var (string `'false'` disables verification, default `true`).
+- `src/whatsapp-client/whatsapp-client.module.ts` — Converted `HttpModule.register()` to `HttpModule.registerAsync()` with injected `ConfigService`. Creates `https.Agent` with `rejectUnauthorized` controlled by `whatsapp.tlsRejectUnauthorized` config. All HTTP requests (sendMessage, getPhoneNumberInfo) inherit the agent automatically.
+- `.env` — Added `WHATSAPP_TLS_REJECT_UNAUTHORIZED=false` for local development behind corporate proxy.
+
+### Feature: WHATSAPP_TEST_MODE environment variable (2026-03-02)
+
+#### apps/adapter-whatsapp/
+- `src/config/env.validation.ts` — Added `WHATSAPP_TEST_MODE` as `@IsOptional()` `@IsBoolean()` field with default `false` (implicit conversion via `class-transformer`).
+- `src/config/whatsapp.config.ts` — Exposed `testMode: boolean` from `WHATSAPP_TEST_MODE` env var (string `'true'` → boolean, default `false`).
+- `src/send/send.service.ts` — Added `testMode` property read from `whatsapp.testMode` config. When `testMode === true`, `buildMessage()` short-circuits and returns a static `hello_world` template payload (preserves only the `to` phone number). Emits `logger.warn()` on every test-mode send.
+- `.env` — Added `WHATSAPP_TEST_MODE=true` for local development.
+
+#### docs/
+- `adapter-whatsapp.md` — Added "Test Mode" section documenting the feature, static payload, usage guidance, and production warning. Added `WHATSAPP_TEST_MODE` to the Environment Variables table.
+
 ### Added: Technical implementation reference documentation (2026-03-01)
 
 - `tech-provider-adapters-v1.md` — Technical implementation reference documentation
