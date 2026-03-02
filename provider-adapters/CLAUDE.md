@@ -26,11 +26,13 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 
 ## Implementation Status
 
-**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). All other adapters not started.
+**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). **adapter-whatsapp Phase 1 complete** — Send pipeline + health (POST /send, GET /health, GET /capabilities, GET /metrics). **libs/common MetadataDto** extended with `templateName`, `templateLanguage`, `templateParameters` for WhatsApp Meta template dispatch. All other adapters not started.
 
 - **Phase 3:** Webhook processing pipeline (`WebhooksModule`: `WebhookVerificationService` with HMAC-SHA256 + timing-safe comparison + 5-min replay protection, `WebhookNormalizerService` with 7 event type mappings + field extraction + metadata, `WebhooksService` pipeline orchestrator with fire-and-forget pattern, `WebhooksController` POST /webhooks/inbound with 200/401 responses). Interfaces: `MailgunWebhookPayload`, `MailgunWebhookSignature`, `MailgunWebhookEventData`. 204 unit tests across 28 suites, 17 E2E tests across 3 files.
 
 - **Phase 2:** Mailgun HTTP client module (`MailgunClientService`: sendMessage, getDomainInfo, buildFormData, EU region support). Send pipeline (`SendService`: channel validation, attachment processing with Base64/URL support and graceful degradation, Mailgun form data mapping with custom variables `v:notificationId`/`v:correlationId`/`v:cycleId` and headers `h:X-Notification-Id`, "Name \<email\>" recipient formatting, HTML detection, fromAddress override, Reply-To). Error classifier (`ErrorClassifierService`: HTTP status→retryable/errorCode mapping for all Mailgun responses). Send controller (`POST /send` with `@HttpCode(200)` — always returns 200 with success/failure in body). Refactored `MailgunHealthService` to use shared `MailgunClientService`. 149 unit tests across 24 suites, 10 E2E tests across 2 files.
+
+- **adapter-whatsapp Phase 1:** WhatsApp (Meta Cloud API) send pipeline + health. `WhatsAppClientService` (sendMessage, getPhoneNumberInfo via Graph API v22.0 with Bearer token). `SendService` (channel validation, phone formatting strip `+`, message type detection — Priority 1: `metadata.templateName` explicit field; Priority 2: `content.subject` prefix `template:`; template/text/media messages, `buildTemplateFromMetadata()` uses metadata fields with fallback to comma-separated body parsing). `ErrorClassifierService` (two-level: Meta error codes 130429/131026/131047/132000/132012/135000/368 + HTTP status fallback). `HealthController` (GET /health, GET /capabilities with providerId `meta-whatsapp`). `WhatsAppHealthService` extends `BaseHealthService`. 10 WA-prefixed error codes. 5 test files (3 E2E spec files).
 
 - **Phase 1:** NestJS monorepo restructuring (nest-cli.json, tsconfig paths, package.json with all dependencies). libs/common/ shared library (DTOs: SendRequest/SendResult/WebhookEvent/Health/Capabilities, errors: PA-prefixed base codes + HttpExceptionFilter, pipes: DtoValidationPipe, interceptors: LoggingInterceptor, metrics: 7 prom-client metrics + GET /metrics, RabbitMQ: optional connection + fire-and-forget publisher, health: abstract BaseHealthService). apps/adapter-mailgun/ application (bootstrap with Pino/validation/filter/interceptor/CORS, config with registerAs + env validation, MG-prefixed error codes, MailgunHealthService with domains API connectivity check, HealthController with GET /health + GET /capabilities). 93 unit tests across 20 suites, 3 E2E tests. Mailgun domain: distelsa.info, region: us.
 
@@ -66,17 +68,22 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 |---|---|---|
 | `build` | `nest build` | Build default app (adapter-mailgun) |
 | `build:mailgun` | `nest build adapter-mailgun` | Build Mailgun adapter |
+| `build:whatsapp` | `nest build adapter-whatsapp` | Build WhatsApp adapter |
 | `start` | `nest start` | Run default app |
 | `start:dev` | `nest start --watch` | Dev mode (default app) |
 | `start:dev:mailgun` | `nest start adapter-mailgun --watch` | Dev mode (Mailgun) |
+| `start:dev:whatsapp` | `nest start adapter-whatsapp --watch` | Dev mode (WhatsApp) |
 | `start:debug:mailgun` | `nest start adapter-mailgun --debug --watch` | Debug mode (Mailgun) |
+| `start:debug:whatsapp` | `nest start adapter-whatsapp --debug --watch` | Debug mode (WhatsApp) |
 | `start:prod:mailgun` | `node dist/apps/adapter-mailgun/main` | Production (Mailgun) |
+| `start:prod:whatsapp` | `node dist/apps/adapter-whatsapp/main` | Production (WhatsApp) |
 | `lint` | `eslint "{apps,libs,test}/**/*.ts" --fix` | Lint and auto-fix |
 | `format` | `prettier --write "apps/**/*.ts" "libs/**/*.ts" "test/**/*.ts"` | Format code |
 | `test` | `jest` | Run all unit tests |
 | `test:watch` | `jest --watch` | Tests in watch mode |
 | `test:cov` | `jest --coverage` | Tests with coverage |
 | `test:e2e:mailgun` | `jest --config ./apps/adapter-mailgun/test/jest-e2e.json` | E2E tests (Mailgun) |
+| `test:e2e:whatsapp` | `jest --config ./apps/adapter-whatsapp/test/jest-e2e.json` | E2E tests (WhatsApp) |
 
 ## RabbitMQ
 
@@ -101,6 +108,13 @@ Configured via `.env` file in the monorepo root (git-ignored). Required for loca
 | `MAILGUN_FROM_ADDRESS` | Default from address | `notifications@distelsa.info` |
 | `MAILGUN_REGION` | Mailgun region (us/eu) | `us` |
 | `MAILGUN_WEBHOOK_SIGNING_KEY` | Mailgun webhook signing key | *(see .env)* |
+| `WHATSAPP_PORT` | WhatsApp adapter HTTP port | `3173` |
+| `META_ACCESS_TOKEN` | Meta system user access token | *(see .env)* |
+| `META_PHONE_NUMBER_ID` | WhatsApp Business phone number ID | *(see .env)* |
+| `META_APP_SECRET` | Meta app secret for webhook verification | *(see .env)* |
+| `META_WEBHOOK_VERIFY_TOKEN` | Token for webhook URL verification | *(see .env)* |
+| `META_API_VERSION` | Graph API version | `v22.0` |
+| `META_DEFAULT_TEMPLATE_LANGUAGE` | Default template language | `en` |
 | `RABBITMQ_HOST` | RabbitMQ host | `localhost` |
 | `RABBITMQ_PORT` | RabbitMQ AMQP port | `5672` |
 | `RABBITMQ_VHOST` | RabbitMQ virtual host | `vhnotificationapi` |
@@ -161,12 +175,44 @@ provider-adapters/
   .prettierrc                    # { singleQuote: true, trailingComma: "all" }
   eslint.config.mjs              # ESLint flat config (typescript-eslint + prettier)
   jest.setup.ts                  # Jest setup (reflect-metadata)
-  nest-cli.json                  # NestJS monorepo config (adapter-mailgun + common)
+  nest-cli.json                  # NestJS monorepo config (adapter-mailgun + adapter-whatsapp + common)
   package.json                   # Dependencies and npm scripts (monorepo)
   package-lock.json
   tsconfig.json                  # ES2023 target, nodenext modules, @app/common paths
   tsconfig.build.json            # Build-specific TS config
   apps/
+    adapter-whatsapp/
+      tsconfig.app.json          # App-specific TS config extending root
+      src/
+        main.ts                  # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3173
+        app.module.ts            # Root module: WhatsAppConfigModule, LoggerModule, MetricsModule, HealthModule, SendModule
+        config/
+          config.module.ts       # ConfigModule.forRoot (isGlobal, env validation, whatsapp + rabbitmq configs)
+          whatsapp.config.ts     # registerAs 'whatsapp': port, accessToken, phoneNumberId, appSecret, apiVersion, baseUrl
+          rabbitmq.config.ts     # registerAs 'rabbitmq': host, port, vhost, user, password
+          env.validation.ts      # class-validator EnvironmentVariables + validate()
+        errors/
+          whatsapp-errors.ts     # WHATSAPP_ERROR_CODES (10 WA-prefixed + inherited PA- base)
+        whatsapp-client/
+          whatsapp-client.module.ts       # Imports HttpModule (10s timeout), provides WhatsAppClientService
+          whatsapp-client.service.ts      # Meta Graph API HTTP client (sendMessage, getPhoneNumberInfo)
+          interfaces/
+            whatsapp.interfaces.ts        # WhatsAppTextMessage, WhatsAppTemplateMessage, WhatsAppMediaMessage, WhatsAppApiResponse, WhatsAppApiError
+        send/
+          send.module.ts         # Imports WhatsAppClientModule, provides SendService, ErrorClassifierService, SendController
+          send.service.ts        # Send pipeline orchestrator (validate channel, format phone, build message, send, classify errors, metrics)
+          send.controller.ts     # POST /send (@HttpCode(200), delegates to SendService, catches unexpected errors)
+          error-classifier.service.ts   # Two-level: Meta error codes + HTTP status fallback
+        health/
+          health.module.ts       # Imports WhatsAppClientModule, provides WhatsAppHealthService + HealthController
+          health.controller.ts   # GET /health, GET /capabilities (meta-whatsapp)
+          whatsapp-health.service.ts  # Extends BaseHealthService, uses WhatsAppClientService.getPhoneNumberInfo()
+      test/
+        test-utils.ts            # E2E test helper (createTestApp with HealthModule + SendModule)
+        app.e2e-spec.ts          # E2E: health, capabilities, metrics
+        send.e2e-spec.ts         # E2E: POST /send (template, text, language override, non-whatsapp, validation, 429/401, shape, metadata-based template flow)
+        send-order-delay.e2e-spec.ts  # E2E: order-delay template scenario (WhatsApp metadata-driven template message)
+        jest-e2e.json            # Jest E2E config
     adapter-mailgun/
       tsconfig.app.json          # App-specific TS config extending root
       src/
@@ -227,7 +273,7 @@ provider-adapters/
       src/
         index.ts                 # Barrel re-exports
         dto/
-          send-request.dto.ts    # SendRequestDto (RecipientDto, ContentDto, MediaDto, MetadataDto, ChannelType)
+          send-request.dto.ts    # SendRequestDto (RecipientDto, ContentDto, MediaDto, MetadataDto with optional templateName/templateLanguage/templateParameters, ChannelType)
           send-request.dto.spec.ts
           send-result.dto.ts     # SendResultDto
           send-result.dto.spec.ts

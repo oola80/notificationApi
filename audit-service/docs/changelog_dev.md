@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Added: Technical implementation reference documentation (2026-03-01)
+
+- `tech-audit-service-v1.md` — Technical implementation reference documentation
+
 ### Phase 4 — DLQ Monitoring, Analytics Engine & Data Retention (2026-02-28)
 
 - **DLQ CRUD endpoints** — `GET /audit/dlq` with paginated query, 4 optional filters (status, originalQueue, from, to), response includes `meta.statusCounts` (aggregated count per status). `PATCH /audit/dlq/:id` for status updates with transition validation (pending → investigated, investigated → reprocessed|discarded, pending → discarded); sets `resolved_at`/`resolved_by` on terminal states; rejects invalid transitions with AUD-006. `POST /audit/dlq/:id/reprocess` republishes DLQ entry payload to original exchange/routing key; validates entry is in `investigated` status; marks as `reprocessed` with resolved metadata.

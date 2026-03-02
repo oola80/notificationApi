@@ -8,11 +8,11 @@ All 4 adapters (adapter-mailgun :3171, adapter-braze :3172, adapter-whatsapp :31
 
 | Method | Path | Description | adapter-mailgun | adapter-braze | adapter-whatsapp | adapter-aws-ses |
 |--------|------|-------------|-----------------|---------------|------------------|-----------------|
-| POST | `/send` | Accept a SendRequest, translate to provider API, return SendResult | Done | Not Started | Not Started | Not Started |
-| GET | `/health` | Liveness + provider connectivity check; returns AdapterHealthResponse | Done | Not Started | Not Started | Not Started |
-| GET | `/capabilities` | Returns adapter capabilities (channels, attachments, media, recipients); returns AdapterCapabilitiesResponse | Done | Not Started | Not Started | Not Started |
+| POST | `/send` | Accept a SendRequest, translate to provider API, return SendResult | Done | Not Started | Done | Not Started |
+| GET | `/health` | Liveness + provider connectivity check; returns AdapterHealthResponse | Done | Not Started | Done | Not Started |
+| GET | `/capabilities` | Returns adapter capabilities (channels, attachments, media, recipients); returns AdapterCapabilitiesResponse | Done | Not Started | Done | Not Started |
 | POST | `/webhooks/inbound` | Receive provider webhook callbacks; verify signature, normalize event, publish to RabbitMQ | Done | Not Started | Not Started | Not Started |
-| GET | `/metrics` | Prometheus metrics (send latency, success/error counts, webhook processing) | Done | Not Started | Not Started | Not Started |
+| GET | `/metrics` | Prometheus metrics (send latency, success/error counts, webhook processing) | Done | Not Started | Done | Not Started |
 
 ## Adapter-Specific Notes
 

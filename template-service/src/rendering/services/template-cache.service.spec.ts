@@ -11,6 +11,7 @@ describe('TemplateCacheService', () => {
   const mockCompiled: CompiledTemplate = {
     subjectFn: Handlebars.compile('Subject {{name}}'),
     bodyFn: Handlebars.compile('Body {{name}}'),
+    channelMetadata: {},
   };
 
   beforeEach(() => {
@@ -135,6 +136,7 @@ describe('TemplateCacheService', () => {
     const compiled2: CompiledTemplate = {
       subjectFn: null,
       bodyFn: Handlebars.compile('Updated body'),
+      channelMetadata: {},
     };
 
     service.set('t1:v1:email', mockCompiled);

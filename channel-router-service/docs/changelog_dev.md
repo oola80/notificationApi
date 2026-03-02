@@ -5,6 +5,22 @@
 
 ## [Unreleased]
 
+### Bugfix: Channel-aware address resolution in adapter-client (2026-03-01)
+
+- `src/adapter-client/adapter-client.service.ts` — Replaced fixed-priority address resolution (`email || phone || deviceToken`) in `toAdapterPayload()` with channel-aware `resolveAddress()` private method. SMS/WhatsApp channels now prefer `phone`, push prefers `deviceToken`, email/default preserves original priority. Each channel falls back to other address types to avoid empty strings when an address is available.
+- `src/adapter-client/adapter-client.service.spec.ts` — Added 7 unit tests for channel-aware address resolution: email/whatsapp/sms/push channel preference, fallback scenarios, and unknown channel default behavior.
+
+### Added: Technical implementation reference documentation (2026-03-01)
+
+- `tech-channel-router-service-v1.md` — Technical implementation reference documentation
+
+### Feature: Pass template metadata through to provider adapters (2026-03-01)
+
+- `src/delivery/interfaces/dispatch-message.interface.ts` — Added optional `templateName`, `templateLanguage`, `templateParameters` fields to `content` block of `DispatchMessage` interface.
+- `src/adapter-client/interfaces/adapter-client.interfaces.ts` — Added same optional template fields to `SendRequest.content`.
+- `src/adapter-client/adapter-client.service.ts` — Updated `toAdapterPayload()` to conditionally spread `templateName`, `templateLanguage`, `templateParameters` into the adapter `metadata` object when `content.templateName` is present.
+- `src/adapter-client/adapter-client.service.spec.ts` — Added 2 unit tests: verifying template metadata is included in adapter payload when present, and omitted when absent.
+
 ### Feature: GET channel by ID endpoint (2026-03-01)
 
 - `src/channels/channels.controller.ts` — Added `@Get(':id')` endpoint delegating to `channelsService.findById(id)`.

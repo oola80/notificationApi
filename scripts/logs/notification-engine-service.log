@@ -1,0 +1,443 @@
+
+> notification-engine-service@0.0.1 start:dev
+> nest start --watch
+
+[2J[3J[H[[90m6:28:09 p. m.[0m] Starting compilation in watch mode...
+
+[[90m6:28:25 p. m.[0m] Found 0 errors. Watching for file changes.
+
+[18:28:45.351] [32mINFO[39m (7444): [36mStarting Nest application...[39m
+    [35mcontext[39m: "NestFactory"
+[18:28:45.352] [32mINFO[39m (7444): [36mAppModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mAppConfigModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mConfigHostModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mDiscoveryModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mMetricsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mConfigModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTrying to connect to RabbitMQ broker (default)[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.352] [32mINFO[39m (7444): [36mLoggerModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mCommonModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mHttpModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTemplateClientModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mSuccessfully connected to RabbitMQ broker (default)[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.352] [32mINFO[39m (7444): [36mSuccessfully connected a RabbitMQ channel "channel-critical"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.352] [32mINFO[39m (7444): [36mSuccessfully connected a RabbitMQ channel "channel-normal"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.352] [32mINFO[39m (7444): [36mSuccessfully connected to RabbitMQ[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mSuccessfully connected a RabbitMQ channel "AmqpConnection"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.352] [32mINFO[39m (7444): [36mRabbitMQModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mAppRabbitMQModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTypeOrmCoreModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mHealthModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mConsumersModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mRulesModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mOverridesModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mRecipientsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mNotificationsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [32mINFO[39m (7444): [36mPreferencesModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.352] [33mWARN[39m (7444): [36mUnsupported route path: "/api/v1/*". In previous versions, the symbols ?, *, and + were used to denote optional or repeating path parameters. The latest version of "path-to-regexp" now requires the use of named parameters. For example, instead of using a route like /users/* to capture all routes starting with "/users", you should use /users/*path. For more details, refer to the migration guide. Attempting to auto-convert...[39m
+    [35mcontext[39m: "LegacyRouteConverter"
+[18:28:45.352] [33mWARN[39m (7444): [36mUnsupported route path: "/api/v1/*". In previous versions, the symbols ?, *, and + were used to denote optional or repeating path parameters. The latest version of "path-to-regexp" now requires the use of named parameters. For example, instead of using a route like /users/* to capture all routes starting with "/users", you should use /users/*path. For more details, refer to the migration guide. Attempting to auto-convert...[39m
+    [35mcontext[39m: "LegacyRouteConverter"
+[18:28:45.352] [32mINFO[39m (7444): [36mMetricsController {/api/v1/metrics}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/metrics, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mHealthController {/api/v1/health}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/health, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mNotificationRulesController {/api/v1/rules}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/rules, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/rules, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/rules/:id, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/rules/:id, PUT} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/rules/:id, DELETE} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mCustomerPreferencesController {/api/v1/customer-preferences}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/customer-preferences, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/customer-preferences/bulk, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mCriticalChannelOverridesController {/api/v1/critical-channel-overrides}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/critical-channel-overrides, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/critical-channel-overrides, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/critical-channel-overrides/:id, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/critical-channel-overrides/:id, PUT} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/critical-channel-overrides/:id, DELETE} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mRecipientGroupsController {/api/v1/recipient-groups}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups/:id, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups/:id, PUT} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups/:id, DELETE} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups/:id/members, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups/:id/members, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/recipient-groups/:id/members/:memberId, DELETE} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mNotificationsController {/api/v1/notifications}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/notifications, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/notifications/:id, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/notifications/:id/timeline, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mMapped {/api/v1/notifications/send, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.352] [32mINFO[39m (7444): [36mInitializing RabbitMQ Handlers[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mSearching for RabbitMQ Handlers in Controllers. You can not use NestJS HTTP-Requests in these controllers![39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mRegistering rabbitmq handlers from CriticalEventConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mCriticalEventConsumer.handleCriticalEvent {subscribe} -> channel-critical::xch.events.normalized::event.critical.#::q.engine.events.critical[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mRegistering rabbitmq handlers from NormalEventConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mNormalEventConsumer.handleNormalEvent {subscribe} -> channel-normal::xch.events.normalized::event.normal.#::q.engine.events.normal[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mRegistering rabbitmq handlers from RuleCacheInvalidationConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mRuleCacheInvalidationConsumer.handleRuleCacheInvalidation {subscribe} -> xch.config.events::config.rule.changed::q.config.rule-cache[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mRegistering rabbitmq handlers from OverrideCacheInvalidationConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mOverrideCacheInvalidationConsumer.handleOverrideCacheInvalidation {subscribe} -> xch.config.events::config.override.changed::q.config.override-cache[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mRegistering rabbitmq handlers from StatusInboundConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mStatusInboundConsumer.handleStatusInbound {subscribe} -> xch.notifications.status::notification.status.delivered,notification.status.failed::q.engine.status.inbound[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.352] [32mINFO[39m (7444): [36mNest application successfully started[39m
+    [35mcontext[39m: "NestApplication"
+[18:29:11.109] [32mINFO[39m (7444): [36mGET /health 200 191ms[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/health",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3152",
+        "user-agent": "curl/8.8.0",
+        "accept": "*/*"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56613
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "GET"
+    [35murl[39m: "/health"
+    [35mstatusCode[39m: 200
+    [35mdurationMs[39m: 191
+[18:29:11.113] [32mINFO[39m (7444): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/health",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3152",
+        "user-agent": "curl/8.8.0",
+        "accept": "*/*"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56613
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "412",
+        "etag": "W/\"19c-3v0wrXQr8ArHurPqSKJTRl5PwbQ\""
+      }
+    }
+    [35mresponseTime[39m: 197
+[18:30:21.885] [32mINFO[39m (7444): [36mProcessing normal event[39m
+    [35mcontext[39m: "NormalEventConsumer"
+    [35meventId[39m: "5f51df45-9dc7-4619-b267-774cc29805e3"
+    [35meventType[39m: "order.delay"
+    [35mqueue[39m: "q.engine.events.normal"
+    [35mroutingKey[39m: "event.normal.order.delay"
+    [35mretryCount[39m: 0
+[18:30:21.886] [32mINFO[39m (7444): [36mPipeline started[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9"
+    [35meventId[39m: "5f51df45-9dc7-4619-b267-774cc29805e3"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "parse"
+    [35mpriority[39m: "normal"
+[18:30:22.080] [34mDEBUG[39m (7444): [36mMatched 1 rules[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9"
+    [35meventId[39m: "5f51df45-9dc7-4619-b267-774cc29805e3"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "match"
+    [35mmatchCount[39m: 1
+    [35mruleIds[39m: [
+      "39587ed8-8a74-47aa-a117-321f7321d648"
+    ]
+[18:30:22.131] [32mINFO[39m (7444): [36mNotification dba086ec-ef00-450e-bb80-bbc22908f853: PENDING → PROCESSING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.215] [32mINFO[39m (7444): [36mNotification 878c4de5-babc-4d85-90ca-550d48a50605: PENDING → PROCESSING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.371] [34mDEBUG[39m (7444): [36mTemplate rendered[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9"
+    [35meventId[39m: "5f51df45-9dc7-4619-b267-774cc29805e3"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "render"
+    [35mchannel[39m: "email"
+    [35mdurationMs[39m: 239
+    [35msuccess[39m: true
+    [35mtemplateId[39m: "fff60f43-59a9-4c75-80f2-ed7214e023be"
+    [35mnotificationId[39m: "dba086ec-ef00-450e-bb80-bbc22908f853"
+[18:30:22.378] [32mINFO[39m (7444): [36mNotification dba086ec-ef00-450e-bb80-bbc22908f853: PROCESSING → RENDERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.381] [34mDEBUG[39m (7444): [36mTemplate rendered[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9"
+    [35meventId[39m: "5f51df45-9dc7-4619-b267-774cc29805e3"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "render"
+    [35mchannel[39m: "whatsapp"
+    [35mdurationMs[39m: 166
+    [35msuccess[39m: true
+    [35mtemplateId[39m: "fff60f43-59a9-4c75-80f2-ed7214e023be"
+    [35mnotificationId[39m: "878c4de5-babc-4d85-90ca-550d48a50605"
+[18:30:22.392] [32mINFO[39m (7444): [36mNotification dba086ec-ef00-450e-bb80-bbc22908f853: RENDERING → DELIVERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.402] [34mDEBUG[39m (7444): [36mPublished deliver message: dba086ec-ef00-450e-bb80-bbc22908f853 → notification.deliver.normal.email[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:30:22.402] [34mDEBUG[39m (7444): [36mNotification dispatched[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9"
+    [35meventId[39m: "5f51df45-9dc7-4619-b267-774cc29805e3"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "dispatch"
+    [35mchannel[39m: "email"
+    [35mpriority[39m: "normal"
+    [35mnotificationId[39m: "dba086ec-ef00-450e-bb80-bbc22908f853"
+[18:30:22.406] [32mINFO[39m (7444): [36mNotification dba086ec-ef00-450e-bb80-bbc22908f853: DELIVERING → SENT[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.407] [34mDEBUG[39m (7444): [36mPublished status: dba086ec-ef00-450e-bb80-bbc22908f853 DELIVERING→SENT[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:30:22.487] [32mINFO[39m (7444): [36mNotification 878c4de5-babc-4d85-90ca-550d48a50605: PROCESSING → RENDERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.495] [32mINFO[39m (7444): [36mNotification 878c4de5-babc-4d85-90ca-550d48a50605: RENDERING → DELIVERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.501] [34mDEBUG[39m (7444): [36mPublished deliver message: 878c4de5-babc-4d85-90ca-550d48a50605 → notification.deliver.normal.whatsapp[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:30:22.502] [34mDEBUG[39m (7444): [36mNotification dispatched[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9"
+    [35meventId[39m: "5f51df45-9dc7-4619-b267-774cc29805e3"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "dispatch"
+    [35mchannel[39m: "whatsapp"
+    [35mpriority[39m: "normal"
+    [35mnotificationId[39m: "878c4de5-babc-4d85-90ca-550d48a50605"
+[18:30:22.507] [32mINFO[39m (7444): [36mNotification 878c4de5-babc-4d85-90ca-550d48a50605: DELIVERING → SENT[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:30:22.507] [34mDEBUG[39m (7444): [36mPublished status: 878c4de5-babc-4d85-90ca-550d48a50605 DELIVERING→SENT[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:31:35.829] [32mINFO[39m (7444): [36mInbound status update[39m
+    [35mcontext[39m: "StatusInboundConsumer"
+    [35mnotificationId[39m: "878c4de5-babc-4d85-90ca-550d48a50605"
+    [35mfromStatus[39m: "DELIVERING"
+    [35mtoStatus[39m: "FAILED"
+    [35mqueue[39m: "q.engine.status.inbound"
+    [35mroutingKey[39m: "notification.status.failed"
+[18:31:35.915] [32mINFO[39m (7444): [36mNotification 878c4de5-babc-4d85-90ca-550d48a50605: SENT → FAILED[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:33:13.286] [32mINFO[39m (7444): [36mInbound status update[39m
+    [35mcontext[39m: "StatusInboundConsumer"
+    [35mnotificationId[39m: "dba086ec-ef00-450e-bb80-bbc22908f853"
+    [35mfromStatus[39m: "DELIVERING"
+    [35mtoStatus[39m: "FAILED"
+    [35mqueue[39m: "q.engine.status.inbound"
+    [35mroutingKey[39m: "notification.status.failed"
+[18:33:13.392] [32mINFO[39m (7444): [36mNotification dba086ec-ef00-450e-bb80-bbc22908f853: SENT → FAILED[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.400] [32mINFO[39m (7444): [36mProcessing normal event[39m
+    [35mcontext[39m: "NormalEventConsumer"
+    [35meventId[39m: "1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f"
+    [35meventType[39m: "order.delay"
+    [35mqueue[39m: "q.engine.events.normal"
+    [35mroutingKey[39m: "event.normal.order.delay"
+    [35mretryCount[39m: 0
+[18:38:43.400] [32mINFO[39m (7444): [36mPipeline started[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "963a484d-e805-4493-85a2-356b69787652"
+    [35meventId[39m: "1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "parse"
+    [35mpriority[39m: "normal"
+[18:38:43.544] [34mDEBUG[39m (7444): [36mMatched 1 rules[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "963a484d-e805-4493-85a2-356b69787652"
+    [35meventId[39m: "1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "match"
+    [35mmatchCount[39m: 1
+    [35mruleIds[39m: [
+      "39587ed8-8a74-47aa-a117-321f7321d648"
+    ]
+[18:38:43.560] [32mINFO[39m (7444): [36mNotification d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3: PENDING → PROCESSING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.677] [32mINFO[39m (7444): [36mNotification fb4ef312-b625-4324-ad58-85423fb35ae4: PENDING → PROCESSING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.686] [34mDEBUG[39m (7444): [36mTemplate rendered[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "963a484d-e805-4493-85a2-356b69787652"
+    [35meventId[39m: "1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "render"
+    [35mchannel[39m: "email"
+    [35mdurationMs[39m: 125
+    [35msuccess[39m: true
+    [35mtemplateId[39m: "fff60f43-59a9-4c75-80f2-ed7214e023be"
+    [35mnotificationId[39m: "d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3"
+[18:38:43.689] [32mINFO[39m (7444): [36mNotification d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3: PROCESSING → RENDERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.696] [32mINFO[39m (7444): [36mNotification d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3: RENDERING → DELIVERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.702] [34mDEBUG[39m (7444): [36mPublished deliver message: d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3 → notification.deliver.normal.email[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:38:43.702] [34mDEBUG[39m (7444): [36mNotification dispatched[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "963a484d-e805-4493-85a2-356b69787652"
+    [35meventId[39m: "1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "dispatch"
+    [35mchannel[39m: "email"
+    [35mpriority[39m: "normal"
+    [35mnotificationId[39m: "d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3"
+[18:38:43.705] [32mINFO[39m (7444): [36mNotification d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3: DELIVERING → SENT[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.706] [34mDEBUG[39m (7444): [36mPublished status: d8c0392b-2b0b-43be-9c2a-d4f9a45e64b3 DELIVERING→SENT[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:38:43.811] [34mDEBUG[39m (7444): [36mTemplate rendered[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "963a484d-e805-4493-85a2-356b69787652"
+    [35meventId[39m: "1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "render"
+    [35mchannel[39m: "whatsapp"
+    [35mdurationMs[39m: 134
+    [35msuccess[39m: true
+    [35mtemplateId[39m: "fff60f43-59a9-4c75-80f2-ed7214e023be"
+    [35mnotificationId[39m: "fb4ef312-b625-4324-ad58-85423fb35ae4"
+[18:38:43.814] [32mINFO[39m (7444): [36mNotification fb4ef312-b625-4324-ad58-85423fb35ae4: PROCESSING → RENDERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.821] [32mINFO[39m (7444): [36mNotification fb4ef312-b625-4324-ad58-85423fb35ae4: RENDERING → DELIVERING[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.830] [34mDEBUG[39m (7444): [36mPublished deliver message: fb4ef312-b625-4324-ad58-85423fb35ae4 → notification.deliver.normal.whatsapp[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:38:43.830] [34mDEBUG[39m (7444): [36mNotification dispatched[39m
+    [35mcontext[39m: "EventProcessingPipelineService"
+    [35mcorrelationId[39m: "963a484d-e805-4493-85a2-356b69787652"
+    [35meventId[39m: "1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f"
+    [35meventType[39m: "order.delay"
+    [35msourceId[39m: "bulk-upload"
+    [35mcycleId[39m: "123132"
+    [35mstep[39m: "dispatch"
+    [35mchannel[39m: "whatsapp"
+    [35mpriority[39m: "normal"
+    [35mnotificationId[39m: "fb4ef312-b625-4324-ad58-85423fb35ae4"
+[18:38:43.834] [32mINFO[39m (7444): [36mNotification fb4ef312-b625-4324-ad58-85423fb35ae4: DELIVERING → SENT[39m
+    [35mcontext[39m: "NotificationLifecycleService"
+[18:38:43.834] [34mDEBUG[39m (7444): [36mPublished status: fb4ef312-b625-4324-ad58-85423fb35ae4 DELIVERING→SENT[39m
+    [35mcontext[39m: "NotificationPublisherService"
+[18:38:44.519] [32mINFO[39m (7444): [36mInbound status update[39m
+    [35mcontext[39m: "StatusInboundConsumer"
+    [35mnotificationId[39m: "fb4ef312-b625-4324-ad58-85423fb35ae4"
+    [35mfromStatus[39m: "DELIVERING"
+    [35mtoStatus[39m: "FAILED"
+    [35mqueue[39m: "q.engine.status.inbound"
+    [35mroutingKey[39m: "notification.status.failed"
+[18:38:44.523] [32mINFO[39m (7444): [36mNotification fb4ef312-b625-4324-ad58-85423fb35ae4: SENT → FAILED[39m
+    [35mcontext[39m: "NotificationLifecycleService"

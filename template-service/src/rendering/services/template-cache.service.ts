@@ -6,6 +6,7 @@ import { MetricsService } from '../../metrics/metrics.service.js';
 export interface CompiledTemplate {
   subjectFn: Handlebars.TemplateDelegate | null;
   bodyFn: Handlebars.TemplateDelegate;
+  channelMetadata: Record<string, any>;
 }
 
 @Injectable()

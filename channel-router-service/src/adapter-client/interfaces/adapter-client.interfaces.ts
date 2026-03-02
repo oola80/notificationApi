@@ -12,6 +12,9 @@ export interface SendRequest {
   content: {
     subject?: string;
     body: string;
+    templateName?: string;
+    templateLanguage?: string;
+    templateParameters?: string[];
   };
   media?: Array<{
     type: string;

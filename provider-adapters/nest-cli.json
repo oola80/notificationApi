@@ -18,6 +18,15 @@
         "tsConfigPath": "apps/adapter-mailgun/tsconfig.app.json"
       }
     },
+    "adapter-whatsapp": {
+      "type": "application",
+      "root": "apps/adapter-whatsapp",
+      "entryFile": "main",
+      "sourceRoot": "apps/adapter-whatsapp/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/adapter-whatsapp/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",

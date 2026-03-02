@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+### Added: Technical implementation reference documentation (2026-03-01)
+
+- `tech-template-service-v1.md` — Technical implementation reference documentation
+
+### 2026-03-01 — Fix render() return type to include channelMetadata
+
+- `src/rendering/services/rendering.service.ts` — Added `channelMetadata: Record<string, any>` to `render()` method return type annotation. The method already returned this field in its response object but the type was missing, causing TypeScript compilation failure.
+
+### 2026-03-01 — Include channelMetadata in render response for provider-specific template metadata
+
+- `src/rendering/services/template-cache.service.ts` — Added `channelMetadata: Record<string, any>` to `CompiledTemplate` interface. Cached alongside compiled Handlebars functions.
+- `src/rendering/services/rendering.service.ts` — `render()`: reads `channelContent.metadata` from DB and stores as `channelMetadata` in compiled cache entry. Returns `channelMetadata` field in render response alongside `rendered`, `metadata`, and `warnings`. Also updated `preview()` and `warmUp()` to include `channelMetadata` in compiled entries.
+- `dbscripts/seed-order-delay-template.sql` — WhatsApp channel insert now includes `metadata` column with `{"metaTemplateName": "order_delay", "metaTemplateLanguage": "es_MX", "metaTemplateParameters": ["customerName", "orderId"]}` JSONB value.
+- `src/rendering/services/rendering.service.spec.ts` — Updated all existing `CompiledTemplate` mock objects to include `channelMetadata: {}`. Added 3 new tests: channelMetadata returned with provider metadata, empty object when channel has no metadata, defaults to empty object when metadata is null. Updated warmUp test assertion. Total: 250 tests.
+
 ### 2026-02-25 — Phase 5: Metrics, Channel Filter, Sanitization, Render Timeout
 
 - **5 new Prometheus metrics** (`src/metrics/metrics.service.ts`): `ts_template_crud_total` (Counter, `operation` label: create/update/delete/rollback), `ts_template_version_created_total` (Counter), `ts_template_audit_publish_failures_total` (Counter), `ts_template_cache_evictions_total` (Counter), `ts_template_db_pool_active` (Gauge, `collect` callback reads pool stats from DataSource driver). Helper methods: `incrementCrudTotal()`, `incrementVersionCreated()`, `incrementAuditPublishFailure()`, `incrementCacheEviction()`. DataSource injected via `@Optional()` for test compatibility. Total custom metrics: 10.

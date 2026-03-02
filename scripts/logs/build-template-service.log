@@ -1,0 +1,11 @@
+
+> template-service@0.0.1 build
+> nest build
+
+[96msrc/rendering/services/rendering.service.ts[0m:[93m184[0m:[93m9[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'channelMetadata' does not exist in type '{ rendered: { subject?: string | undefined; body: string; }; metadata: { templateId: string; versionNumber: number; channel: string; renderedAt: string; renderDurationMs: number; }; warnings: string[]; }'.
+
+[7m184[0m         channelMetadata: compiled.channelMetadata,
+[7m   [0m [91m        ~~~~~~~~~~~~~~~[0m
+
+Found 1 error(s).
+

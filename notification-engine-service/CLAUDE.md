@@ -253,9 +253,9 @@ notification-engine-service/
         priority-resolver.service.spec.ts
     recipients/
       recipients.module.ts                           # Feature module (TypeORM, services, controller, imports Preferences+Overrides)
-      recipient-groups.controller.ts                 # @Controller('recipient-groups') — 3 endpoints
+      recipient-groups.controller.ts                 # @Controller('recipient-groups') — 8 endpoints (POST, GET list, PUT :id, GET :id, DELETE :id /204, GET :id/members, POST :id/members, DELETE :id/members/:memberId /204)
       recipient-groups.controller.spec.ts
-      recipient-groups.service.ts                    # CRUD + name uniqueness (NES-004, NES-014)
+      recipient-groups.service.ts                    # CRUD + name uniqueness (NES-004, NES-014) + softDelete, findMembers, addMember, removeMember
       recipient-groups.service.spec.ts
       recipient-groups.repository.ts                 # Extends PgBaseRepository, member management
       recipient-groups.repository.spec.ts
@@ -346,10 +346,10 @@ notification-engine-service/
       notification-publisher.service.spec.ts
       interfaces/
         normalized-event-message.interface.ts  # Inbound message shape from EIS
-        deliver-message.interface.ts           # Outbound message to channel-router
+        deliver-message.interface.ts           # Outbound message to channel-router; content includes optional templateName, templateLanguage, templateParameters for WhatsApp Meta template dispatch
     template-client/
       template-client.module.ts              # HttpModule.registerAsync (baseURL from config, 5s timeout)
-      template-client.service.ts             # render() with circuit breaker + 3 retries, exponential backoff (NES-018, NES-019, NES-020)
+      template-client.service.ts             # render() with circuit breaker + 3 retries, exponential backoff (NES-018, NES-019, NES-020); TemplateRenderResult includes templateId and channelMetadata (provider-specific metadata from template-service)
       template-client.service.spec.ts
       circuit-breaker.service.ts             # Circuit breaker state machine (CLOSED/OPEN/HALF_OPEN, configurable threshold/reset)
       circuit-breaker.service.spec.ts
@@ -367,7 +367,7 @@ notification-engine-service/
       override-cache-invalidation.consumer.spec.ts
       status-inbound.consumer.ts             # @RabbitSubscribe notification.status.delivered/failed → lifecycle
       status-inbound.consumer.spec.ts
-      event-processing-pipeline.service.ts   # 9-step pipeline orchestrating all domain services
+      event-processing-pipeline.service.ts   # 9-step pipeline orchestrating all domain services; dispatch step uses channelMetadata for WhatsApp (templateName→metaTemplateName, templateLanguage, templateParameters resolved from payload)
       event-processing-pipeline.service.spec.ts
   test/
     test-utils.ts              # Shared E2E helper: createTestApp(), cleanupTestData()

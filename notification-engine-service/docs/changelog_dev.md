@@ -5,6 +5,25 @@
 
 ## [Unreleased]
 
+### Added: Technical implementation reference documentation (2026-03-01)
+
+- `tech-notification-engine-service-v1.md` — Technical implementation reference documentation
+
+### Feature: Use channelMetadata from template-service for WhatsApp Meta template dispatch (2026-03-01)
+
+- `src/template-client/template-client.service.ts` — Added `channelMetadata?: Record<string, any>` to `TemplateRenderResult` and `TemplateServiceRenderResponse` interfaces. `executeRender()` now maps `response.data.channelMetadata` into the render result.
+- `src/consumers/event-processing-pipeline.service.ts` — Dispatch step now uses `channelMetadata` for WhatsApp: `templateName` resolves to `metaTemplateName` (falls back to `action.templateId`), `templateLanguage` from `metaTemplateLanguage`, `templateParameters` resolved by mapping `metaTemplateParameters` field names against the event payload. Email dispatch is unaffected (always uses `action.templateId`).
+- `src/template-client/template-client.service.spec.ts` — Updated `mockServiceResponse` and `expectedRenderResult` to include `channelMetadata`. Added 2 new tests: channelMetadata parsed from response, undefined when absent.
+- `src/consumers/event-processing-pipeline.service.spec.ts` — Added `WhatsApp channelMetadata dispatch` describe block with 3 tests: WhatsApp uses metaTemplateName + resolves parameters from payload, fallback to action.templateId without channelMetadata, email regression test uses action.templateId.
+
+### Feature: Pass template metadata through delivery pipeline (2026-03-01)
+
+- `src/rabbitmq/interfaces/deliver-message.interface.ts` — Added optional `templateName`, `templateLanguage`, `templateParameters` fields to `content` block of `DeliverMessage` interface.
+- `src/template-client/template-client.service.ts` — Added `templateId` to `TemplateRenderResult` interface; now returned from `executeRender()` using `metadata.templateId` from template-service response.
+- `src/consumers/event-processing-pipeline.service.ts` — Added `templateName: action.templateId` to the `content` block in `publishToDeliver()` call, enabling downstream WhatsApp adapter to send proper Meta template messages instead of plain text.
+- `src/template-client/template-client.service.spec.ts` — Updated `expectedRenderResult` to include `templateId`.
+- `src/consumers/event-processing-pipeline.service.spec.ts` — Updated full pipeline test to verify `templateName` is included in the `publishToDeliver` content payload.
+
 ### Feature: Recipient group GET/DELETE + member endpoints (2026-03-01)
 
 - `src/recipients/recipient-groups.controller.ts` — Added 4 new endpoints:

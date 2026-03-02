@@ -299,6 +299,12 @@ describe('EventProcessingPipelineService', () => {
           ruleId: 'rule-1',
           channel: 'email',
           priority: 'normal',
+          content: expect.objectContaining({
+            subject: 'Order Confirmed',
+            body: '<p>Your order is confirmed</p>',
+            templateVersion: 3,
+            templateName: 'tpl-order-confirm',
+          }),
         }),
       );
 
@@ -591,6 +597,148 @@ describe('EventProcessingPipelineService', () => {
       // Should only process the exclusive rule's actions
       expect(notificationsRepository.createNotification).toHaveBeenCalledTimes(
         1,
+      );
+    });
+  });
+
+  describe('WhatsApp channelMetadata dispatch', () => {
+    const mockWhatsAppRule = {
+      ...mockRule,
+      id: 'rule-wa',
+      name: 'Order Delay WhatsApp',
+      eventType: 'order.delay',
+      actions: [
+        {
+          templateId: 'tpl-order-delay',
+          channels: ['whatsapp'],
+          recipientType: 'customer',
+        },
+      ],
+    };
+
+    const whatsAppEvent: NormalizedEventMessage = {
+      ...mockEvent,
+      eventType: 'order.delay',
+      normalizedPayload: {
+        customerName: 'Juan',
+        orderId: 'ORD-123',
+        customerPhone: '+50212345678',
+        customerId: 'cust-1',
+      },
+    };
+
+    it('should use metaTemplateName from channelMetadata for WhatsApp dispatch', async () => {
+      ruleCacheService.getRulesByEventType.mockResolvedValue([
+        mockWhatsAppRule as any,
+      ]);
+      ruleMatcherService.matchFromRules.mockReturnValue([
+        mockWhatsAppRule as any,
+      ]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { phone: '+50212345678', customerId: 'cust-1' },
+      ]);
+      channelResolverService.resolveChannels.mockResolvedValue({
+        effectiveChannels: ['whatsapp'],
+        filtered: false,
+      });
+      templateClientService.render.mockResolvedValue({
+        channel: 'whatsapp',
+        body: 'Hola Juan, lamentamos informarle que su orden ORD-123 se encuentra retrasada.',
+        templateVersion: 1,
+        templateId: 'tpl-order-delay',
+        channelMetadata: {
+          metaTemplateName: 'order_delay',
+          metaTemplateLanguage: 'es_MX',
+          metaTemplateParameters: ['customerName', 'orderId'],
+        },
+      });
+
+      await pipeline.processEvent(whatsAppEvent);
+
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'whatsapp',
+          content: expect.objectContaining({
+            templateName: 'order_delay',
+            templateLanguage: 'es_MX',
+            templateParameters: ['Juan', 'ORD-123'],
+          }),
+        }),
+      );
+    });
+
+    it('should fall back to action.templateId when channelMetadata has no metaTemplateName', async () => {
+      ruleCacheService.getRulesByEventType.mockResolvedValue([
+        mockWhatsAppRule as any,
+      ]);
+      ruleMatcherService.matchFromRules.mockReturnValue([
+        mockWhatsAppRule as any,
+      ]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { phone: '+50212345678', customerId: 'cust-1' },
+      ]);
+      channelResolverService.resolveChannels.mockResolvedValue({
+        effectiveChannels: ['whatsapp'],
+        filtered: false,
+      });
+      templateClientService.render.mockResolvedValue({
+        channel: 'whatsapp',
+        body: 'Hello',
+        templateVersion: 1,
+        templateId: 'tpl-order-delay',
+      });
+
+      await pipeline.processEvent(whatsAppEvent);
+
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            templateName: 'tpl-order-delay',
+          }),
+        }),
+      );
+    });
+
+    it('should use action.templateId for email dispatch (regression)', async () => {
+      const emailRule = {
+        ...mockRule,
+        actions: [
+          {
+            templateId: 'tpl-order-delay-email',
+            channels: ['email'],
+            recipientType: 'customer',
+          },
+        ],
+      };
+
+      ruleCacheService.getRulesByEventType.mockResolvedValue([
+        emailRule as any,
+      ]);
+      ruleMatcherService.matchFromRules.mockReturnValue([emailRule as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { email: 'juan@example.com', customerId: 'cust-1' },
+      ]);
+      templateClientService.render.mockResolvedValue({
+        channel: 'email',
+        subject: 'Order Delay',
+        body: '<p>Order delayed</p>',
+        templateVersion: 1,
+        templateId: 'tpl-order-delay-email',
+        channelMetadata: {
+          metaTemplateName: 'order_delay',
+          metaTemplateLanguage: 'es_MX',
+        },
+      });
+
+      await pipeline.processEvent(mockEvent);
+
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'email',
+          content: expect.objectContaining({
+            templateName: 'tpl-order-delay-email',
+          }),
+        }),
       );
     });
   });

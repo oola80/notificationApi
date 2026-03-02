@@ -37,11 +37,12 @@ ins_version AS (
     RETURNING id, template_id
 ),
 
--- Step 3a: Insert WhatsApp channel
+-- Step 3a: Insert WhatsApp channel (with Meta template metadata for native template messages)
 ins_whatsapp AS (
-    INSERT INTO template_channels (template_version_id, channel, subject, body)
+    INSERT INTO template_channels (template_version_id, channel, subject, body, metadata)
     SELECT id, 'whatsapp', NULL,
-        'Hola {{customerName}}, lamentamos informarle que su orden {{orderId}} se encuentra retrasada.'
+        'Hola {{customerName}}, lamentamos informarle que su orden {{orderId}} se encuentra retrasada.',
+        '{"metaTemplateName": "order_delay", "metaTemplateLanguage": "es_MX", "metaTemplateParameters": ["customerName", "orderId"]}'::jsonb
     FROM ins_version
     RETURNING id
 ),

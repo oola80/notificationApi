@@ -51,6 +51,7 @@ describe('TemplateClientService', () => {
       renderedAt: '2026-02-25T00:00:00.000Z',
       renderDurationMs: 50,
     },
+    channelMetadata: { metaTemplateName: 'order_confirm' },
     warnings: [],
   };
 
@@ -59,6 +60,8 @@ describe('TemplateClientService', () => {
     subject: 'Order Confirmed',
     body: '<p>Your order #12345 has been confirmed</p>',
     templateVersion: 3,
+    templateId: 'tpl-order-confirm',
+    channelMetadata: { metaTemplateName: 'order_confirm' },
   };
 
   const createAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
@@ -101,7 +104,7 @@ describe('TemplateClientService', () => {
 
       expect(result).toEqual(expectedRenderResult);
       expect(httpService.post).toHaveBeenCalledWith(
-        '/templates/tpl-order-confirm/render',
+        '/api/v1/templates/tpl-order-confirm/render',
         { channel: 'email', data: { orderId: '12345' } },
       );
     });
@@ -205,7 +208,7 @@ describe('TemplateClientService', () => {
         orderId: '999',
       });
 
-      expect(httpService.post).toHaveBeenCalledWith('/templates/tpl-1/render', {
+      expect(httpService.post).toHaveBeenCalledWith('/api/v1/templates/tpl-1/render', {
         channel: 'sms',
         data: { name: 'John', orderId: '999' },
       });
@@ -219,6 +222,45 @@ describe('TemplateClientService', () => {
       await service.render('tpl-1', 'email', {});
 
       expect(circuitBreakerService.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('should parse channelMetadata from template-service response', async () => {
+      const responseWithMetadata = {
+        ...mockServiceResponse,
+        channelMetadata: {
+          metaTemplateName: 'order_delay',
+          metaTemplateLanguage: 'es_MX',
+          metaTemplateParameters: ['customerName', 'orderId'],
+        },
+      };
+
+      httpService.post.mockReturnValue(
+        of(createAxiosResponse(responseWithMetadata)),
+      );
+
+      const result = await service.render('tpl-1', 'whatsapp', {});
+
+      expect(result.channelMetadata).toEqual({
+        metaTemplateName: 'order_delay',
+        metaTemplateLanguage: 'es_MX',
+        metaTemplateParameters: ['customerName', 'orderId'],
+      });
+    });
+
+    it('should return undefined channelMetadata when template-service does not include it', async () => {
+      const responseWithoutMetadata = {
+        rendered: mockServiceResponse.rendered,
+        metadata: mockServiceResponse.metadata,
+        warnings: [],
+      };
+
+      httpService.post.mockReturnValue(
+        of(createAxiosResponse(responseWithoutMetadata)),
+      );
+
+      const result = await service.render('tpl-1', 'email', {});
+
+      expect(result.channelMetadata).toBeUndefined();
     });
 
     it('should propagate NES-020 when circuit breaker is open', async () => {

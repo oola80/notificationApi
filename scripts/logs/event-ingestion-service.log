@@ -1,0 +1,375 @@
+
+> event-ingestion-service@0.0.1 start:dev
+> nest start --watch
+
+[2J[3J[H[[90m6:28:08 p. m.[0m] Starting compilation in watch mode...
+
+[[90m6:28:22 p. m.[0m] Found 0 errors. Watching for file changes.
+
+[18:28:41.893] [32mINFO[39m (27084): [36mStarting Nest application...[39m
+    [35mcontext[39m: "NestFactory"
+[18:28:41.894] [32mINFO[39m (27084): [36mAppModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mAppConfigModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mNormalizationModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mConfigHostModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mDiscoveryModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mMetricsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mConfigModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mTerminusModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mTrying to connect to RabbitMQ broker (default)[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:41.894] [32mINFO[39m (27084): [36mRateLimiterModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mLoggerModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mCommonModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mSuccessfully connected to RabbitMQ broker (default)[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:41.894] [32mINFO[39m (27084): [36mSuccessfully connected to RabbitMQ[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.894] [32mINFO[39m (27084): [36mSuccessfully connected a RabbitMQ channel "AmqpConnection"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:41.894] [32mINFO[39m (27084): [36mRabbitMQModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mAppRabbitMQModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mHealthModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mTypeOrmCoreModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mEventSourcesModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mMappingCacheModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mEventMappingsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mEventsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mConsumersModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.894] [32mINFO[39m (27084): [36mWebhookModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:41.895] [33mWARN[39m (27084): [36mUnsupported route path: "/api/v1/*". In previous versions, the symbols ?, *, and + were used to denote optional or repeating path parameters. The latest version of "path-to-regexp" now requires the use of named parameters. For example, instead of using a route like /users/* to capture all routes starting with "/users", you should use /users/*path. For more details, refer to the migration guide. Attempting to auto-convert...[39m
+    [35mcontext[39m: "LegacyRouteConverter"
+[18:28:41.895] [33mWARN[39m (27084): [36mUnsupported route path: "/api/v1/*". In previous versions, the symbols ?, *, and + were used to denote optional or repeating path parameters. The latest version of "path-to-regexp" now requires the use of named parameters. For example, instead of using a route like /users/* to capture all routes starting with "/users", you should use /users/*path. For more details, refer to the migration guide. Attempting to auto-convert...[39m
+    [35mcontext[39m: "LegacyRouteConverter"
+[18:28:41.895] [32mINFO[39m (27084): [36mMetricsController {/api/v1/metrics}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/metrics, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mEventMappingsController {/api/v1/event-mappings}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/event-mappings, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/event-mappings, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/event-mappings/:id, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/event-mappings/:id, PUT} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/event-mappings/:id, DELETE} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/event-mappings/:id/test, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mEventsController {/api/v1/events}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/events, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/events/:eventId, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mWebhookController {/api/v1/webhooks}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/api/v1/webhooks/events, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mHealthController {/api/v1/health}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapped {/health, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:41.895] [32mINFO[39m (27084): [36mMapping cache disabled, using direct DB lookups[39m
+    [35mcontext[39m: "MappingCacheService"
+[18:28:41.895] [32mINFO[39m (27084): [36mInitializing RabbitMQ Handlers[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mSearching for RabbitMQ Handlers in Controllers. You can not use NestJS HTTP-Requests in these controllers![39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mRegistering rabbitmq handlers from MappingCacheConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mMappingCacheConsumer.handleMappingChanged {subscribe} -> xch.config.events::config.mapping.changed::q.config.mapping-cache[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mRegistering rabbitmq handlers from AmqpEventConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mAmqpEventConsumer.handleAmqpEvent {subscribe} -> xch.events.incoming::source.*.#::q.events.amqp[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mRegistering rabbitmq handlers from WebhookEventConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mWebhookEventConsumer.handleWebhookEvent {subscribe} -> xch.events.incoming::source.webhook.#::q.events.webhook[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mRegistering rabbitmq handlers from EmailIngestEventConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mEmailIngestEventConsumer.handleEmailIngestEvent {subscribe} -> xch.events.incoming::source.email-ingest.#::q.events.email-ingest[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:41.895] [32mINFO[39m (27084): [36mNest application successfully started[39m
+    [35mcontext[39m: "NestApplication"
+[18:29:10.801] [32mINFO[39m (27084): [36mGET /health 200 137ms[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/health",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3151",
+        "user-agent": "curl/8.8.0",
+        "accept": "*/*"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56609
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "GET"
+    [35murl[39m: "/health"
+    [35mstatusCode[39m: 200
+    [35mdurationMs[39m: 137
+[18:29:10.804] [32mINFO[39m (27084): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/health",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3151",
+        "user-agent": "curl/8.8.0",
+        "accept": "*/*"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56609
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "485",
+        "etag": "W/\"1e5-NxVsEYEJjvnsk/LLawZPy0cDNsA\""
+      }
+    }
+    [35mresponseTime[39m: 142
+[18:30:21.890] [32mINFO[39m (27084): [36mPublished event 5f51df45-9dc7-4619-b267-774cc29805e3 to xch.events.normalized [event.normal.order.delay][39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "df9f1431-8c1a-4102-ac82-482377ea4a43",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1032"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56226
+    }
+    [35mcontext[39m: "EventPublisherService"
+[18:30:21.944] [32mINFO[39m (27084): [36mPOST /api/v1/webhooks/events 202 268ms[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "df9f1431-8c1a-4102-ac82-482377ea4a43",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1032"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56226
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "POST"
+    [35murl[39m: "/api/v1/webhooks/events"
+    [35mstatusCode[39m: 202
+    [35mdurationMs[39m: 268
+    [35mcorrelationId[39m: "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9"
+    [35msourceId[39m: "bulk-upload"
+[18:30:21.945] [32mINFO[39m (27084): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "5741ffc0-4212-4e8e-916c-26f6ba0b7dd9",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "df9f1431-8c1a-4102-ac82-482377ea4a43",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1032"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56226
+    }
+    [35mres[39m: {
+      "statusCode": 202,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "126",
+        "etag": "W/\"7e-Yf/1xG1PYdSUD0uvHTrwEgnDs2o\""
+      }
+    }
+    [35mresponseTime[39m: 270
+[18:38:43.401] [32mINFO[39m (27084): [36mPublished event 1b8a775a-b0a0-4278-a3f9-5fcf596fdc2f to xch.events.normalized [event.normal.order.delay][39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "963a484d-e805-4493-85a2-356b69787652",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "a3b38e17-1f84-4d18-854e-c6efe237b6b1",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1032"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 58824
+    }
+    [35mcontext[39m: "EventPublisherService"
+[18:38:43.408] [32mINFO[39m (27084): [36mPOST /api/v1/webhooks/events 202 136ms[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "963a484d-e805-4493-85a2-356b69787652",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "a3b38e17-1f84-4d18-854e-c6efe237b6b1",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1032"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 58824
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "POST"
+    [35murl[39m: "/api/v1/webhooks/events"
+    [35mstatusCode[39m: 202
+    [35mdurationMs[39m: 136
+    [35mcorrelationId[39m: "963a484d-e805-4493-85a2-356b69787652"
+    [35msourceId[39m: "bulk-upload"
+[18:38:43.409] [32mINFO[39m (27084): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "POST",
+      "url": "/api/v1/webhooks/events",
+      "query": {},
+      "params": {
+        "path": [
+          "webhooks",
+          "events"
+        ]
+      },
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "963a484d-e805-4493-85a2-356b69787652",
+        "user-agent": "PostmanRuntime/7.51.1",
+        "accept": "*/*",
+        "cache-control": "no-cache",
+        "postman-token": "a3b38e17-1f84-4d18-854e-c6efe237b6b1",
+        "host": "localhost:3151",
+        "accept-encoding": "gzip, deflate, br",
+        "connection": "keep-alive",
+        "content-length": "1032"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 58824
+    }
+    [35mres[39m: {
+      "statusCode": 202,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "126",
+        "etag": "W/\"7e-1u5lUvPH7O/tdQLCUlvKyF5F6NY\""
+      }
+    }
+    [35mresponseTime[39m: 138

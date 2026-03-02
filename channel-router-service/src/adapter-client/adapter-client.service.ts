@@ -56,12 +56,24 @@ export class AdapterClientService {
     }
   }
 
+  private resolveAddress(
+    channel: string,
+    recipient: SendRequest['recipient'],
+  ): string {
+    switch (channel) {
+      case 'sms':
+      case 'whatsapp':
+        return recipient.phone || recipient.email || '';
+      case 'push':
+        return recipient.deviceToken || recipient.email || '';
+      case 'email':
+      default:
+        return recipient.email || recipient.phone || recipient.deviceToken || '';
+    }
+  }
+
   private toAdapterPayload(request: SendRequest): Record<string, any> {
-    const address =
-      request.recipient.email ||
-      request.recipient.phone ||
-      request.recipient.deviceToken ||
-      '';
+    const address = this.resolveAddress(request.channel, request.recipient);
 
     const media = request.media?.map((m) => ({
       url: m.url || m.content || '',
@@ -85,6 +97,11 @@ export class AdapterClientService {
         correlationId: request.metadata?.correlationId,
         cycleId: request.metadata?.cycleId,
         priority: request.priority,
+        ...(request.content.templateName && {
+          templateName: request.content.templateName,
+          templateLanguage: request.content.templateLanguage,
+          templateParameters: request.content.templateParameters,
+        }),
       },
     };
   }

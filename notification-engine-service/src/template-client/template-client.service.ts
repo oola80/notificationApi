@@ -10,6 +10,8 @@ export interface TemplateRenderResult {
   subject?: string;
   body: string;
   templateVersion?: number;
+  templateId?: string;
+  channelMetadata?: Record<string, any>;
 }
 
 interface TemplateServiceRenderResponse {
@@ -21,6 +23,7 @@ interface TemplateServiceRenderResponse {
     renderedAt: string;
     renderDurationMs: number;
   };
+  channelMetadata?: Record<string, any>;
   warnings: string[];
 }
 
@@ -68,6 +71,8 @@ export class TemplateClientService {
           subject: rendered.subject,
           body: rendered.body,
           templateVersion: metadata.versionNumber,
+          templateId: metadata.templateId,
+          channelMetadata: response.data.channelMetadata,
         };
       } catch (error) {
         const axiosError = error as AxiosError;

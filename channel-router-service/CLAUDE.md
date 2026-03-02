@@ -19,7 +19,7 @@ Routes rendered notifications to delivery providers via external provider adapte
 
 - **Phase 4:** RabbitMQ integration via `@golevelup/nestjs-rabbitmq` (3 exchanges, 8 queues, named channels). 8 consumers (4 channels × 2 priorities) with abstract BaseDeliveryConsumer. 7-step DeliveryPipelineService orchestrator (validate → resolve adapter → circuit breaker → rate limit → media → send → handle result). RabbitMQPublisherService (5 fire-and-forget publish methods: status, delivery attempt, DLQ, fallback dispatch, retry republish). FallbackService (single-level, no cascading, publisher as method param to avoid circular deps). AdapterHealthMonitorService (periodic checks, CB integration, per-provider status map). Enhanced GET /ready with adapter health. Weighted/failover/primary provider routing. Graceful media degradation. Delayed retry via setTimeout + republish. Non-retryable errors don't trip circuit breaker. 432 unit tests passing across 46 suites.
 - **Phase 1:** NestJS project scaffolding, ConfigModule with Joi env validation (33 env vars), CommonModule (@Global: errors with 24 CRS-prefixed codes, HttpExceptionFilter, DtoValidationPipe, LoggingInterceptor, PgBaseRepository), TypeORM entities & repositories (channels, channel_configs, provider_configs, delivery_attempts), database scripts (4 tables, 8 indexes, purge function, updated_at triggers), HealthModule (GET /health liveness, GET /ready readiness with DB + RabbitMQ Management API checks), MetricsModule (@Global: 13 custom Prometheus metrics at GET /metrics), structured Pino logging. 111 unit tests passing across 19 suites.
-- **Phase 2:** Channel configuration CRUD (GET /channels with provider info, PUT /channels/:id/config with validation, auto-seed 4 default channels), provider adapter management (POST /providers/register with capability discovery, DELETE /providers/:id, GET /providers, PUT /providers/:id/config, GET /providers/:id/capabilities proxy, GET /providers/:id/health proxy), adapter HTTP client (@nestjs/axios with configurable timeout, send/health/capabilities methods, graceful error handling), provider config cache (in-memory with TTL auto-refresh, invalidation on changes, PROVIDER_CACHE_ENABLED toggle). 199 unit tests passing across 28 suites.
+- **Phase 2:** Channel configuration CRUD (GET /channels with provider info, GET /channels/:id single channel with provider info, PUT /channels/:id/config with validation, auto-seed 4 default channels), provider adapter management (POST /providers/register with capability discovery, DELETE /providers/:id, GET /providers, PUT /providers/:id/config, GET /providers/:id/capabilities proxy, GET /providers/:id/health proxy), adapter HTTP client (@nestjs/axios with configurable timeout, send/health/capabilities methods, toAdapterPayload() transform for CRS→adapter contract mapping, graceful error handling), provider config cache (in-memory with TTL auto-refresh, invalidation on changes, PROVIDER_CACHE_ENABLED toggle). 199 unit tests passing across 28 suites.
 - **Phase 3:** Circuit breaker per provider (CLOSED/OPEN/HALF_OPEN state machine, failure window, cooldown, success threshold, DB persistence, manual reset, Prometheus metrics), token bucket rate limiter per provider (acquire with wait/timeout, refill over time, bucket reinitialization), retry engine per channel (exponential backoff with jitter, channel-specific max retries, shouldRetry decision), media processor per channel (email: download+Base64, SMS: skip, WhatsApp: URL passthrough, push: first inline image; HTTPS validation, size enforcement, graceful degradation, download timeout). 314 unit tests passing across 32 suites.
 
 ## Key Dependencies
@@ -229,9 +229,9 @@ channel-router-service/
       env.validation.spec.ts
     channels/
       channels.module.ts       # TypeORM feature module, imports ProvidersModule, controller + service + repos
-      channels.controller.ts   # GET /channels, PUT /channels/:id/config
+      channels.controller.ts   # GET /channels, GET /channels/:id, PUT /channels/:id/config
       channels.controller.spec.ts
-      channels.service.ts      # findAll with provider info, updateConfig, seed default channels
+      channels.service.ts      # findAll with provider info, findById, updateConfig, seed default channels
       channels.service.spec.ts
       channels.repository.ts   # Extends PgBaseRepository, findAll, findByType, findAllActive
       channels.repository.spec.ts
@@ -265,10 +265,10 @@ channel-router-service/
         provider-config.entity.spec.ts
     adapter-client/
       adapter-client.module.ts    # HttpModule + AdapterClientService
-      adapter-client.service.ts   # send(), checkHealth(), getCapabilities() via @nestjs/axios
+      adapter-client.service.ts   # send(), checkHealth(), getCapabilities() via @nestjs/axios; toAdapterPayload() maps internal SendRequest to adapter SendRequestDto format (resolves recipient.address, moves notificationId/priority to metadata, conditionally includes templateName/templateLanguage/templateParameters)
       adapter-client.service.spec.ts
       interfaces/
-        adapter-client.interfaces.ts  # SendRequest, SendResult, AdapterHealthResponse, AdapterCapabilitiesResponse
+        adapter-client.interfaces.ts  # SendRequest (content includes optional templateName, templateLanguage, templateParameters), SendResult, AdapterHealthResponse, AdapterCapabilitiesResponse
     delivery/
       delivery.module.ts       # TypeORM feature module, imports 9 dependent modules, exports repo + pipeline
       delivery-pipeline.service.ts   # 7-step delivery orchestrator (validate, resolve, CB, rate limit, media, send, handle)
@@ -276,7 +276,7 @@ channel-router-service/
       delivery-attempts.repository.ts  # Extends PgBaseRepository, findByNotificationId, findByProviderMessageId
       delivery-attempts.repository.spec.ts
       interfaces/
-        dispatch-message.interface.ts  # DispatchMessage, MediaEntry
+        dispatch-message.interface.ts  # DispatchMessage (content includes optional templateName, templateLanguage, templateParameters), MediaEntry
         pipeline-result.interface.ts   # PipelineResult
       entities/
         delivery-attempt.entity.ts  # 12 columns, UUID PK, FK to provider_configs

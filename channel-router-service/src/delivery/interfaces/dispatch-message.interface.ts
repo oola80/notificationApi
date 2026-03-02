@@ -14,6 +14,9 @@ export interface DispatchMessage {
   content: {
     subject?: string;
     body: string;
+    templateName?: string;
+    templateLanguage?: string;
+    templateParameters?: string[];
   };
   media?: MediaEntry[];
   metadata: {

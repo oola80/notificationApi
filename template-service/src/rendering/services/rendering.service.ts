@@ -62,6 +62,7 @@ export class RenderingService implements OnApplicationBootstrap {
       renderedAt: string;
       renderDurationMs: number;
     };
+    channelMetadata: Record<string, any>;
     warnings: string[];
   }> {
     const startTime = process.hrtime.bigint();
@@ -115,6 +116,7 @@ export class RenderingService implements OnApplicationBootstrap {
             ? Handlebars.compile(channelContent.subject)
             : null,
           bodyFn: Handlebars.compile(channelContent.body),
+          channelMetadata: channelContent.metadata ?? {},
         };
         this.cacheService.set(cacheKey, compiled);
       }
@@ -180,6 +182,7 @@ export class RenderingService implements OnApplicationBootstrap {
           renderedAt: new Date().toISOString(),
           renderDurationMs: Math.round(durationMs * 100) / 100,
         },
+        channelMetadata: compiled.channelMetadata,
         warnings,
       };
     } catch (error) {
@@ -250,6 +253,7 @@ export class RenderingService implements OnApplicationBootstrap {
         compiled = {
           subjectFn: ch.subject ? Handlebars.compile(ch.subject) : null,
           bodyFn: Handlebars.compile(ch.body),
+          channelMetadata: ch.metadata ?? {},
         };
         this.cacheService.set(cacheKey, compiled);
       }
@@ -314,6 +318,7 @@ export class RenderingService implements OnApplicationBootstrap {
               ? Handlebars.compile(ch.subject)
               : null,
             bodyFn: Handlebars.compile(ch.body),
+            channelMetadata: ch.metadata ?? {},
           };
           this.cacheService.set(cacheKey, compiled);
           count++;

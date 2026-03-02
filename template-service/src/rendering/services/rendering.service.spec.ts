@@ -124,6 +124,7 @@ describe('RenderingService', () => {
       const compiled: CompiledTemplate = {
         subjectFn: Handlebars.compile('Cached {{orderId}}'),
         bodyFn: Handlebars.compile('Cached body {{customerName}}'),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -289,6 +290,7 @@ describe('RenderingService', () => {
         bodyFn: jest.fn().mockImplementation(() => {
           throw new Error('Handlebars runtime error');
         }) as any,
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -314,6 +316,7 @@ describe('RenderingService', () => {
       const compiled: CompiledTemplate = {
         subjectFn: null,
         bodyFn: Handlebars.compile(longBody),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -335,6 +338,7 @@ describe('RenderingService', () => {
       const compiled: CompiledTemplate = {
         subjectFn: null,
         bodyFn: Handlebars.compile(veryLongBody),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -357,6 +361,7 @@ describe('RenderingService', () => {
       const compiled: CompiledTemplate = {
         subjectFn: null,
         bodyFn: Handlebars.compile(longBody),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -377,6 +382,7 @@ describe('RenderingService', () => {
       const compiled: CompiledTemplate = {
         subjectFn: Handlebars.compile('x'.repeat(100)),
         bodyFn: Handlebars.compile('y'.repeat(200)),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -398,6 +404,7 @@ describe('RenderingService', () => {
       const compiled: CompiledTemplate = {
         subjectFn: Handlebars.compile('Subject'),
         bodyFn: Handlebars.compile(longBody),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -419,6 +426,7 @@ describe('RenderingService', () => {
       cacheService.get.mockReturnValue({
         subjectFn: null,
         bodyFn: Handlebars.compile('body'),
+        channelMetadata: {},
       });
       variableRepo.find.mockResolvedValue([]);
 
@@ -443,6 +451,7 @@ describe('RenderingService', () => {
         bodyFn: Handlebars.compile(
           '<p>Hello</p><script>alert("xss")</script><p>World</p>',
         ),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -465,6 +474,7 @@ describe('RenderingService', () => {
       const compiled: CompiledTemplate = {
         subjectFn: null,
         bodyFn: Handlebars.compile(bodyWithTags),
+        channelMetadata: {},
       };
 
       templateRepo.findOne.mockResolvedValue(mockTemplate);
@@ -478,6 +488,67 @@ describe('RenderingService', () => {
       });
 
       expect(result.rendered.body).toBe(bodyWithTags);
+    });
+
+    it('should include channelMetadata in render response when channel has metadata', async () => {
+      const whatsappChannel = {
+        ...mockChannel,
+        channel: 'whatsapp',
+        subject: null,
+        body: 'Hola {{customerName}}',
+        metadata: { metaTemplateName: 'order_delay', metaTemplateLanguage: 'es_MX' },
+      };
+
+      templateRepo.findOne.mockResolvedValue(mockTemplate);
+      versionRepo.findOne.mockResolvedValue(mockVersion);
+      cacheService.get.mockReturnValue(undefined);
+      channelRepo.findOne.mockResolvedValue(whatsappChannel);
+      variableRepo.find.mockResolvedValue([]);
+
+      const result = await service.render(templateId, {
+        channel: 'whatsapp',
+        data: { customerName: 'Juan' },
+      });
+
+      expect(result.channelMetadata).toEqual({
+        metaTemplateName: 'order_delay',
+        metaTemplateLanguage: 'es_MX',
+      });
+    });
+
+    it('should return empty channelMetadata when channel has no metadata', async () => {
+      templateRepo.findOne.mockResolvedValue(mockTemplate);
+      versionRepo.findOne.mockResolvedValue(mockVersion);
+      cacheService.get.mockReturnValue(undefined);
+      channelRepo.findOne.mockResolvedValue(mockChannel);
+      variableRepo.find.mockResolvedValue([]);
+
+      const result = await service.render(templateId, {
+        channel: 'email',
+        data: { orderId: '12345', customerName: 'Alice' },
+      });
+
+      expect(result.channelMetadata).toEqual({});
+    });
+
+    it('should default channelMetadata to empty object when channel metadata is null', async () => {
+      const channelNoMetadata = {
+        ...mockChannel,
+        metadata: null,
+      };
+
+      templateRepo.findOne.mockResolvedValue(mockTemplate);
+      versionRepo.findOne.mockResolvedValue(mockVersion);
+      cacheService.get.mockReturnValue(undefined);
+      channelRepo.findOne.mockResolvedValue(channelNoMetadata);
+      variableRepo.find.mockResolvedValue([]);
+
+      const result = await service.render(templateId, {
+        channel: 'email',
+        data: { orderId: '12345', customerName: 'Alice' },
+      });
+
+      expect(result.channelMetadata).toEqual({});
     });
 
     it('should throw TS-012 when render timeout is exceeded', async () => {
@@ -600,6 +671,7 @@ describe('RenderingService', () => {
         expect.objectContaining({
           subjectFn: expect.any(Function),
           bodyFn: expect.any(Function),
+          channelMetadata: expect.any(Object),
         }),
       );
     });

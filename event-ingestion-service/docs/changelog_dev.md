@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Added: Technical implementation reference documentation (2026-03-01)
+
+- `tech-event-ingestion-service-v1.md` — Technical implementation reference documentation
+
 ### Fix: Global prefix + controller path dedup (2026-03-01)
 
 - `src/main.ts` — Added `app.setGlobalPrefix('api/v1', { exclude: ['health', 'metrics'] })` so all EIS routes are served under `/api/v1/` consistently.

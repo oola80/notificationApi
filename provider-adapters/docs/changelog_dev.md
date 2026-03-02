@@ -6,6 +6,67 @@
 
 ## [Unreleased]
 
+### Added: Technical implementation reference documentation (2026-03-01)
+
+- `tech-provider-adapters-v1.md` — Technical implementation reference documentation
+
+### Feature: Template metadata support for WhatsApp template messages (2026-03-01)
+
+#### libs/common/
+- `src/dto/send-request.dto.ts` — Added 3 optional fields to `MetadataDto`: `templateName` (string), `templateLanguage` (string), `templateParameters` (string[]). All fields have `@IsOptional()` + appropriate class-validator decorators. Existing flows (email/Mailgun) are unaffected — fields are purely additive.
+
+#### apps/adapter-whatsapp/
+- `src/send/send.service.ts` — Updated `buildMessage()` to check `metadata.templateName` first (Priority 1) before legacy `subject.startsWith('template:')` detection (Priority 2). Added `buildTemplateFromMetadata()` method that builds `WhatsAppTemplateMessage` from explicit metadata fields, with fallback to comma-separated body parsing when `templateParameters` is absent. Legacy flow preserved for backward compatibility.
+- `test/send.e2e-spec.ts` — Added 4 E2E tests for metadata-based template flow: explicit parameters, default language, comma-separated body fallback, and metadata priority over subject prefix.
+
+### 2026-03-01 — Phase 1: adapter-whatsapp Send Pipeline + Health (POST /send, GET /health, GET /capabilities)
+
+#### apps/adapter-whatsapp/ — WhatsApp (Meta Cloud API) Adapter Application
+- **main.ts:** Bootstrap with Pino logger, DtoValidationPipe, HttpExceptionFilter, LoggingInterceptor, CORS, port 3173
+- **app.module.ts:** WhatsAppConfigModule, LoggerModule, MetricsModule, HealthModule, SendModule
+- **config/:** `WhatsAppConfigModule` (ConfigModule.forRoot isGlobal), `whatsapp.config.ts` (registerAs 'whatsapp': port, accessToken, phoneNumberId, appSecret, webhookVerifyToken, apiVersion v22.0, defaultTemplateLanguage, baseUrl), `rabbitmq.config.ts` (registerAs 'rabbitmq'), `env.validation.ts` (class-validator for META_* and RABBITMQ_* env vars)
+- **errors/:** `WHATSAPP_ERROR_CODES` (10 WA-prefixed codes + inherited PA- base codes): WA-001 invalid request, WA-002 API unavailable, WA-003 send failed, WA-004 invalid token, WA-005 invalid phone, WA-006 template not found, WA-007 rate limit, WA-008 template param mismatch, WA-009 policy violation, WA-010 conversation window expired
+
+#### whatsapp-client/ — Meta Cloud API HTTP Client
+- **WhatsAppClientModule:** Imports HttpModule (10s timeout), provides WhatsAppClientService
+- **WhatsAppClientService:** Low-level HTTP client for Meta Graph API v22.0:
+  - `sendMessage(payload)` — POST to `{baseUrl}/messages` with Bearer token (JSON, not form-data)
+  - `getPhoneNumberInfo()` — GET `{baseUrl}?fields=verified_name,quality_rating,platform_type` (for health checks)
+- **Interfaces:** `WhatsAppTextMessage`, `WhatsAppTemplateMessage`, `WhatsAppMediaMessage`, `WhatsAppApiResponse`, `WhatsAppApiError`, `WhatsAppApiErrorResponse`
+
+#### send/ — Send Pipeline
+- **SendModule:** Imports WhatsAppClientModule, provides SendService, ErrorClassifierService, SendController
+- **SendService:** Orchestrates the WhatsApp send pipeline:
+  1. Channel validation (whatsapp only, rejects email/sms/push)
+  2. Phone number formatting: strips leading `+` (Meta requires E.164 without `+`)
+  3. Message type detection via `content.subject`:
+     - `template:name` or `template:name:language` → template message
+     - Has `content.media` → media message (image/document/video URL passthrough)
+     - Default → text message
+  4. Template params from comma-separated `content.body`
+  5. Call WhatsAppClientService.sendMessage() (JSON payload)
+  6. Extract `providerMessageId` from `response.messages[0].id`
+  7. Prometheus metrics: adapter_send_total, adapter_send_duration_seconds, adapter_send_errors_total (providerId: `meta-whatsapp`)
+- **ErrorClassifierService:** Two-level error classification:
+  - Level 1 — Meta error codes: 130429→rate limit/retryable, 131026→not on WhatsApp, 131047→window expired, 131051→unsupported type, 132000→template not found, 132012→param mismatch, 135000→generic/retryable, 368→policy violation
+  - Level 2 — HTTP status fallback: 400→WA-005, 401→WA-004, 403→WA-009, 429→WA-007/retryable, 500/502/503→WA-002/retryable
+- **SendController:** POST /send with @HttpCode(200) — always returns 200 with SendResultDto body (success/failure + retryable flag)
+
+#### health/ — Health Checks
+- **HealthModule:** Imports WhatsAppClientModule, provides WhatsAppHealthService + HealthController
+- **HealthController:** GET /health (delegates to WhatsAppHealthService), GET /capabilities (providerId: meta-whatsapp, channels: [whatsapp], supportsMediaUrls: true, maxAttachmentSizeMb: 16, maxRecipientsPerRequest: 1)
+- **WhatsAppHealthService:** Extends BaseHealthService, calls `getPhoneNumberInfo()` for connectivity check, includes verifiedName and qualityRating in health details
+
+#### Monorepo Configuration
+- Updated `nest-cli.json` with adapter-whatsapp project entry
+- Updated `package.json` with build:whatsapp, start:dev:whatsapp, start:debug:whatsapp, start:prod:whatsapp, test:e2e:whatsapp scripts
+- Updated `.env` META_API_VERSION from v21.0 to v22.0
+
+#### Testing
+- 4 E2E test files: jest-e2e.json, test-utils.ts, app.e2e-spec.ts (health/capabilities/metrics), send.e2e-spec.ts (template/text/language override/non-whatsapp channel/validation/429 rate limit/401 auth/shape)
+
+---
+
 ### Bugfix: TypeScript isolatedModules compilation errors (2026-02-27)
 
 - **libs/common/src/index.ts:** Changed `export { ErrorResponse }` to `export type { ErrorResponse }` and separated `ErrorDefinition` into its own `export type` statement (TS1205: re-exporting a type requires `export type` when `isolatedModules` is enabled)

@@ -15,7 +15,7 @@ Template CRUD, Handlebars rendering, versioning, and channel-specific content ma
 
 ## Implementation Status
 
-**Phase 5 complete** — Phase 1 foundation (config, common, metrics, health, bootstrap) plus Phase 2 Template CRUD & Versioning plus Phase 3 Rendering Engine, Caching & Preview plus Phase 4 RabbitMQ Audit Publishing, E2E Tests & Polish plus Phase 5 Metrics, Channel Filter, Sanitization, Render Timeout. 5 new Prometheus metrics (CRUD total, version created total, audit publish failures, cache evictions, DB pool active). `GET /templates?channel=` query filter via EXISTS subquery. HTML sanitization for email output (strips script/iframe/object/embed, on* handlers, javascript: URIs, CSS expressions). `RENDER_TIMEOUT_MS` config with best-effort timeout checkpoints. 247 unit tests across 21 suites.
+**Phase 5 complete** — Phase 1 foundation (config, common, metrics, health, bootstrap) plus Phase 2 Template CRUD & Versioning plus Phase 3 Rendering Engine, Caching & Preview plus Phase 4 RabbitMQ Audit Publishing, E2E Tests & Polish plus Phase 5 Metrics, Channel Filter, Sanitization, Render Timeout. 5 new Prometheus metrics (CRUD total, version created total, audit publish failures, cache evictions, DB pool active). `GET /templates?channel=` query filter via EXISTS subquery. HTML sanitization for email output (strips script/iframe/object/embed, on* handlers, javascript: URIs, CSS expressions). `RENDER_TIMEOUT_MS` config with best-effort timeout checkpoints. `render()` now returns `channelMetadata` (provider-specific JSONB metadata from `template_channels.metadata` column, e.g. WhatsApp `metaTemplateName`/`metaTemplateLanguage`/`metaTemplateParameters`). 250 unit tests across 21 suites.
 
 ## Key Dependencies
 
@@ -222,8 +222,8 @@ template-service/
         preview-template.dto.ts    # data, versionNumber?
         index.ts                   # Barrel export
       services/
-        rendering.service.ts       # Render pipeline, preview, cache warm-up on bootstrap
-        template-cache.service.ts  # LRU in-memory compiled template cache with metrics
+        rendering.service.ts       # Render pipeline, preview, cache warm-up on bootstrap; render() returns channelMetadata (JSONB from template_channels.metadata)
+        template-cache.service.ts  # LRU in-memory compiled template cache with metrics; CompiledTemplate interface includes channelMetadata: Record<string, any>
       sanitizers/
         html-sanitizer.ts          # Email HTML sanitization (strips script/iframe/object/embed, on* handlers, javascript: URIs)
       helpers/

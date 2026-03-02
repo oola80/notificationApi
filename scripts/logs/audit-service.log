@@ -1,0 +1,260 @@
+
+> audit-service@0.0.1 start:dev
+> nest start --watch
+
+[2J[3J[H[[90m6:28:11 p. m.[0m] Starting compilation in watch mode...
+
+[[90m6:28:28 p. m.[0m] Found 0 errors. Watching for file changes.
+
+[18:28:45.645] [32mINFO[39m (1020): [36mStarting Nest application...[39m
+    [35mcontext[39m: "NestFactory"
+[18:28:45.645] [32mINFO[39m (1020): [36mAppModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mAppConfigModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mConfigHostModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mDiscoveryModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mDiscoveryModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mMetricsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mConfigModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mScheduleModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mTrying to connect to RabbitMQ broker (default)[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mLoggerModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mCommonModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected to RabbitMQ broker (default)[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected a RabbitMQ channel "channel-events"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected a RabbitMQ channel "channel-deliver"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected a RabbitMQ channel "channel-status"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected a RabbitMQ channel "channel-template"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected a RabbitMQ channel "channel-dlq"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected to RabbitMQ[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.645] [32mINFO[39m (1020): [36mSuccessfully connected a RabbitMQ channel "AmqpConnection"[39m
+    [35mcontext[39m: "AmqpConnection"
+[18:28:45.645] [32mINFO[39m (1020): [36mRabbitMQModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mAppRabbitMQModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mTypeOrmCoreModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mTypeOrmModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mRetentionModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mConsumersModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mEventsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mSearchModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.645] [32mINFO[39m (1020): [36mReceiptsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.646] [32mINFO[39m (1020): [36mTraceModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.646] [32mINFO[39m (1020): [36mAnalyticsModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.646] [32mINFO[39m (1020): [36mDlqModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.646] [32mINFO[39m (1020): [36mHealthModule dependencies initialized[39m
+    [35mcontext[39m: "InstanceLoader"
+[18:28:45.646] [33mWARN[39m (1020): [36mUnsupported route path: "/api/v1/*". In previous versions, the symbols ?, *, and + were used to denote optional or repeating path parameters. The latest version of "path-to-regexp" now requires the use of named parameters. For example, instead of using a route like /users/* to capture all routes starting with "/users", you should use /users/*path. For more details, refer to the migration guide. Attempting to auto-convert...[39m
+    [35mcontext[39m: "LegacyRouteConverter"
+[18:28:45.646] [33mWARN[39m (1020): [36mUnsupported route path: "/api/v1/*". In previous versions, the symbols ?, *, and + were used to denote optional or repeating path parameters. The latest version of "path-to-regexp" now requires the use of named parameters. For example, instead of using a route like /users/* to capture all routes starting with "/users", you should use /users/*path. For more details, refer to the migration guide. Attempting to auto-convert...[39m
+    [35mcontext[39m: "LegacyRouteConverter"
+[18:28:45.646] [32mINFO[39m (1020): [36mMetricsController {/api/v1/metrics}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/metrics, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mAuditLogsController {/api/v1/audit/logs}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/logs, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mAuditReceiptsController {/api/v1/audit/receipts}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/receipts/:notificationId, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mAnalyticsController {/api/v1/audit/analytics}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/analytics, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/analytics/summary, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mDlqController {/api/v1/audit/dlq}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/dlq, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/dlq/:id, PATCH} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/dlq/:id/reprocess, POST} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mSearchController {/api/v1/audit/search}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/search, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mTraceController {/api/v1/audit/trace}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/trace/correlation/:correlationId, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/trace/cycle/:cycleId, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/api/v1/audit/trace/:notificationId, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mHealthController {/api/v1}:[39m
+    [35mcontext[39m: "RoutesResolver"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/health, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mMapped {/health/ready, GET} route[39m
+    [35mcontext[39m: "RouterExplorer"
+[18:28:45.646] [32mINFO[39m (1020): [36mInitializing RabbitMQ Handlers[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mSearching for RabbitMQ Handlers in Controllers. You can not use NestJS HTTP-Requests in these controllers![39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mRegistering rabbitmq handlers from EventsConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mEventsConsumer.handle {subscribe} -> channel-events::xch.events.normalized::event.#::audit.events[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mRegistering rabbitmq handlers from DeliverConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mDeliverConsumer.handle {subscribe} -> channel-deliver::xch.notifications.deliver::notification.deliver.#::audit.deliver[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mRegistering rabbitmq handlers from StatusConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mStatusConsumer.handle {subscribe} -> channel-status::xch.notifications.status::notification.status.#,adapter.webhook.#::q.status.updates[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mRegistering rabbitmq handlers from TemplateConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mTemplateConsumer.handle {subscribe} -> channel-template::xch.notifications.status::template.#::q.audit.template[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mRegistering rabbitmq handlers from DlqConsumer[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mDlqConsumer.handle {subscribe} -> channel-dlq::xch.notifications.dlq::::audit.dlq[39m
+    [35mcontext[39m: "RabbitMQModule"
+[18:28:45.646] [32mINFO[39m (1020): [36mNest application successfully started[39m
+    [35mcontext[39m: "NestApplication"
+[18:29:11.467] [32mINFO[39m (1020): [36mGET /health 200 1ms[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/health",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3156",
+        "user-agent": "curl/8.8.0",
+        "accept": "*/*"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56621
+    }
+    [35mcontext[39m: "HTTP"
+    [35mmethod[39m: "GET"
+    [35murl[39m: "/health"
+    [35mstatusCode[39m: 200
+    [35mdurationMs[39m: 1
+[18:29:11.470] [32mINFO[39m (1020): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "GET",
+      "url": "/health",
+      "query": {},
+      "params": {},
+      "headers": {
+        "host": "localhost:3156",
+        "user-agent": "curl/8.8.0",
+        "accept": "*/*"
+      },
+      "remoteAddress": "::1",
+      "remotePort": 56621
+    }
+    [35mres[39m: {
+      "statusCode": 200,
+      "headers": {
+        "x-powered-by": "Express",
+        "access-control-allow-origin": "*",
+        "content-type": "application/json; charset=utf-8",
+        "content-length": "80",
+        "etag": "W/\"50-LgBOB+4Njq7bsVFhsM4IfBPiqhg\""
+      }
+    }
+    [35mresponseTime[39m: 5
+[19:05:00.525] [32mINFO[39m (1020): [36mStarting hourly aggregation[39m
+    [35mcontext[39m: "AggregationService"
+    [35mperiodStart[39m: "2026-03-02T00:00:00.000Z"
+    [35mperiodEnd[39m: "2026-03-02T01:00:00.000Z"
+[19:05:00.648] [31mERROR[39m (1020): [36mAggregation failed[39m
+    [35mcontext[39m: "AggregationService"
+    [35mperiod[39m: "hourly"
+    [35mperiodStart[39m: "2026-03-02T00:00:00.000Z"
+    error: "no existe la relación «delivery_receipts»"
+[19:05:00.648] [31mERROR[39m (1020): [36mno existe la relación «delivery_receipts»[39m
+    [35mcontext[39m: "Scheduler"
+    err: {
+      "type": "QueryFailedError",
+      "message": "no existe la relación «delivery_receipts»",
+      "stack":
+          QueryFailedError: no existe la relación «delivery_receipts»
+              at PostgresQueryRunner.query (C:\Users\omar.ola\NotificationAPI\audit-service\node_modules\typeorm\driver\src\driver\postgres\PostgresQueryRunner.ts:325:19)
+              at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+              at async DataSource.query (C:\Users\omar.ola\NotificationAPI\audit-service\node_modules\typeorm\data-source\src\data-source\DataSource.ts:541:20)
+              at async NotificationAnalyticsRepository.aggregateFromReceipts (C:\Users\omar.ola\NotificationAPI\audit-service\src\analytics\notification-analytics.repository.ts:115:18)
+              at async AggregationService.aggregate (C:\Users\omar.ola\NotificationAPI\audit-service\src\analytics\aggregation.service.ts:69:9)
+              at async AggregationService.runHourlyAggregation (C:\Users\omar.ola\NotificationAPI\audit-service\src\analytics\aggregation.service.ts:37:5)
+              at async CronJob.<anonymous> (C:\Users\omar.ola\NotificationAPI\audit-service\node_modules\@nestjs\schedule\dist\schedule.explorer.js:119:17)
+      "query": "SELECT\n         channel,\n         COUNT(*) FILTER (WHERE status = 'sent')::int as total_sent,\n         COUNT(*) FILTER (WHERE status = 'delivered')::int as total_delivered,\n         COUNT(*) FILTER (WHERE status = 'failed')::int as total_failed,\n         COUNT(*) FILTER (WHERE status = 'opened')::int as total_opened,\n         COUNT(*) FILTER (WHERE status = 'clicked')::int as total_clicked,\n         COUNT(*) FILTER (WHERE status = 'bounced')::int as total_bounced\n       FROM delivery_receipts\n       WHERE received_at >= $1 AND received_at < $2\n       GROUP BY channel",
+      "parameters": [
+        "2026-03-02T00:00:00.000Z",
+        "2026-03-02T01:00:00.000Z"
+      ],
+      "driverError": {
+        "type": "DatabaseError",
+        "message": "no existe la relación «delivery_receipts»",
+        "stack":
+            error: no existe la relación «delivery_receipts»
+                at C:\Users\omar.ola\NotificationAPI\audit-service\node_modules\pg\lib\client.js:631:17
+                at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+                at async PostgresQueryRunner.query (C:\Users\omar.ola\NotificationAPI\audit-service\node_modules\typeorm\driver\src\driver\postgres\PostgresQueryRunner.ts:254:25)
+                at async DataSource.query (C:\Users\omar.ola\NotificationAPI\audit-service\node_modules\typeorm\data-source\src\data-source\DataSource.ts:541:20)
+                at async NotificationAnalyticsRepository.aggregateFromReceipts (C:\Users\omar.ola\NotificationAPI\audit-service\src\analytics\notification-analytics.repository.ts:115:18)
+                at async AggregationService.aggregate (C:\Users\omar.ola\NotificationAPI\audit-service\src\analytics\aggregation.service.ts:69:9)
+                at async AggregationService.runHourlyAggregation (C:\Users\omar.ola\NotificationAPI\audit-service\src\analytics\aggregation.service.ts:37:5)
+                at async CronJob.<anonymous> (C:\Users\omar.ola\NotificationAPI\audit-service\node_modules\@nestjs\schedule\dist\schedule.explorer.js:119:17)
+        "length": 118,
+        "name": "error",
+        "severity": "ERROR",
+        "code": "42P01",
+        "position": "481",
+        "file": "parse_relation.c",
+        "line": "1469",
+        "routine": "parserOpenTable"
+      },
+      "length": 118,
+      "severity": "ERROR",
+      "code": "42P01",
+      "position": "481",
+      "file": "parse_relation.c",
+      "line": "1469",
+      "routine": "parserOpenTable"
+    }

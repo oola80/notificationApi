@@ -81,6 +81,19 @@ export class MetadataDto {
   @IsString()
   @IsOptional()
   priority?: string;
+
+  @IsString()
+  @IsOptional()
+  templateName?: string;
+
+  @IsString()
+  @IsOptional()
+  templateLanguage?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  templateParameters?: string[];
 }
 
 export class SendRequestDto {
