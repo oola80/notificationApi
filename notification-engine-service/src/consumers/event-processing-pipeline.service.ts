@@ -440,7 +440,10 @@ export class EventProcessingPipelineService {
           templateParameters:
             channel === 'whatsapp' && renderResult.channelMetadata?.metaTemplateParameters
               ? renderResult.channelMetadata.metaTemplateParameters.map(
-                  (field: string) => String(payload[field] ?? ''),
+                  (param: { name: string; field: string }) => ({
+                    name: param.name,
+                    value: String(payload[param.field] ?? ''),
+                  }),
                 )
               : undefined,
         },

@@ -152,7 +152,7 @@ describe('AdapterClientService', () => {
           body: 'Order #123,Shipped',
           templateName: 'order-delay',
           templateLanguage: 'es',
-          templateParameters: ['Order #123', 'Shipped'],
+          templateParameters: [{ name: 'order_number', value: 'Order #123' }, { name: 'status', value: 'Shipped' }],
         },
         metadata: { correlationId: 'corr-tpl' },
       };
@@ -176,8 +176,8 @@ describe('AdapterClientService', () => {
       expect(payload.metadata.templateName).toBe('order-delay');
       expect(payload.metadata.templateLanguage).toBe('es');
       expect(payload.metadata.templateParameters).toEqual([
-        'Order #123',
-        'Shipped',
+        { name: 'order_number', value: 'Order #123' },
+        { name: 'status', value: 'Shipped' },
       ]);
     });
 

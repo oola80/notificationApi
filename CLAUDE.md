@@ -105,7 +105,7 @@ All NestJS backend services follow these standards (documented in each service's
 
 3. **Standardized Error Responses** — All errors follow a consistent JSON schema:
    - Schema: `{ code: string, details: string, message: string, status: number, stack?: string }`
-   - **Error Registry (`errors.ts`)** — Centralized error code definitions with HTTP status, message, and details. Error codes use domain-specific prefixes per service (e.g., `GW-` for Gateway, `EIS-` for Event Ingestion, `NES-` for Notification Engine, `TS-` for Template, `CRS-` for Channel Router, `ADM-` for Admin, `AUD-` for Audit, `EMI-` for Email Ingest, `BUS-` for Bulk Upload, `ARS-` for Auth RBAC Service, `ECB-` for eCommerce Backoffice). No duplicates.
+   - **Error Registry (`errors.ts`)** — Centralized error code definitions with HTTP status, message, and details. Error codes use domain-specific prefixes per service (e.g., `GW-` for Gateway, `EIS-` for Event Ingestion, `NES-` for Notification Engine, `TS-` for Template, `CRS-` for Channel Router, `PA-` for Provider Adapter base, `MG-` for Mailgun, `WA-` for WhatsApp, `BZ-` for Braze, `SES-` for AWS SES, `ADM-` for Admin, `AUD-` for Audit, `EMI-` for Email Ingest, `BUS-` for Bulk Upload, `ARS-` for Auth RBAC Service, `ECB-` for eCommerce Backoffice). No duplicates.
    - **Global Exception Filter** — A single `@Catch(HttpException)` filter maps every thrown exception to the standardized JSON response `{ code, details, message, status }`.
 
 4. **Global Middleware via NestJS Bootstrap (`main.ts`)** — Cross-cutting concerns applied once at the application level:

@@ -65,6 +65,16 @@ export class ContentDto {
   media?: MediaDto[];
 }
 
+export class TemplateParameterDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsNotEmpty()
+  value: string;
+}
+
 export class MetadataDto {
   @IsString()
   @IsNotEmpty()
@@ -91,9 +101,10 @@ export class MetadataDto {
   templateLanguage?: string;
 
   @IsArray()
-  @IsString({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => TemplateParameterDto)
   @IsOptional()
-  templateParameters?: string[];
+  templateParameters?: TemplateParameterDto[];
 }
 
 export class SendRequestDto {

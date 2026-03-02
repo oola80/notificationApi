@@ -42,7 +42,7 @@ ins_whatsapp AS (
     INSERT INTO template_channels (template_version_id, channel, subject, body, metadata)
     SELECT id, 'whatsapp', NULL,
         'Hola {{customerName}}, lamentamos informarle que su orden {{orderId}} se encuentra retrasada.',
-        '{"metaTemplateName": "order_delay", "metaTemplateLanguage": "es_MX", "metaTemplateParameters": ["customerName", "orderId"]}'::jsonb
+        '{"metaTemplateName": "order_delay", "metaTemplateLanguage": "es_MX", "metaTemplateParameters": [{"name": "customer_name", "field": "customerName"}, {"name": "order_id", "field": "orderId"}]}'::jsonb
     FROM ins_version
     RETURNING id
 ),

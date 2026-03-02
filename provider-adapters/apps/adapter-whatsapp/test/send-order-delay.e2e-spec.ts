@@ -50,7 +50,7 @@ describe('WhatsApp Adapter — Order Delay Template E2E', () => {
           notificationId: 'notif-order-delay-001',
           templateName: 'order_delay',
           templateLanguage: 'es_MX',
-          templateParameters: ['Juan', 'ORD-123'],
+          templateParameters: [{ name: 'customer_name', value: 'Juan' }, { name: 'order_id', value: 'ORD-123' }],
         },
       })
       .expect(200);
@@ -71,8 +71,8 @@ describe('WhatsApp Adapter — Order Delay Template E2E', () => {
           {
             type: 'body',
             parameters: [
-              { type: 'text', text: 'Juan' },
-              { type: 'text', text: 'ORD-123' },
+              { type: 'text', parameter_name: 'customer_name', text: 'Juan' },
+              { type: 'text', parameter_name: 'order_id', text: 'ORD-123' },
             ],
           },
         ],
@@ -91,7 +91,7 @@ describe('WhatsApp Adapter — Order Delay Template E2E', () => {
           notificationId: 'notif-order-delay-002',
           templateName: 'order_delay',
           templateLanguage: 'es_MX',
-          templateParameters: ['Juan', 'ORD-123'],
+          templateParameters: [{ name: 'customer_name', value: 'Juan' }, { name: 'order_id', value: 'ORD-123' }],
         },
       })
       .expect(200);

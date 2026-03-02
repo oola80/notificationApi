@@ -5,6 +5,7 @@ export {
   ContentDto,
   MediaDto,
   MetadataDto,
+  TemplateParameterDto,
   ChannelType,
 } from './dto/send-request.dto.js';
 export { SendResultDto } from './dto/send-result.dto.js';

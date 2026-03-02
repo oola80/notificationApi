@@ -202,7 +202,7 @@ template-service/
         update-template.dto.ts         # channels[], changeSummary, updatedBy
         rollback-template.dto.ts       # versionNumber, updatedBy
         list-templates-query.dto.ts    # page, limit, search, isActive, sortBy, sortOrder
-        channel.dto.ts                 # channel (email/sms/whatsapp/push), subject, body, metadata
+        channel.dto.ts                 # channel (email/sms/whatsapp/push), subject, body, metadata (WhatsApp: metaTemplateName, metaTemplateLanguage, metaTemplateParameters [{ name: Meta placeholder, field: event payload field }])
         index.ts                       # Barrel export
       repositories/
         templates.repository.ts        # Extends PgBaseRepository: paginated list, slug check, relations load

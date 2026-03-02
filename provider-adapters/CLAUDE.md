@@ -26,13 +26,13 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 
 ## Implementation Status
 
-**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). **adapter-whatsapp Phase 1 complete** — Send pipeline + health (POST /send, GET /health, GET /capabilities, GET /metrics). **libs/common MetadataDto** extended with `templateName`, `templateLanguage`, `templateParameters` for WhatsApp Meta template dispatch. All other adapters not started.
+**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). **adapter-whatsapp Phase 1 complete** — Send pipeline + health (POST /send, GET /health, GET /capabilities, GET /metrics). **libs/common MetadataDto** extended with `templateName`, `templateLanguage`, `templateParameters` (`TemplateParameterDto[]` — named parameter objects with `name`/`value` fields) for WhatsApp Meta template dispatch. Named parameters emitted to Meta API as `{ type: 'text', parameter_name, text }`. All other adapters not started.
 
 - **Phase 3:** Webhook processing pipeline (`WebhooksModule`: `WebhookVerificationService` with HMAC-SHA256 + timing-safe comparison + 5-min replay protection, `WebhookNormalizerService` with 7 event type mappings + field extraction + metadata, `WebhooksService` pipeline orchestrator with fire-and-forget pattern, `WebhooksController` POST /webhooks/inbound with 200/401 responses). Interfaces: `MailgunWebhookPayload`, `MailgunWebhookSignature`, `MailgunWebhookEventData`. 204 unit tests across 28 suites, 17 E2E tests across 3 files.
 
 - **Phase 2:** Mailgun HTTP client module (`MailgunClientService`: sendMessage, getDomainInfo, buildFormData, EU region support). Send pipeline (`SendService`: channel validation, attachment processing with Base64/URL support and graceful degradation, Mailgun form data mapping with custom variables `v:notificationId`/`v:correlationId`/`v:cycleId` and headers `h:X-Notification-Id`, "Name \<email\>" recipient formatting, HTML detection, fromAddress override, Reply-To). Error classifier (`ErrorClassifierService`: HTTP status→retryable/errorCode mapping for all Mailgun responses). Send controller (`POST /send` with `@HttpCode(200)` — always returns 200 with success/failure in body). Refactored `MailgunHealthService` to use shared `MailgunClientService`. 149 unit tests across 24 suites, 10 E2E tests across 2 files.
 
-- **adapter-whatsapp Phase 1:** WhatsApp (Meta Cloud API) send pipeline + health. `WhatsAppClientService` (sendMessage, getPhoneNumberInfo via Graph API v22.0 with Bearer token). `SendService` (channel validation, phone formatting strip `+`, message type detection — Priority 1: `metadata.templateName` explicit field; Priority 2: `content.subject` prefix `template:`; template/text/media messages, `buildTemplateFromMetadata()` uses metadata fields with fallback to comma-separated body parsing). `ErrorClassifierService` (two-level: Meta error codes 130429/131026/131047/132000/132012/135000/368 + HTTP status fallback). `HealthController` (GET /health, GET /capabilities with providerId `meta-whatsapp`). `WhatsAppHealthService` extends `BaseHealthService`. 10 WA-prefixed error codes. 5 test files (3 E2E spec files).
+- **adapter-whatsapp Phase 1:** WhatsApp (Meta Cloud API) send pipeline + health. `WhatsAppClientService` (sendMessage, getPhoneNumberInfo via Graph API v22.0 with Bearer token; debug logging of Meta API request payload). `SendService` (channel validation, phone formatting strip `+`, message type detection — Priority 1: `metadata.templateName` explicit field; Priority 2: `content.subject` prefix `template:`; template/text/media messages, `buildTemplateFromMetadata()` uses metadata fields with named parameters `{ type: 'text', parameter_name: param.name, text: param.value }`, fallback to comma-separated body parsing). `ErrorClassifierService` (two-level: Meta error codes 130429/131026/131047/132000/132012/135000/368 + HTTP status fallback). `HealthController` (GET /health, GET /capabilities with providerId `meta-whatsapp`). `WhatsAppHealthService` extends `BaseHealthService`. 10 WA-prefixed error codes. 5 test files (3 E2E spec files).
 
 - **Phase 1:** NestJS monorepo restructuring (nest-cli.json, tsconfig paths, package.json with all dependencies). libs/common/ shared library (DTOs: SendRequest/SendResult/WebhookEvent/Health/Capabilities, errors: PA-prefixed base codes + HttpExceptionFilter, pipes: DtoValidationPipe, interceptors: LoggingInterceptor, metrics: 7 prom-client metrics + GET /metrics, RabbitMQ: optional connection + fire-and-forget publisher, health: abstract BaseHealthService). apps/adapter-mailgun/ application (bootstrap with Pino/validation/filter/interceptor/CORS, config with registerAs + env validation, MG-prefixed error codes, MailgunHealthService with domains API connectivity check, HealthController with GET /health + GET /capabilities). 93 unit tests across 20 suites, 3 E2E tests. Mailgun domain: distelsa.info, region: us.
 
@@ -192,14 +192,14 @@ provider-adapters/
           config.module.ts       # ConfigModule.forRoot (isGlobal, env validation, whatsapp + rabbitmq configs)
           whatsapp.config.ts     # registerAs 'whatsapp': port, nodeEnv, accessToken, phoneNumberId, appSecret, apiVersion, defaultTemplateLanguage, baseUrl, testMode, tlsRejectUnauthorized
           rabbitmq.config.ts     # registerAs 'rabbitmq': host, port, vhost, user, password
-          env.validation.ts      # class-validator EnvironmentVariables + validate()
+          env.validation.ts      # class-validator EnvironmentVariables + validate() (WHATSAPP_TEST_MODE is @IsString with default 'false')
         errors/
           whatsapp-errors.ts     # WHATSAPP_ERROR_CODES (10 WA-prefixed + inherited PA- base)
         whatsapp-client/
           whatsapp-client.module.ts       # HttpModule.registerAsync (10s timeout, https.Agent with configurable TLS rejectUnauthorized), provides WhatsAppClientService
           whatsapp-client.service.ts      # Meta Graph API HTTP client (sendMessage, getPhoneNumberInfo)
           interfaces/
-            whatsapp.interfaces.ts        # WhatsAppTextMessage, WhatsAppTemplateMessage, WhatsAppMediaMessage, WhatsAppApiResponse, WhatsAppApiError
+            whatsapp.interfaces.ts        # WhatsAppTextMessage, WhatsAppTemplateMessage (WhatsAppTemplateParameter includes optional parameter_name for named parameters), WhatsAppMediaMessage, WhatsAppApiResponse, WhatsAppApiError
         send/
           send.module.ts         # Imports WhatsAppClientModule, provides SendService, ErrorClassifierService, SendController
           send.service.ts        # Send pipeline orchestrator (validate channel, format phone, build message, send, classify errors, metrics)
@@ -273,9 +273,9 @@ provider-adapters/
     common/
       tsconfig.lib.json          # Lib-specific TS config extending root
       src/
-        index.ts                 # Barrel re-exports
+        index.ts                 # Barrel re-exports (includes TemplateParameterDto)
         dto/
-          send-request.dto.ts    # SendRequestDto (RecipientDto, ContentDto, MediaDto, MetadataDto with optional templateName/templateLanguage/templateParameters, ChannelType)
+          send-request.dto.ts    # SendRequestDto (RecipientDto, ContentDto, MediaDto, MetadataDto with optional templateName/templateLanguage/templateParameters: TemplateParameterDto[], ChannelType), TemplateParameterDto (name, value — validated with @ValidateNested)
           send-request.dto.spec.ts
           send-result.dto.ts     # SendResultDto
           send-result.dto.spec.ts

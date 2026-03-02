@@ -346,7 +346,7 @@ notification-engine-service/
       notification-publisher.service.spec.ts
       interfaces/
         normalized-event-message.interface.ts  # Inbound message shape from EIS
-        deliver-message.interface.ts           # Outbound message to channel-router; content includes optional templateName, templateLanguage, templateParameters for WhatsApp Meta template dispatch
+        deliver-message.interface.ts           # Outbound message to channel-router; content includes optional templateName, templateLanguage, templateParameters (Array<{ name, value }> — named parameters for WhatsApp Meta template dispatch)
     template-client/
       template-client.module.ts              # HttpModule.registerAsync (baseURL from config, 5s timeout)
       template-client.service.ts             # render() with circuit breaker + 3 retries, exponential backoff (NES-018, NES-019, NES-020); TemplateRenderResult includes templateId and channelMetadata (provider-specific metadata from template-service)
@@ -367,7 +367,7 @@ notification-engine-service/
       override-cache-invalidation.consumer.spec.ts
       status-inbound.consumer.ts             # @RabbitSubscribe notification.status.delivered/failed → lifecycle
       status-inbound.consumer.spec.ts
-      event-processing-pipeline.service.ts   # 9-step pipeline orchestrating all domain services; dispatch step uses channelMetadata for WhatsApp (templateName→metaTemplateName, templateLanguage, templateParameters resolved from payload)
+      event-processing-pipeline.service.ts   # 9-step pipeline orchestrating all domain services; dispatch step uses channelMetadata for WhatsApp (templateName→metaTemplateName, templateLanguage, metaTemplateParameters mapped from { name, field } → { name, value } by resolving field names from event payload)
       event-processing-pipeline.service.spec.ts
   test/
     test-utils.ts              # Shared E2E helper: createTestApp(), cleanupTestData()

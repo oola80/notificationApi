@@ -230,7 +230,7 @@ describe('TemplateClientService', () => {
         channelMetadata: {
           metaTemplateName: 'order_delay',
           metaTemplateLanguage: 'es_MX',
-          metaTemplateParameters: ['customerName', 'orderId'],
+          metaTemplateParameters: [{ name: 'customer_name', field: 'customerName' }, { name: 'order_id', field: 'orderId' }],
         },
       };
 
@@ -243,7 +243,7 @@ describe('TemplateClientService', () => {
       expect(result.channelMetadata).toEqual({
         metaTemplateName: 'order_delay',
         metaTemplateLanguage: 'es_MX',
-        metaTemplateParameters: ['customerName', 'orderId'],
+        metaTemplateParameters: [{ name: 'customer_name', field: 'customerName' }, { name: 'order_id', field: 'orderId' }],
       });
     });
 

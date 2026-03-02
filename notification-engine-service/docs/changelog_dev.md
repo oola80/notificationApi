@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Changed: templateParameters shape from string[] to Array<{ name, value }> for named Meta parameters (2026-03-02)
+
+- `src/rabbitmq/interfaces/deliver-message.interface.ts` — Changed `templateParameters` type from `string[]` to `Array<{ name: string; value: string }>`.
+- `src/consumers/event-processing-pipeline.service.ts` — Updated dispatch step `.map()` to produce `{ name, value }` objects from `metaTemplateParameters` (now `{ name, field }` objects from template metadata). `name` is the Meta placeholder name, `value` is resolved from the event payload field.
+- `src/consumers/event-processing-pipeline.service.spec.ts` — Updated WhatsApp channelMetadata dispatch test: mock `metaTemplateParameters` to object array format, expected `templateParameters` to `[{ name, value }]` format.
+- `src/template-client/template-client.service.spec.ts` — Updated channelMetadata passthrough test to use object array format for `metaTemplateParameters`.
+
 ### Added: Technical implementation reference documentation (2026-03-01)
 
 - `tech-notification-engine-service-v1.md` — Technical implementation reference documentation

@@ -6,6 +6,29 @@
 
 ## [Unreleased]
 
+### Bugfix: WHATSAPP_TEST_MODE=false incorrectly evaluated as true (2026-03-02)
+
+#### apps/adapter-whatsapp/
+- `src/config/env.validation.ts` — Changed `WHATSAPP_TEST_MODE` from `@IsBoolean()` to `@IsString()` with default `'false'`. Same fix previously applied to `WHATSAPP_TLS_REJECT_UNAUTHORIZED`: `enableImplicitConversion: true` in `plainToInstance` converts the string `'false'` via `Boolean('false')` → `true` (non-empty string is truthy), corrupting the value. Removed unused `IsBoolean` import.
+
+### Enhancement: Log WhatsApp Meta API request payload (2026-03-02)
+
+#### apps/adapter-whatsapp/
+- `src/whatsapp-client/whatsapp-client.service.ts` — Added `logger.debug({ payload }, 'WhatsApp request payload to Meta API')` before the HTTP POST call. Uses Pino structured logging (object-first argument) so the full JSON payload is inspectable in debug logs.
+
+### Feature: Support named parameters (parameter_name) for WhatsApp Meta templates (2026-03-02)
+
+#### libs/common/
+- `src/dto/send-request.dto.ts` — Added `TemplateParameterDto` class (`name: string`, `value: string`). Changed `MetadataDto.templateParameters` from `@IsString({ each: true }) string[]` to `@ValidateNested({ each: true }) @Type(() => TemplateParameterDto) TemplateParameterDto[]`.
+- `src/dto/send-request.dto.spec.ts` — Added `TemplateParameterDto` validation tests (5 tests) and `MetadataDto — templateParameters` tests (3 tests: object array valid, string array rejected, omitted allowed).
+- `src/index.ts` — Added `TemplateParameterDto` to barrel exports.
+
+#### apps/adapter-whatsapp/
+- `src/whatsapp-client/interfaces/whatsapp.interfaces.ts` — Added optional `parameter_name?: string` to `WhatsAppTemplateParameter` interface.
+- `src/send/send.service.ts` — Updated `buildTemplateFromMetadata()` to emit `{ type: 'text', parameter_name: param.name, text: param.value }` per parameter. Comma-separated body fallback remains positional (no `parameter_name`).
+- `test/send-order-delay.e2e-spec.ts` — Updated request payloads to `[{ name, value }]` format. Updated Meta API assertions to include `parameter_name`.
+- `test/send.e2e-spec.ts` — Updated metadata-based template test payloads and assertions to `[{ name, value }]` format with `parameter_name`. Comma-separated body fallback test unchanged.
+
 ### Bugfix: WhatsApp adapter SSL certificate error behind corporate proxy (2026-03-02)
 
 #### apps/adapter-whatsapp/

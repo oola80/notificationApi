@@ -273,7 +273,7 @@ describe('WhatsApp Adapter — POST /send (e2e)', () => {
             notificationId: 'notif-pipe-001',
             templateName: 'order_update',
             templateLanguage: 'es_MX',
-            templateParameters: ['Order #12345', 'Shipped'],
+            templateParameters: [{ name: 'order_number', value: 'Order #12345' }, { name: 'status', value: 'Shipped' }],
           },
         })
         .expect(200);
@@ -288,12 +288,16 @@ describe('WhatsApp Adapter — POST /send (e2e)', () => {
       expect(payload.template.language.code).toBe('es_MX');
       expect(payload.template.components).toBeDefined();
       expect(payload.template.components[0].parameters).toHaveLength(2);
-      expect(payload.template.components[0].parameters[0].text).toBe(
-        'Order #12345',
-      );
-      expect(payload.template.components[0].parameters[1].text).toBe(
-        'Shipped',
-      );
+      expect(payload.template.components[0].parameters[0]).toEqual({
+        type: 'text',
+        parameter_name: 'order_number',
+        text: 'Order #12345',
+      });
+      expect(payload.template.components[0].parameters[1]).toEqual({
+        type: 'text',
+        parameter_name: 'status',
+        text: 'Shipped',
+      });
     });
 
     it('should use default language when templateLanguage is not provided', async () => {

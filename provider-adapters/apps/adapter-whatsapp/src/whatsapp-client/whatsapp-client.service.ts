@@ -28,6 +28,7 @@ export class WhatsAppClientService {
     const url = `${this.baseUrl}/messages`;
 
     this.logger.debug(`Sending WhatsApp message to ${url}`);
+    this.logger.debug({ payload }, 'WhatsApp request payload to Meta API');
 
     const response = await firstValueFrom(
       this.httpService.post<WhatsAppApiResponse>(url, payload, {

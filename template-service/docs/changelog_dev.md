@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Changed: metaTemplateParameters seed data format from string array to object array (2026-03-02)
+
+- `dbscripts/seed-order-delay-template.sql` — Changed `metaTemplateParameters` from `["customerName", "orderId"]` to `[{"name": "customer_name", "field": "customerName"}, {"name": "order_id", "field": "orderId"}]`. `name` is the Meta placeholder name (snake_case), `field` is the event payload field (camelCase). Supports Meta Cloud API `parameter_name` for named-placeholder templates.
+
 ### Added: Technical implementation reference documentation (2026-03-01)
 
 - `tech-template-service-v1.md` — Technical implementation reference documentation

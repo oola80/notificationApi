@@ -27,6 +27,7 @@ export interface WhatsAppTemplateComponent {
 
 export interface WhatsAppTemplateParameter {
   type: 'text' | 'image' | 'document' | 'video';
+  parameter_name?: string;
   text?: string;
   image?: { link: string };
   document?: { link: string; filename?: string };

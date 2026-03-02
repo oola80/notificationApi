@@ -649,7 +649,7 @@ describe('EventProcessingPipelineService', () => {
         channelMetadata: {
           metaTemplateName: 'order_delay',
           metaTemplateLanguage: 'es_MX',
-          metaTemplateParameters: ['customerName', 'orderId'],
+          metaTemplateParameters: [{ name: 'customer_name', field: 'customerName' }, { name: 'order_id', field: 'orderId' }],
         },
       });
 
@@ -661,7 +661,7 @@ describe('EventProcessingPipelineService', () => {
           content: expect.objectContaining({
             templateName: 'order_delay',
             templateLanguage: 'es_MX',
-            templateParameters: ['Juan', 'ORD-123'],
+            templateParameters: [{ name: 'customer_name', value: 'Juan' }, { name: 'order_id', value: 'ORD-123' }],
           }),
         }),
       );

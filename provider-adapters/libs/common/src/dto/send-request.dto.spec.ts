@@ -6,6 +6,7 @@ import {
   ContentDto,
   MediaDto,
   MetadataDto,
+  TemplateParameterDto,
   ChannelType,
 } from './send-request.dto.js';
 
@@ -132,6 +133,82 @@ describe('MetadataDto', () => {
     const dto = plainToInstance(MetadataDto, {});
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe('TemplateParameterDto', () => {
+  it('should validate a valid TemplateParameterDto', async () => {
+    const dto = plainToInstance(TemplateParameterDto, {
+      name: 'customer_name',
+      value: 'Juan',
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
+  });
+
+  it('should reject empty name', async () => {
+    const dto = plainToInstance(TemplateParameterDto, {
+      name: '',
+      value: 'Juan',
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('should reject empty value', async () => {
+    const dto = plainToInstance(TemplateParameterDto, {
+      name: 'customer_name',
+      value: '',
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('should reject missing name', async () => {
+    const dto = plainToInstance(TemplateParameterDto, {
+      value: 'Juan',
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('should reject missing value', async () => {
+    const dto = plainToInstance(TemplateParameterDto, {
+      name: 'customer_name',
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe('MetadataDto — templateParameters', () => {
+  it('should validate with object-array templateParameters', async () => {
+    const dto = plainToInstance(MetadataDto, {
+      notificationId: 'test-123',
+      templateParameters: [
+        { name: 'customer_name', value: 'Juan' },
+        { name: 'order_id', value: 'ORD-123' },
+      ],
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
+  });
+
+  it('should reject string-array templateParameters', async () => {
+    const dto = plainToInstance(MetadataDto, {
+      notificationId: 'test-123',
+      templateParameters: ['Juan', 'ORD-123'],
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('should allow omitted templateParameters', async () => {
+    const dto = plainToInstance(MetadataDto, {
+      notificationId: 'test-123',
+    });
+    const errors = await validate(dto);
+    expect(errors.length).toBe(0);
   });
 });
 

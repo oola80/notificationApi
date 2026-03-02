@@ -17,7 +17,7 @@ export interface DeliverMessage {
     templateVersion?: number;
     templateName?: string;
     templateLanguage?: string;
-    templateParameters?: string[];
+    templateParameters?: Array<{ name: string; value: string }>;
   };
   media?: Record<string, any>;
   metadata: Record<string, any>;

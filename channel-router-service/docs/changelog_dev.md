@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Changed: templateParameters type from string[] to Array<{ name, value }> for named Meta parameters (2026-03-02)
+
+- `src/delivery/interfaces/dispatch-message.interface.ts` — Changed `templateParameters` type from `string[]` to `Array<{ name: string; value: string }>`.
+- `src/adapter-client/interfaces/adapter-client.interfaces.ts` — Changed `templateParameters` type from `string[]` to `Array<{ name: string; value: string }>` in `SendRequest.content`.
+- `src/adapter-client/adapter-client.service.spec.ts` — Updated template metadata test data and assertions to use `[{ name, value }]` format.
+
 ### Bugfix: Channel-aware address resolution in adapter-client (2026-03-01)
 
 - `src/adapter-client/adapter-client.service.ts` — Replaced fixed-priority address resolution (`email || phone || deviceToken`) in `toAdapterPayload()` with channel-aware `resolveAddress()` private method. SMS/WhatsApp channels now prefer `phone`, push prefers `deviceToken`, email/default preserves original priority. Each channel falls back to other address types to avoid empty strings when an address is available.

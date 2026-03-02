@@ -187,7 +187,11 @@ export class SendService {
       message.template.components = [
         {
           type: 'body',
-          parameters: params.map((text) => ({ type: 'text', text })),
+          parameters: params.map((param) => ({
+            type: 'text' as const,
+            parameter_name: param.name,
+            text: param.value,
+          })),
         },
       ];
     } else {
