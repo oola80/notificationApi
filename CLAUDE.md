@@ -4,7 +4,7 @@ Unified notification platform for eCommerce — consolidates fragmented notifica
 
 ## Project Status
 
-Auth/RBAC decoupled into standalone services (:3160–3162). `notification-gateway` deprecated. `notification-admin-ui` simplified (no auth, direct microservice communication).
+Auth/RBAC decoupled into standalone services (moved to separate repositories). `notification-gateway` deprecated. `notification-admin-ui` simplified (no auth, direct microservice communication).
 
 | Service | Status | Tests |
 |---|---|---|
@@ -16,7 +16,7 @@ Auth/RBAC decoupled into standalone services (:3160–3162). `notification-gatew
 | provider-adapters/adapter-whatsapp | Phase 1 complete | 3 E2E spec files |
 | bulk-upload-service | Phase 4 complete | 387 unit / 23 suites, 24 E2E / 4 files |
 | audit-service | Phase 4 complete | 338 unit / 41 suites, 58 E2E / 8 files |
-| admin-service, email-ingest-service, auth-rbac-*, ecommerce-backoffice | Scaffolding only | — |
+| admin-service, email-ingest-service, ecommerce-backoffice | Scaffolding only | — |
 
 ## Tech Stack (Planned)
 
@@ -31,18 +31,18 @@ Auth/RBAC decoupled into standalone services (:3160–3162). `notification-gatew
 
 | Service | Port | Purpose |
 |---|---|---|
-| notification-gateway | 3150 | **Deprecated** — BFF / API Gateway (auth, routing, rate limiting). Responsibilities redistributed: auth → auth-rbac-service-backend, RBAC → per-service JWT validation, rate limiting → infrastructure proxy, proxying → direct frontend-to-backend. |
+| notification-gateway | 3150 | **Deprecated** — BFF / API Gateway (auth, routing, rate limiting). Responsibilities redistributed: auth → auth-rbac-service-backend (separate repo), RBAC → per-service JWT validation, rate limiting → infrastructure proxy, proxying → direct frontend-to-backend. |
 | event-ingestion-service | 3151 | Receives and normalizes events from source systems via runtime field mappings; assigns priority tier (normal/critical) per mapping config |
 | notification-engine-service | 3152 | Core orchestrator — rules, recipients, lifecycle; priority-aware processing via tiered queues |
 | template-service | 3153 | Template CRUD, Handlebars rendering, versioning |
 | channel-router-service | 3154 | Routes to delivery providers via decoupled provider adapter microservices (Mailgun, Braze, WhatsApp/Meta, AWS SES); core orchestration (circuit breaker, rate limiting, retry, fallback, media processing); all providers are dumb pipes (pre-rendered content); priority-tiered delivery queues per channel; fire-and-forget audit logging. V2 design docs reflect the decoupled adapter architecture. |
-| admin-service | 3155 | Backoffice administration — configuration management (rules, mappings, channels, templates, recipients, system config). JWT validation via auth-rbac-service-backend RS256 public key. |
+| admin-service | 3155 | Backoffice administration — configuration management (rules, mappings, channels, templates, recipients, system config). JWT validation via auth-rbac-service-backend RS256 public key (separate repo). |
 | audit-service | 3156 | Notification tracking, delivery receipts, analytics |
 | email-ingest-service | 3157/2525 | SMTP ingest — receives emails, parses, generates events |
 | bulk-upload-service | 3158 | XLSX bulk upload — async file processing, result file with per-row status, fire-and-forget audit logging |
 | notification-admin-ui | 3159 | Next.js admin frontend — connects directly to admin-service (:3155) |
-| auth-rbac-service-backend | 3160 | Multi-application authentication, user management, RBAC, JWT issuance (RS256 platform + app-scoped tokens) |
-| auth-rbac-service-frontend | 3161 | Next.js admin UI for auth/RBAC management (applications, users, roles, permissions) |
+| auth-rbac-service-backend | 3160 | **Separate repo** — Multi-application authentication, user management, RBAC, JWT issuance (RS256 platform + app-scoped tokens) |
+| auth-rbac-service-frontend | 3161 | **Separate repo** — Next.js admin UI for auth/RBAC management (applications, users, roles, permissions) |
 | ecommerce-backoffice | 3162 | Next.js login portal and application launcher — centralized entry point for all platform applications |
 
 ### Service Folders
@@ -105,7 +105,7 @@ All NestJS backend services follow these standards (documented in each service's
 
 3. **Standardized Error Responses** — All errors follow a consistent JSON schema:
    - Schema: `{ code: string, details: string, message: string, status: number, stack?: string }`
-   - **Error Registry (`errors.ts`)** — Centralized error code definitions with HTTP status, message, and details. Error codes use domain-specific prefixes per service (e.g., `GW-` for Gateway, `EIS-` for Event Ingestion, `NES-` for Notification Engine, `TS-` for Template, `CRS-` for Channel Router, `PA-` for Provider Adapter base, `MG-` for Mailgun, `WA-` for WhatsApp, `BZ-` for Braze, `SES-` for AWS SES, `ADM-` for Admin, `AUD-` for Audit, `EMI-` for Email Ingest, `BUS-` for Bulk Upload, `ARS-` for Auth RBAC Service, `ECB-` for eCommerce Backoffice). No duplicates.
+   - **Error Registry (`errors.ts`)** — Centralized error code definitions with HTTP status, message, and details. Error codes use domain-specific prefixes per service (e.g., `GW-` for Gateway, `EIS-` for Event Ingestion, `NES-` for Notification Engine, `TS-` for Template, `CRS-` for Channel Router, `PA-` for Provider Adapter base, `MG-` for Mailgun, `WA-` for WhatsApp, `BZ-` for Braze, `SES-` for AWS SES, `ADM-` for Admin, `AUD-` for Audit, `EMI-` for Email Ingest, `BUS-` for Bulk Upload, `ECB-` for eCommerce Backoffice). Auth RBAC Service (`ARS-`) is in a separate repo. No duplicates.
    - **Global Exception Filter** — A single `@Catch(HttpException)` filter maps every thrown exception to the standardized JSON response `{ code, details, message, status }`.
 
 4. **Global Middleware via NestJS Bootstrap (`main.ts`)** — Cross-cutting concerns applied once at the application level:

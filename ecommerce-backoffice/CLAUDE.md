@@ -12,16 +12,16 @@ Next.js login portal and application launcher — centralized entry point for al
 
 ## API Backend
 
-All data is fetched from the Auth RBAC Service Backend (:3160) API.
+All data is fetched from the Auth RBAC Service Backend (:3160) API (separate repo).
 
 ## Dependencies
 
-- auth-rbac-service-backend (:3160) — sole API backend
+- auth-rbac-service-backend (:3160) — sole API backend (separate repo)
 
 ## Related Services
 
-- Consumes API from: auth-rbac-service-backend (:3160)
-- Redirects to: notification-admin-ui (:3159), auth-rbac-service-frontend (:3161), and other registered application frontends
+- Consumes API from: auth-rbac-service-backend (:3160) (separate repo)
+- Redirects to: notification-admin-ui (:3159), auth-rbac-service-frontend (:3161, separate repo), and other registered application frontends
 - No direct access to any other microservice
 
 ## Key References
