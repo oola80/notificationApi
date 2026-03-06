@@ -93,8 +93,6 @@ function TemplateForm({
     resolver: zodResolver(schema),
     defaultValues: isEditing
       ? {
-          name: initialData?.name ?? "",
-          description: initialData?.description ?? "",
           channels: defaultChannels,
           changeSummary: "",
         }
@@ -204,66 +202,88 @@ function TemplateForm({
                   <CardTitle>General</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
+                  {isEditing ? (
+                    <>
                       <FormItem>
                         <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Order Confirmation Email"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          A descriptive name for this template
-                        </FormDescription>
-                        <FormMessage />
+                        <Input
+                          value={initialData?.name ?? ""}
+                          disabled
+                        />
                       </FormItem>
-                    )}
-                  />
-
-                  {!isEditing && (
-                    <FormField
-                      control={form.control}
-                      name={"slug" as "name"}
-                      render={({ field }) => (
+                      {initialData?.description && (
                         <FormItem>
-                          <FormLabel>Slug</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., order-confirmation-email"
-                              className="font-mono text-sm"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            URL-safe identifier (auto-generated from name, editable)
-                          </FormDescription>
-                          <FormMessage />
+                          <FormLabel>Description</FormLabel>
+                          <Textarea
+                            value={initialData.description}
+                            rows={2}
+                            disabled
+                          />
                         </FormItem>
                       )}
-                    />
-                  )}
+                    </>
+                  ) : (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Order Confirmation Email"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              A descriptive name for this template
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Describe what this template is used for..."
-                            rows={2}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name={"slug" as "name"}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Slug</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., order-confirmation-email"
+                                className="font-mono text-sm"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              URL-safe identifier (auto-generated from name, editable)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Describe what this template is used for..."
+                                rows={2}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  )}
 
                   {isEditing && (
                     <FormField
@@ -311,7 +331,7 @@ function TemplateForm({
                             onClick={() => {
                               appendChannel({
                                 channel: ch,
-                                subject: ch === "email" ? "" : undefined,
+                                subject: (ch === "email" || ch === "push") ? "" : undefined,
                                 body: "",
                                 metadata: undefined,
                               });
@@ -354,8 +374,8 @@ function TemplateForm({
                           value={field.channel}
                           className="mt-4 space-y-4"
                         >
-                          {/* Subject (email only) */}
-                          {field.channel === "email" && (
+                          {/* Subject (email and push) */}
+                          {(field.channel === "email" || field.channel === "push") && (
                             <FormField
                               control={form.control}
                               name={`channels.${index}.subject`}

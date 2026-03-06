@@ -119,7 +119,7 @@ export function Sidebar() {
             </span>
           </div>
           {!collapsed && (
-            <span className="text-sm font-semibold text-foreground">
+            <span className="text-sm font-semibold text-sidebar-primary-foreground">
               Notification API
             </span>
           )}

@@ -37,7 +37,7 @@ Backoffice administration — aggregates management operations across downstream
 
 ## Key References
 
-- Design doc: `docs/14-admin-service.md` (convenience copy) — authoritative at `../../docs/14-admin-service.md`
+- Design doc: `docs/14-admin-service.md`
 - Endpoints: `../../endpoints/endpoints-admin-service.md`
 - DB schema script: `dbscripts/schema-admin-service.sql`
 - DB objects script: `dbscripts/admin-service-dbscripts.sql` — **must be updated on every database change**

@@ -52,7 +52,7 @@ function UploadHistory({ className }: UploadHistoryProps) {
   }, [hasProcessing, mutate]);
 
   // Delete
-  const deleteId = deleteTarget?.id ?? "";
+  const deleteId = deleteTarget?.uploadId ?? "";
   const { trigger: doDelete, isMutating: isDeleting } =
     useDeleteUpload(deleteId);
 
@@ -121,21 +121,21 @@ function UploadHistory({ className }: UploadHistoryProps) {
       {
         label: "View Detail",
         icon: <Eye className="h-4 w-4" />,
-        onClick: (row) => router.push(`/bulk-upload/${row.id}`),
+        onClick: (row) => router.push(`/bulk-upload/${row.uploadId}`),
       },
       {
         label: "Download Result",
         icon: <Download className="h-4 w-4" />,
         onClick: (row) => {
           // Trigger download inline
-          downloadResult(row.id, row.fileName);
+          downloadResult(row.uploadId, row.fileName);
         },
       },
       {
         label: "Retry",
         icon: <RotateCcw className="h-4 w-4" />,
         onClick: (row) => {
-          retryUpload(row.id);
+          retryUpload(row.uploadId);
         },
       },
       {
@@ -155,7 +155,7 @@ function UploadHistory({ className }: UploadHistoryProps) {
       <DataTable
         columns={columns}
         data={data?.data ?? []}
-        rowKey={(row) => row.id}
+        rowKey={(row) => row.uploadId}
         page={page}
         pageSize={pageSize}
         total={data?.total ?? 0}
@@ -163,7 +163,7 @@ function UploadHistory({ className }: UploadHistoryProps) {
         loading={isLoading}
         error={error?.message}
         onRetry={() => mutate()}
-        onRowClick={(row) => router.push(`/bulk-upload/${row.id}`)}
+        onRowClick={(row) => router.push(`/bulk-upload/${row.uploadId}`)}
         rowActions={rowActions}
         emptyTitle="No uploads yet"
         emptyDescription="Upload an XLSX file using the drop zone above."

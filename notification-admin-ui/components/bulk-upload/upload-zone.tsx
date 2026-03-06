@@ -27,7 +27,7 @@ function formatFileSize(bytes: number): string {
 }
 
 interface UploadZoneProps {
-  onUploadComplete?: (upload: { id: string }) => void;
+  onUploadComplete?: (upload: { uploadId: string }) => void;
   className?: string;
 }
 

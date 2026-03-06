@@ -26,7 +26,7 @@ All data is fetched from the Auth RBAC Service Backend (:3160) API (separate rep
 
 ## Key References
 
-- Design doc: `docs/21-ecommerce-backoffice.md` (convenience copy) — authoritative at `../../docs/21-ecommerce-backoffice.md`
+- Design doc: `docs/21-ecommerce-backoffice.md`
 - Routes: `../../endpoints/endpoints-ecommerce-backoffice.md`
 
 ## Coding Conventions

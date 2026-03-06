@@ -1,5 +1,3 @@
-> *This is a convenience copy. The authoritative version is at `../../docs/16-audit-service-v2.md`.*
-
 # 16 — Audit Service
 
 **Notification API — Audit Service Deep-Dive**

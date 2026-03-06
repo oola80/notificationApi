@@ -300,4 +300,59 @@ describe('MappingCacheService', () => {
       });
     });
   });
+
+  describe('cache warm-up failure scenarios', () => {
+    it('should propagate error when findAllActive rejects, ready stays false', async () => {
+      await createModule(true);
+      repository.findAllActive.mockRejectedValue(
+        new Error('DB connection refused'),
+      );
+
+      await expect(service.onModuleInit()).rejects.toThrow(
+        'DB connection refused',
+      );
+
+      expect(service.getCacheStats().ready).toBe(false);
+
+      // getMapping should throw EIS-021 when cache not ready
+      try {
+        await service.getMapping('shopify', 'order.created');
+        fail('Should have thrown');
+      } catch (error: any) {
+        const response = error.getResponse();
+        expect(response.code).toBe('EIS-021');
+      }
+    });
+
+    it('should set ready=true and size=0 when findAllActive resolves empty', async () => {
+      await createModule(true);
+      repository.findAllActive.mockResolvedValue([]);
+
+      await service.onModuleInit();
+
+      expect(service.getCacheStats().ready).toBe(true);
+      expect(service.getCacheStats().size).toBe(0);
+    });
+
+    it('should handle 1000 mappings on warm-up', async () => {
+      await createModule(true);
+
+      const largeMappingSet: EventMapping[] = Array.from(
+        { length: 1000 },
+        (_, i) => ({
+          ...mockMapping,
+          id: `id-${i}`,
+          sourceId: `source-${i}`,
+          eventType: `event.type.${i}`,
+          name: `Mapping ${i}`,
+        }),
+      );
+      repository.findAllActive.mockResolvedValue(largeMappingSet);
+
+      await service.onModuleInit();
+
+      expect(service.getCacheStats().size).toBe(1000);
+      expect(service.getCacheStats().ready).toBe(true);
+    });
+  });
 });

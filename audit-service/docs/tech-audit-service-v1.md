@@ -1,7 +1,5 @@
 # Audit Service — Technical Reference v1
 
-> This is a convenience copy. The authoritative version is at `../../docs/16-audit-service-v2.md`.
-
 ## 1. Overview
 
 | Attribute | Value |

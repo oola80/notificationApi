@@ -148,8 +148,7 @@ Configured via `.env` file in the service root (git-ignored). Required for local
 
 ## Key References
 
-- Design doc (v2): `docs/11-channel-router-service-v2.md` (convenience copy) — authoritative at `../../docs/11-channel-router-service-v2.md`
-- Design doc (v1): `../../docs/11-channel-router-service.md` (original monolithic design)
+- Design doc (v2): `docs/11-channel-router-service-v2.md`
 - Endpoints (v2): `../../endpoints/endpoints-channel-router-service-v2.md`
 - Endpoints (v1): `../../endpoints/endpoints-channel-router-service.md`
 - DB schema script: `dbscripts/schema-channel-router-service.sql`

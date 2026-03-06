@@ -1,9 +1,10 @@
 export interface RecipientGroupMember {
-  id: string;
+  id: number;
   email: string;
   phone: string | null;
   deviceToken: string | null;
   memberName: string | null;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -33,5 +34,4 @@ export interface CreateRecipientGroupMemberDto {
 export interface UpdateRecipientGroupDto {
   name?: string;
   description?: string;
-  isActive?: boolean;
 }

@@ -27,11 +27,10 @@ export default function MappingDetailPage({
 
   const handleSubmit = async (data: CreateMappingFormData) => {
     const dto: UpdateMappingDto = {
-      sourceId: data.sourceId,
-      eventType: data.eventType,
       name: data.name,
       description: data.description || undefined,
       priority: data.priority,
+      isActive: data.isActive,
       fieldMappings: fieldMappingsToApi(data.fieldMappings),
       timestampField: data.timestampField || undefined,
       timestampFormat: data.timestampFormat || undefined,

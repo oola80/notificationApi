@@ -28,7 +28,6 @@ export default function RecipientGroupDetailPage({
     const dto: UpdateRecipientGroupDto = {
       name: data.name,
       description: data.description || undefined,
-      isActive: data.isActive,
     };
 
     try {

@@ -62,7 +62,11 @@ function TemplatePreview({ template }: TemplatePreviewProps) {
       }
 
       const result = await preview({ data: variableValues });
-      setResults(result.renderedChannels);
+      setResults(result.previews);
+      const channelWarnings = result.previews.flatMap((p) => p.warnings ?? []);
+      if (channelWarnings.length > 0) {
+        setWarnings((prev) => [...prev, ...channelWarnings]);
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to preview template",

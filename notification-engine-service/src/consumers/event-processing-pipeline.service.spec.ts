@@ -699,6 +699,173 @@ describe('EventProcessingPipelineService', () => {
       );
     });
 
+    it('should resolve missing payload field to empty string in WhatsApp templateParameters', async () => {
+      ruleCacheService.getRulesByEventType.mockResolvedValue([mockWhatsAppRule as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([mockWhatsAppRule as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { phone: '+50212345678', customerId: 'cust-1' },
+      ]);
+      channelResolverService.resolveChannels.mockResolvedValue({
+        effectiveChannels: ['whatsapp'],
+        filtered: false,
+      });
+
+      // Parameter references 'missingField' which is NOT in the payload
+      templateClientService.render.mockResolvedValue({
+        channel: 'whatsapp',
+        body: 'Hello',
+        templateVersion: 1,
+        templateId: 'tpl-order-delay',
+        channelMetadata: {
+          metaTemplateName: 'order_delay',
+          metaTemplateLanguage: 'es_MX',
+          metaTemplateParameters: [
+            { name: 'customer_name', field: 'customerName' },
+            { name: 'missing_param', field: 'missingField' },
+          ],
+        },
+      });
+
+      await pipeline.processEvent(whatsAppEvent);
+
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            templateParameters: [
+              { name: 'customer_name', value: 'Juan' },
+              { name: 'missing_param', value: '' },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('should map multiple template parameters correctly', async () => {
+      ruleCacheService.getRulesByEventType.mockResolvedValue([mockWhatsAppRule as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([mockWhatsAppRule as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { phone: '+50212345678', customerId: 'cust-1' },
+      ]);
+      channelResolverService.resolveChannels.mockResolvedValue({
+        effectiveChannels: ['whatsapp'],
+        filtered: false,
+      });
+
+      const eventWith3Fields: NormalizedEventMessage = {
+        ...whatsAppEvent,
+        normalizedPayload: {
+          customerName: 'Maria',
+          orderId: 'ORD-456',
+          estimatedDate: '2026-03-10',
+          customerPhone: '+50212345678',
+          customerId: 'cust-1',
+        },
+      };
+
+      templateClientService.render.mockResolvedValue({
+        channel: 'whatsapp',
+        body: 'Hello Maria',
+        templateVersion: 1,
+        templateId: 'tpl-order-delay',
+        channelMetadata: {
+          metaTemplateName: 'order_delay_v2',
+          metaTemplateLanguage: 'es_MX',
+          metaTemplateParameters: [
+            { name: 'customer_name', field: 'customerName' },
+            { name: 'order_id', field: 'orderId' },
+            { name: 'eta', field: 'estimatedDate' },
+          ],
+        },
+      });
+
+      await pipeline.processEvent(eventWith3Fields);
+
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            templateParameters: [
+              { name: 'customer_name', value: 'Maria' },
+              { name: 'order_id', value: 'ORD-456' },
+              { name: 'eta', value: '2026-03-10' },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('should fall back when channelMetadata is undefined for WhatsApp', async () => {
+      ruleCacheService.getRulesByEventType.mockResolvedValue([mockWhatsAppRule as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([mockWhatsAppRule as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { phone: '+50212345678', customerId: 'cust-1' },
+      ]);
+      channelResolverService.resolveChannels.mockResolvedValue({
+        effectiveChannels: ['whatsapp'],
+        filtered: false,
+      });
+      templateClientService.render.mockResolvedValue({
+        channel: 'whatsapp',
+        body: 'Hello',
+        templateVersion: 1,
+        templateId: 'tpl-order-delay',
+        // channelMetadata is undefined
+      });
+
+      await pipeline.processEvent(whatsAppEvent);
+
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            templateName: 'tpl-order-delay',
+            templateParameters: undefined,
+          }),
+        }),
+      );
+    });
+
+    it('should ignore channelMetadata for non-WhatsApp channels', async () => {
+      const emailRule = {
+        ...mockRule,
+        actions: [
+          {
+            templateId: 'tpl-order-delay-email',
+            channels: ['email'],
+            recipientType: 'customer',
+          },
+        ],
+      };
+
+      ruleCacheService.getRulesByEventType.mockResolvedValue([emailRule as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([emailRule as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { email: 'juan@example.com', customerId: 'cust-1' },
+      ]);
+      templateClientService.render.mockResolvedValue({
+        channel: 'email',
+        subject: 'Order Delay',
+        body: '<p>Delayed</p>',
+        templateVersion: 1,
+        templateId: 'tpl-order-delay-email',
+        channelMetadata: {
+          metaTemplateName: 'order_delay',
+          metaTemplateLanguage: 'es_MX',
+          metaTemplateParameters: [{ name: 'customer_name', field: 'customerName' }],
+        },
+      });
+
+      await pipeline.processEvent(mockEvent);
+
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'email',
+          content: expect.objectContaining({
+            templateName: 'tpl-order-delay-email',
+            templateParameters: undefined,
+          }),
+        }),
+      );
+    });
+
     it('should use action.templateId for email dispatch (regression)', async () => {
       const emailRule = {
         ...mockRule,
@@ -740,6 +907,163 @@ describe('EventProcessingPipelineService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('error isolation', () => {
+    it('should isolate multi-recipient partial failure — 1st and 3rd succeed when 2nd fails at notification creation', async () => {
+      const groupRule = {
+        ...mockRule,
+        actions: [
+          {
+            templateId: 'tpl-1',
+            channels: ['email'],
+            recipientType: 'group',
+            recipientGroupId: 'grp-1',
+          },
+        ],
+      };
+
+      ruleCacheService.getRulesByEventType.mockResolvedValue([groupRule as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([groupRule as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { email: 'user1@example.com', customerId: 'cust-1' },
+        { email: 'user2@example.com', customerId: 'cust-2' },
+        { email: 'user3@example.com', customerId: 'cust-3' },
+      ]);
+
+      const notif1 = { ...mockNotification, notificationId: 'notif-001' };
+      const notif3 = { ...mockNotification, notificationId: 'notif-003' };
+
+      notificationsRepository.createNotification
+        .mockResolvedValueOnce(notif1 as any)
+        .mockRejectedValueOnce(new Error('DB constraint violation'))
+        .mockResolvedValueOnce(notif3 as any);
+
+      await pipeline.processEvent(mockEvent);
+
+      expect(notificationsRepository.createNotification).toHaveBeenCalledTimes(3);
+      // 1st and 3rd dispatched, 2nd failed before dispatch
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledTimes(2);
+    });
+
+    it('should isolate multi-action failures — 2nd action still processes when 1st throws at recipient resolution', async () => {
+      const twoActionRule = {
+        ...mockRule,
+        actions: [
+          { templateId: 'tpl-1', channels: ['email'], recipientType: 'group', recipientGroupId: 'grp-1' },
+          { templateId: 'tpl-2', channels: ['sms'], recipientType: 'customer' },
+        ],
+      };
+
+      ruleCacheService.getRulesByEventType.mockResolvedValue([twoActionRule as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([twoActionRule as any]);
+
+      // 1st action: recipient resolution throws
+      // 2nd action: resolves fine
+      recipientResolverService.resolveRecipients
+        .mockRejectedValueOnce(new Error('Group not found'))
+        .mockResolvedValueOnce([{ phone: '+1234567890', customerId: 'cust-1' }]);
+
+      channelResolverService.resolveChannels.mockResolvedValue({
+        effectiveChannels: ['sms'],
+        filtered: false,
+      });
+
+      await pipeline.processEvent(mockEvent);
+
+      // 2nd action should still create notification and dispatch
+      expect(notificationsRepository.createNotification).toHaveBeenCalledTimes(1);
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle suppression + success mix — one suppressed, one dispatched', async () => {
+      const ruleWithSuppression = {
+        ...mockRule,
+        suppression: {
+          dedupKey: ['orderId'],
+          modes: [{ type: 'dedup', windowMinutes: 60 }],
+        },
+        actions: [
+          { templateId: 'tpl-1', channels: ['email'], recipientType: 'group', recipientGroupId: 'grp-1' },
+        ],
+      };
+
+      ruleCacheService.getRulesByEventType.mockResolvedValue([ruleWithSuppression as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([ruleWithSuppression as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { email: 'user1@example.com', customerId: 'cust-1' },
+        { email: 'user2@example.com', customerId: 'cust-2' },
+      ]);
+
+      // 1st recipient: suppressed. 2nd: not suppressed
+      suppressionEvaluatorService.evaluate
+        .mockResolvedValueOnce({ suppressed: true, reason: 'dedup', mode: 'dedup' })
+        .mockResolvedValueOnce({ suppressed: false });
+
+      await pipeline.processEvent(mockEvent);
+
+      // Suppressed one should publish SUPPRESSED status
+      expect(notificationPublisher.publishStatus).toHaveBeenCalledWith(
+        mockEvent.eventId,
+        'PROCESSING',
+        'SUPPRESSED',
+        'email',
+        expect.objectContaining({ ruleId: 'rule-1' }),
+      );
+
+      // Non-suppressed one should create notification and dispatch
+      expect(notificationsRepository.createNotification).toHaveBeenCalledTimes(1);
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledTimes(1);
+    });
+
+    it('should isolate dispatch failures across channels — email fails, sms and push still dispatch', async () => {
+      const threeChannelRule = {
+        ...mockRule,
+        actions: [
+          { templateId: 'tpl-multi', channels: ['email', 'sms', 'push'], recipientType: 'customer' },
+        ],
+      };
+
+      ruleCacheService.getRulesByEventType.mockResolvedValue([threeChannelRule as any]);
+      ruleMatcherService.matchFromRules.mockReturnValue([threeChannelRule as any]);
+      recipientResolverService.resolveRecipients.mockResolvedValue([
+        { email: 'john@example.com', phone: '+1234567890', customerId: 'cust-1' },
+      ]);
+      channelResolverService.resolveChannels.mockResolvedValue({
+        effectiveChannels: ['email', 'sms', 'push'],
+        filtered: false,
+      });
+
+      const notifEmail = { ...mockNotification, notificationId: 'notif-email', channel: 'email' };
+      const notifSms = { ...mockNotification, notificationId: 'notif-sms', channel: 'sms' };
+      const notifPush = { ...mockNotification, notificationId: 'notif-push', channel: 'push' };
+      notificationsRepository.createNotification
+        .mockResolvedValueOnce(notifEmail as any)
+        .mockResolvedValueOnce(notifSms as any)
+        .mockResolvedValueOnce(notifPush as any);
+
+      // Email dispatch fails, sms and push succeed
+      notificationPublisher.publishToDeliver
+        .mockRejectedValueOnce(new Error('Email dispatch error'))
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined);
+
+      await pipeline.processEvent(mockEvent);
+
+      expect(notificationsRepository.createNotification).toHaveBeenCalledTimes(3);
+      expect(notificationPublisher.publishToDeliver).toHaveBeenCalledTimes(3);
+
+      // Email should transition to FAILED
+      expect(lifecycleService.transition).toHaveBeenCalledWith(
+        'notif-email',
+        'FAILED',
+        expect.objectContaining({ errorMessage: expect.stringContaining('Dispatch failed') }),
+      );
+
+      // SMS and push should transition to SENT
+      expect(lifecycleService.transition).toHaveBeenCalledWith('notif-sms', 'SENT');
+      expect(lifecycleService.transition).toHaveBeenCalledWith('notif-push', 'SENT');
     });
   });
 

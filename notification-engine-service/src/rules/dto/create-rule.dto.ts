@@ -22,6 +22,11 @@ export class CreateRuleDto {
   name: string;
 
   @IsString()
+  @IsOptional()
+  @MaxLength(1000)
+  description?: string;
+
+  @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   eventType: string;

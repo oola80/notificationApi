@@ -1,5 +1,3 @@
-> **Note:** This is a convenience copy extracted from `../../docs/02-detailed-microservices.md` (Section 9 — Email Ingest Service).
-
 ---
 
 ## 9. Email Ingest Service

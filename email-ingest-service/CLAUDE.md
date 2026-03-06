@@ -42,7 +42,7 @@ SMTP ingest — receives emails from legacy/closed source systems, parses them a
 
 ## Key References
 
-- Design doc: `docs/email-ingest-service-spec.md` (convenience copy) — authoritative at `../../docs/02-detailed-microservices.md` (Section 9)
+- Design doc: `docs/email-ingest-service-spec.md`
 - Endpoints: `../../endpoints/endpoints-email-ingest-service.md`
 - DB schema script: `dbscripts/schema-email-ingest-service.sql`
 - DB objects script: `dbscripts/email-ingest-service-dbscripts.sql` — **must be updated on every database change**

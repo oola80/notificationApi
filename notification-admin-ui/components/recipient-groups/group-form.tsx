@@ -9,7 +9,6 @@ import {
   Button,
   Input,
   Textarea,
-  Switch,
   Card,
   CardContent,
   CardHeader,
@@ -49,7 +48,6 @@ function GroupForm({
     defaultValues: {
       name: initialData?.name ?? "",
       description: initialData?.description ?? "",
-      isActive: initialData?.isActive ?? true,
     },
   });
 
@@ -125,26 +123,6 @@ function GroupForm({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="isActive"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Active</FormLabel>
-                      <FormDescription>
-                        Enable this group for use in notification rules
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
             </CardContent>
           </Card>
 

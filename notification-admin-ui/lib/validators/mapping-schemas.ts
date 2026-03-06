@@ -56,7 +56,7 @@ export function fieldMappingsToApi(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const entry of entries) {
-    const mapping: Record<string, unknown> = { path: entry.sourceField };
+    const mapping: Record<string, unknown> = { source: entry.sourceField };
     if (entry.transform && entry.transform !== "none") {
       mapping.transform = entry.transform;
     }
@@ -82,7 +82,7 @@ export function fieldMappingsFromApi(
     const mapping = value as Record<string, unknown> | undefined;
     return {
       targetField,
-      sourceField: (mapping?.path as string) ?? "",
+      sourceField: (mapping?.source as string) ?? "",
       transform: (mapping?.transform as TransformType) ?? "none",
       required: (mapping?.required as boolean) ?? false,
       defaultValue: (mapping?.default as string) ?? "",

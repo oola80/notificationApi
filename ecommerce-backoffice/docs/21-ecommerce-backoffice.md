@@ -1,5 +1,3 @@
-> _This is a convenience copy. The authoritative version is at `../../docs/21-ecommerce-backoffice.md`._
-
 # 21 — eCommerce Backoffice
 
 **Notification API — eCommerce Backoffice Deep-Dive**

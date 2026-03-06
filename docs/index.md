@@ -86,12 +86,6 @@ Architecture diagrams, layer design, event flows, RabbitMQ topology, database ar
 
 [Read System Architecture](03-system-architecture.md)
 
-### 04 — Authentication & Identity
-
-Local authentication, SAML 2.0 SSO with Azure AD, JWT session management, account linking, database schema additions, and security considerations.
-
-[Read Authentication & Identity](04-authentication-identity.md)
-
 ### 05 — Testing Strategy
 
 Jest unit testing, Playwright frontend E2E, backend E2E scaffolding, Allure reporting, CI/CD integration, and quality gates.
@@ -108,67 +102,67 @@ Documentation and feature change log tracking all notable additions, changes, fi
 
 Deep-dive into the Event Ingestion Service — generic source integration, runtime mapping configuration, processing pipeline, RabbitMQ topology, REST API, idempotency, and sequence diagrams.
 
-[Read Event Ingestion Service](07-event-ingestion-service.md)
+[Read Event Ingestion Service](../event-ingestion-service/docs/07-event-ingestion-service.md)
 
 ### 08 — Notification Engine Service
 
 Deep-dive into the Notification Engine Service — rule engine with condition operators, recipient resolution, suppression query optimization, template rendering coordination, priority management, RabbitMQ topology, REST API, database design with FILLFACTOR and VACUUM tuning, notification lifecycle state machine, sequence diagrams, horizontal scalability, rule caching, asynchronous status logging, and performance strategies.
 
-[Read Notification Engine Service](08-notification-engine-service.md)
+[Read Notification Engine Service](../notification-engine-service/docs/08-notification-engine-service.md)
 
 ### 09 — Bulk Upload Service
 
 Deep-dive into the Bulk Upload Service — asynchronous XLSX file processing, three-endpoint upload lifecycle (upload, poll status, download result), result file generation with per-row submission status column, flexible column mapping, Event Ingestion integration via HTTP, fire-and-forget audit logging via RabbitMQ, circuit breaker for downstream resilience, database design, sequence diagrams, and configuration.
 
-[Read Bulk Upload Service](09-bulk-upload-service.md)
+[Read Bulk Upload Service](../bulk-upload-service/docs/09-bulk-upload-service.md)
 
 ### 10 — Template Service
 
 Deep-dive into the Template Service — Handlebars rendering pipeline with compiled template caching, immutable versioning model, variable auto-detection, custom helpers, multi-channel content specifications (email HTML, SMS, WhatsApp, push), performance evaluation (PostgreSQL vs DynamoDB/MongoDB/Redis), fire-and-forget audit logging via RabbitMQ, REST API contracts, database design with 4 tables, media pass-through architecture, sequence diagrams, security considerations (HTML escaping, XSS prevention, RBAC), and configuration.
 
-[Read Template Service](10-template-service.md)
+[Read Template Service](../template-service/docs/10-template-service.md)
 
 ### 11 — Channel Router Service
 
 Deep-dive into the Channel Router Service — provider strategy pattern with multi-provider support (SendGrid, Mailgun, Braze, Twilio, FCM), dumb-pipe integration architecture, delivery pipeline, token bucket rate limiting, circuit breaker pattern, retry strategy with exponential backoff and jitter, fallback channel logic, media and attachment handling, webhook receivers with provider signature verification, Braze user profile synchronization, asynchronous audit logging via RabbitMQ fire-and-forget, database design with 4 tables, sequence diagrams (email delivery, Braze multi-channel, retry with circuit breaker trip, fallback), and configuration.
 
-[Read Channel Router Service](11-channel-router-service.md)
+[Read Channel Router Service](../channel-router-service/docs/11-channel-router-service-v2.md)
 
 ### 12 — RabbitMQ Topology
 
 Consolidated RabbitMQ topology reference — exchanges, queues, bindings, routing keys, dead-letter configuration, consumer allocation, retry configuration, and importable definitions file.
 
-[Read RabbitMQ Topology](12-rabbitmq-topology.md)
+[Read RabbitMQ Topology](12-rabbitmq-topology-v2.md)
 
 ### 13 — Notification Gateway
 
 Deep-dive into the Notification Gateway (BFF/API Gateway) — 7-step request processing pipeline, JWT and API key authentication, RBAC with endpoint-to-role mapping, sliding window rate limiting, service proxy layer with per-service circuit breakers, request validation, response envelope transformation, CORS configuration, database design with 4 tables (api_keys, sessions, rate_limits, token_blacklist), sequence diagrams (login, proxy, token refresh, API key, circuit breaker), error handling, security considerations, monitoring metrics, and configuration.
 
-[Read Notification Gateway](13-notification-gateway.md)
+[Read Notification Gateway](../notification-gateway/docs/13-notification-gateway-v2.md)
 
 ### 14 — Admin Service
 
 Deep-dive into the Admin Service (Backoffice Administration) — user management lifecycle with RBAC (4 roles: Super Admin, Admin, Operator, Viewer), cross-service notification rule validation pipeline, event mapping management with RabbitMQ cache invalidation, template management delegation, channel configuration with credential masking and connectivity dry-run, recipient group management (static and dynamic), system configuration key-value store, dashboard data aggregation with parallel fan-out and graceful degradation, RabbitMQ config invalidation topology (xch.config.events exchange), SAML 2.0 IdP management, database design with 7 tables, sequence diagrams (login, rule creation, mapping update, dashboard aggregation), error handling, security considerations, and configuration.
 
-[Read Admin Service](14-admin-service.md)
+[Read Admin Service](../admin-service/docs/14-admin-service.md)
 
 ### 15 — Notification Admin UI
 
 Deep-dive into the Notification Admin UI (Next.js Frontend) — Next.js 14 App Router architecture with TypeScript, technology stack (TipTap WYSIWYG, SWR data fetching, Tailwind CSS, Radix UI, React Hook Form, Recharts, Monaco Editor), application folder structure, authentication and session management (in-memory access tokens with proactive refresh and 401 recovery), RBAC UI visibility matrix (4 roles across 20+ UI elements), SWR data fetching with SSR prefetch fallback, 12 page specifications with ASCII wireframes (dashboard, rules, templates, channels, logs, event mappings, bulk upload, users, recipient groups, audit, settings, identity providers), component architecture hierarchy, API integration layer with 60+ Gateway endpoint mappings, routing table with role-based access, flowcharts (rule creation, template save, bulk upload processing, mapping test), sequence diagrams (local login, SSO login, dashboard SSR prefetch, template live preview, token refresh with 401 recovery), UI data model entity relationships, error handling with two-tier form validation, accessibility (WCAG 2.1 AA), responsive design, testing strategy, security considerations, monitoring, and deployment.
 
-[Read Notification Admin UI](15-notification-admin-ui.md)
+[Read Notification Admin UI](../notification-admin-ui/docs/15-notification-admin-ui.md)
 
 ### 16 — Audit Service
 
 Deep-dive into the Audit Service — event sourcing model with append-only immutable audit trail, multi-source event capture pipeline (5 RabbitMQ consumers with batch insert optimization), delivery receipt correlation via `provider_message_id`, end-to-end notification trace reconstruction, analytics aggregation engine with hourly/daily rollups, full-text search using PostgreSQL `tsvector`/`tsquery`, dead-letter queue monitoring with investigation and reprocessing support, two-tier data retention and purge strategy (90-day payload / 2-year metadata), GDPR compliance (Right to Erasure anonymization, Right of Access export), database design with 4 tables (`audit_events`, `delivery_receipts`, `notification_analytics`, `dlq_entries`), 4 sequence diagrams (full lifecycle accumulation, delivery receipt correlation, analytics aggregation, DLQ capture and reprocessing), error handling with consumer resilience, security considerations, monitoring metrics, and configuration.
 
-[Read Audit Service](16-audit-service.md)
+[Read Audit Service](../audit-service/docs/16-audit-service-v2.md)
 
 ### 17 — Provider Adapter Services
 
 Deep-dive into the Provider Adapter Services — NestJS monorepo with 4 stateless adapter microservices (Mailgun, Braze, WhatsApp/Meta, AWS SES), standardized HTTP contract (SendRequest/SendResult), webhook architecture with signature verification and event normalization, shared infrastructure library, error classification, media handling per adapter, and registration in core services.
 
-[Read Provider Adapter Services](17-provider-adapters.md)
+[Read Provider Adapter Services](../provider-adapters/docs/17-provider-adapters.md)
 
 ### 18 — Auth/RBAC Architecture Addendum
 
@@ -180,19 +174,19 @@ Addendum documenting the decoupling of authentication and RBAC into a standalone
 
 Deep-dive into the Auth RBAC Service Backend — multi-application authentication and RBAC hub with RS256 JWT issuance, user lifecycle management, application registration, per-application roles with hierarchy and permissions as resource+action pairs, refresh token rotation with replay detection, password policy enforcement with history tracking, database design with 9 tables, 35+ REST API endpoints, and 4 sequence diagrams.
 
-[Read Auth RBAC Service Backend](19-auth-rbac-service-backend.md)
+> **Note:** This service lives in a separate repository. Design doc is maintained there.
 
 ### 20 — Auth RBAC Service Frontend
 
 Deep-dive into the Auth RBAC Service Frontend — Next.js 14 admin interface for managing the centralized auth/RBAC system, self-authenticating via app-scoped JWT, application management with role/permission tabs, user management with application assignment, 7 page specifications with wireframes.
 
-[Read Auth RBAC Service Frontend](20-auth-rbac-service-frontend.md)
+> **Note:** This service lives in a separate repository. Design doc is maintained there.
 
 ### 21 — eCommerce Backoffice
 
 Deep-dive into the eCommerce Backoffice — Next.js 14 login portal and application launcher serving as the single entry point for all platform users, two-token authentication flow, proactive session management, password recovery, 4 page specifications with wireframes.
 
-[Read eCommerce Backoffice](21-ecommerce-backoffice.md)
+[Read eCommerce Backoffice](../ecommerce-backoffice/docs/21-ecommerce-backoffice.md)
 
 ---
 

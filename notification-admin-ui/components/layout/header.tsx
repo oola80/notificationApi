@@ -52,7 +52,7 @@ export function Header() {
                   N
                 </span>
               </div>
-              <SheetTitle className="text-sm font-semibold text-foreground">
+              <SheetTitle className="text-sm font-semibold text-sidebar-primary-foreground">
                 Notification API
               </SheetTitle>
             </SheetHeader>

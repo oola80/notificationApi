@@ -115,7 +115,7 @@ Configured via `.env` file in the service root (git-ignored). Required for local
 
 ## Key References
 
-- Design doc: `docs/10-template-service.md` (convenience copy) — authoritative at `../../docs/10-template-service.md`
+- Design doc: `docs/10-template-service.md`
 - Endpoints: `../../endpoints/endpoints-template-service.md`
 - DB schema script: `dbscripts/schema-template-service.sql`
 - DB objects script: `dbscripts/template-service-dbscripts.sql` — **must be updated on every database change**

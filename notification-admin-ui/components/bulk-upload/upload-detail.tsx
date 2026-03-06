@@ -284,7 +284,7 @@ function UploadDetail({ uploadId }: UploadDetailProps) {
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
-            <DetailRow label="Upload ID" value={current.id} mono />
+            <DetailRow label="Upload ID" value={current.uploadId} mono />
             <DetailRow
               label="File Size"
               value={formatFileSize(current.fileSize)}

@@ -7,7 +7,7 @@ export type UploadStatus =
   | "cancelled";
 
 export interface Upload {
-  id: string;
+  uploadId: string;
   fileName: string;
   fileSize: number;
   totalRows: number;
@@ -22,6 +22,7 @@ export interface Upload {
   resultFileReady: boolean;
   startedAt: string | null;
   completedAt: string | null;
+  resultGeneratedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

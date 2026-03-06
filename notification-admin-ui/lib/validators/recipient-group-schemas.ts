@@ -3,7 +3,6 @@ import { z } from "zod";
 export const createRecipientGroupSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
   description: z.string().optional(),
-  isActive: z.boolean(),
 });
 
 export type CreateRecipientGroupFormData = z.infer<typeof createRecipientGroupSchema>;

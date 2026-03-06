@@ -137,7 +137,7 @@ Configured via `.env` file in the monorepo root (git-ignored). Required for loca
 
 ## Key References
 
-- Design doc: `docs/17-provider-adapters.md` (convenience copy) — authoritative at `../../docs/17-provider-adapters.md`
+- Design doc: `docs/17-provider-adapters.md`
 - Per-adapter reference docs: `docs/adapter-mailgun.md`, `docs/adapter-braze.md`, `docs/adapter-whatsapp.md`, `docs/adapter-aws-ses.md`
 - Endpoints: `../../endpoints/endpoints-provider-adapters.md`
 

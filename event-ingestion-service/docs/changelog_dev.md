@@ -5,6 +5,33 @@
 
 ## [Unreleased]
 
+### Added: Comprehensive test coverage expansion (2026-03-06)
+
+Added ~40 new unit tests across 8 files (6 new, 2 edited) and 3 E2E test files with E2E infrastructure. **304 unit tests passing across 39 suites** (was 264/33).
+
+**New unit test files:**
+- `src/event-mappings/dto/create-event-mapping.dto.spec.ts` — 7 DTO validation tests (class-validator)
+- `src/webhook/dto/webhook-event.dto.spec.ts` — 4 DTO validation tests
+- `src/consumers/base-event.consumer.spec.ts` — 6 tests (calculateDelay, isRetryable retry/backoff logic)
+- `src/app.module.spec.ts` — 2 tests (module import count + key module presence via Reflect metadata)
+- `src/event-mappings/event-mappings.repository.spec.ts` — 5 tests (findBySourceAndType, existsActiveMapping with mocked TypeORM)
+- `src/events/events.repository.spec.ts` — 6 tests (createEvent with/without sourceEventId, findByEventId, findDuplicate)
+
+**Edited existing test files:**
+- `src/rate-limiter/rate-limiter.service.spec.ts` — +2 concurrent rate limiting tests (12 rapid calls, independent per-source limits)
+- `src/mapping-cache/mapping-cache.service.spec.ts` — +3 cache warm-up failure tests (DB rejection propagation, empty warm-up, 1000-mapping bulk)
+
+**New E2E test files (require real DB + RabbitMQ):**
+- `test/webhook-pipeline.e2e-spec.ts` — 6 tests (valid 202, duplicate 200, unknown source 404, inactive 422, missing fields 400, rate limit 429)
+- `test/event-mappings.e2e-spec.ts` — 7 tests (full CRUD lifecycle + test endpoint + conflict 409)
+- `test/events.e2e-spec.ts` — 3 tests (paginated list, get by eventId, 404 for non-existent)
+
+**E2E infrastructure:**
+- `.env.test` — Separate test environment config
+- `test/jest-e2e-setup.ts` — dotenv loader for E2E
+- `test/jest-e2e.json` — Updated with setupFiles, testTimeout, moduleNameMapper
+- `test/test-utils.ts` — Shared helpers (createTestApp, cleanupTestData, seedEventSource, seedEventMapping)
+
 ### Added: Technical implementation reference documentation (2026-03-01)
 
 - `tech-event-ingestion-service-v1.md` — Technical implementation reference documentation

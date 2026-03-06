@@ -49,7 +49,7 @@ Auth/RBAC decoupled into standalone services (moved to separate repositories). `
 
 Each microservice has its own folder at the project root. **See each service's `CLAUDE.md` for detailed folder structure, DB tables, RabbitMQ topology, dependencies, and implementation notes.**
 
-Every service folder contains at minimum: `CLAUDE.md`, `dbscripts/` (backend only), `docs/` (convenience copy of design doc + `changelog_dev.md`). Implemented NestJS services additionally follow this standard layout:
+Every service folder contains at minimum: `CLAUDE.md`, `dbscripts/` (backend only), `docs/` (authoritative design doc + `changelog_dev.md`). Implemented NestJS services additionally follow this standard layout:
 
 ```
 {service-name}/
@@ -67,7 +67,7 @@ Every service folder contains at minimum: `CLAUDE.md`, `dbscripts/` (backend onl
     {feature-modules}/   # Domain-specific modules (CRUD, business logic)
   test/                  # E2E tests + jest-e2e.json
   dbscripts/             # schema-*.sql + *-dbscripts.sql
-  docs/                  # Design doc copy + changelog_dev.md
+  docs/                  # Design doc (authoritative) + changelog_dev.md
 ```
 
 **Exceptions:** `notification-admin-ui` is Next.js (no dbscripts). `provider-adapters/` is a NestJS monorepo (4 apps in `apps/` + shared `libs/common/`). `notification-gateway` is deprecated. Scaffolding-only services have only `CLAUDE.md`, `dbscripts/`, and `docs/`.
@@ -86,11 +86,11 @@ Naming convention (snake_case from folder name): schema `{name}`, role `{name}_u
 
 ### RabbitMQ Definitions
 
-The `rabbitmq/` folder contains `definitions.json` — an importable RabbitMQ topology file (vhost `vhnotificationapi`, 6 exchanges, 23 queues, 24 bindings). Import via RabbitMQ Management UI, `rabbitmqadmin`, or `management.load_definitions` config. The topology is documented in `docs/12-rabbitmq-topology.md`.
+The `rabbitmq/` folder contains `definitions.json` — an importable RabbitMQ topology file (vhost `vhnotificationapi`, 6 exchanges, 23 queues, 24 bindings). Import via RabbitMQ Management UI, `rabbitmqadmin`, or `management.load_definitions` config. The topology is documented in `docs/12-rabbitmq-topology-v2.md`.
 
 ## Documentation
 
-All design docs (authoritative versions) live in `docs/` as numbered Markdown files (`NN-kebab-case-name.md`). See `docs/index.md` for the full listing. Each microservice has a convenience copy in its own `docs/` subfolder — see [Per-Service Documentation](#per-service-documentation) below. Docs use ASCII art diagrams and blockquote callout boxes (`> **Info:** ...`).
+Cross-cutting design docs (executive summary, system architecture, testing strategy, changelog, RabbitMQ topology, auth addendum) live in root `docs/`. **Service-specific design docs live exclusively in each microservice's own `docs/` subfolder** — these are the authoritative versions. See `docs/index.md` for the full listing with links to each service's doc. Docs use ASCII art diagrams and blockquote callout boxes (`> **Info:** ...`).
 
 ## Coding Standards
 
@@ -120,7 +120,7 @@ The **notification-admin-ui** (Next.js frontend) follows standard #1 (camelCase 
 ### Per-Service Documentation
 
 - Each microservice folder **must** have its own `docs/` subfolder containing:
-  - A **convenience copy** of the service's design doc from root `docs/`. The copy includes a header note: _"This is a convenience copy. The authoritative version is at `../../docs/{filename}`."_ If the authoritative doc is updated, the copy should be refreshed.
+  - The **authoritative design doc** for the service (e.g., `07-event-ingestion-service.md`). This is the single source of truth — there is no copy in root `docs/`.
   - A `changelog_dev.md` tracking **code changes only** (not design changes).
 - Each microservice folder **must** have its own `CLAUDE.md` with service-specific context (port, tech, DB schema/tables, RabbitMQ exchanges/queues, dependencies, folder structure, coding conventions).
 

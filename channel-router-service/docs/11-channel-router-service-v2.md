@@ -1,5 +1,3 @@
-> *This is a convenience copy. The authoritative version is at `../../docs/11-channel-router-service-v2.md`.*
-
 # 11 — Channel Router Service (v2 — Decoupled Provider Adapter Architecture)
 
 **Notification API — Channel Router Service Deep-Dive**

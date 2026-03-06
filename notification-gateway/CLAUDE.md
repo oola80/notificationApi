@@ -33,8 +33,7 @@ No direct RabbitMQ interaction. Pure HTTP/REST BFF.
 
 ## Key References
 
-- Design doc (v2): `docs/13-notification-gateway-v2.md` (convenience copy) — authoritative at `../../docs/13-notification-gateway-v2.md`
-- Design doc (v1): `../../docs/13-notification-gateway.md` (original design)
+- Design doc (v2): `docs/13-notification-gateway-v2.md`
 - Endpoints: `../../endpoints/endpoints-notification-gateway.md`
 - DB schema script: `dbscripts/schema-notification-gateway.sql`
 - DB objects script: `dbscripts/notification-gateway-dbscripts.sql` — **must be updated on every database change**

@@ -1,5 +1,3 @@
-> **Note:** This is a convenience copy. The authoritative version is at `../../docs/14-admin-service.md`.
-
 ---
 
 # 14 — Admin Service

@@ -6,7 +6,7 @@ import type {
   CreateTemplateDto,
   UpdateTemplateDto,
   PreviewResult,
-  RenderResult,
+  RenderResponse,
 } from "@/types";
 
 interface PaginatedTemplatesResponse {
@@ -14,7 +14,6 @@ interface PaginatedTemplatesResponse {
   total: number;
   page: number;
   limit: number;
-  hasMore: boolean;
 }
 
 interface UseTemplatesParams {
@@ -80,7 +79,7 @@ export function useDeleteTemplate(id: string) {
 }
 
 export function useRenderTemplate(id: string) {
-  return useApiMutation<RenderResult[], { channel: string; data: Record<string, string> }>(
+  return useApiMutation<RenderResponse, { channel: string; data: Record<string, string> }>(
     "template",
     `/api/v1/templates/${id}/render`,
     "POST",

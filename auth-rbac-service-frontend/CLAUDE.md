@@ -26,7 +26,7 @@ All data is fetched from the Auth RBAC Service Backend (:3160) API.
 
 ## Key References
 
-- Design doc: `docs/20-auth-rbac-service-frontend.md` (convenience copy) — authoritative at `../../docs/20-auth-rbac-service-frontend.md`
+- Design doc: `docs/20-auth-rbac-service-frontend.md`
 - Routes: `../../endpoints/endpoints-auth-rbac-service-frontend.md`
 
 ## Coding Conventions

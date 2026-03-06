@@ -2,15 +2,6 @@ import type { ChannelType } from "./rules";
 
 export type RoutingMode = "primary" | "weighted" | "failover";
 
-export interface ChannelConfig {
-  id: string;
-  channelId: string;
-  configKey: string;
-  configValue: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Channel {
   id: string;
   name: string;
@@ -18,7 +9,6 @@ export interface Channel {
   isActive: boolean;
   routingMode: RoutingMode;
   fallbackChannelId: string | null;
-  configs: ChannelConfig[];
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +20,8 @@ export interface UpdateChannelDto {
   isActive?: boolean;
 }
 
+export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
 export interface Provider {
   id: string;
   providerName: string;
@@ -40,6 +32,11 @@ export interface Provider {
   routingWeight: number;
   rateLimitTokensPerSec: number | null;
   rateLimitMaxBurst: number | null;
+  circuitBreakerState: CircuitBreakerState;
+  failureCount: number;
+  lastFailureAt: string | null;
+  lastHealthCheck: string | null;
+  configJson: Record<string, any> | null;
   createdAt: string;
   updatedAt: string;
 }

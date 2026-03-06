@@ -46,18 +46,36 @@ export interface CreateTemplateDto {
 }
 
 export interface UpdateTemplateDto {
-  name?: string;
-  description?: string;
-  channels?: TemplateChannel[];
+  channels: TemplateChannel[];
+  changeSummary: string;
   updatedBy?: string;
 }
 
 export interface RenderResult {
-  channel: ChannelType;
+  channel: string;
   subject?: string;
   body: string;
+  warnings: string[];
+}
+
+export interface RenderResponse {
+  rendered: { subject?: string; body: string };
+  metadata: {
+    templateId: string;
+    versionNumber: number;
+    channel: string;
+    renderedAt: string;
+    renderDurationMs: number;
+  };
+  channelMetadata: Record<string, unknown>;
+  warnings: string[];
 }
 
 export interface PreviewResult {
-  renderedChannels: RenderResult[];
+  previews: RenderResult[];
+  metadata: {
+    templateId: string;
+    versionNumber: number;
+    renderedAt: string;
+  };
 }

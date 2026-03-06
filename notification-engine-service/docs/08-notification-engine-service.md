@@ -1,5 +1,3 @@
-> **Note:** This is a convenience copy. The authoritative version is at `../../docs/08-notification-engine-service.md`.
-
 ---
 
 # 08 — Notification Engine Service

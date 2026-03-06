@@ -1,5 +1,3 @@
-> **Note:** This is a convenience copy. The authoritative version is at `../../docs/09-bulk-upload-service.md`.
-
 ---
 
 # 09 — Bulk Upload Service

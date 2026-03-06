@@ -117,4 +117,39 @@ describe('RateLimiterService', () => {
       expect(service.checkGlobalWebhookLimit()).toBe(false);
     });
   });
+
+  describe('concurrent rate limiting', () => {
+    it('should allow 10 and reject 2 with limit=10 on rapid calls', async () => {
+      await createService(10);
+
+      let allowed = 0;
+      let rejected = 0;
+
+      for (let i = 0; i < 12; i++) {
+        if (service.checkGlobalWebhookLimit()) {
+          allowed++;
+        } else {
+          rejected++;
+        }
+      }
+
+      expect(allowed).toBe(10);
+      expect(rejected).toBe(2);
+    });
+
+    it('should independently limit two sources with limit=3 each', async () => {
+      await createService(100); // high global limit to not interfere
+
+      let sourceAAllowed = 0;
+      let sourceBAllowed = 0;
+
+      for (let i = 0; i < 5; i++) {
+        if (service.checkSourceLimit('sourceA', 3)) sourceAAllowed++;
+        if (service.checkSourceLimit('sourceB', 3)) sourceBAllowed++;
+      }
+
+      expect(sourceAAllowed).toBe(3);
+      expect(sourceBAllowed).toBe(3);
+    });
+  });
 });

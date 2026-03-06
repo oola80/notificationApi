@@ -19,8 +19,8 @@ export const registerProviderSchema = z.object({
   adapterUrl: z.string().url("Must be a valid URL"),
   isActive: z.boolean().optional(),
   routingWeight: z.number().min(0).max(100).optional(),
-  rateLimitTokensPerSec: z.number().min(0).optional(),
-  rateLimitMaxBurst: z.number().min(0).optional(),
+  rateLimitTokensPerSec: z.number().min(1, "Must be at least 1").optional(),
+  rateLimitMaxBurst: z.number().min(1, "Must be at least 1").optional(),
 });
 
 export type RegisterProviderFormData = z.infer<typeof registerProviderSchema>;
@@ -30,8 +30,8 @@ export const updateProviderSchema = z.object({
   adapterUrl: z.string().url("Must be a valid URL").optional(),
   isActive: z.boolean().optional(),
   routingWeight: z.number().min(0).max(100).optional(),
-  rateLimitTokensPerSec: z.number().min(0).optional(),
-  rateLimitMaxBurst: z.number().min(0).optional(),
+  rateLimitTokensPerSec: z.number().min(1, "Must be at least 1").optional(),
+  rateLimitMaxBurst: z.number().min(1, "Must be at least 1").optional(),
 });
 
 export type UpdateProviderFormData = z.infer<typeof updateProviderSchema>;

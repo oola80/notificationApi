@@ -1,5 +1,3 @@
-> **Note:** This is a convenience copy. The authoritative version is at `../../docs/07-event-ingestion-service.md`.
-
 ---
 
 # 07 — Event Ingestion Service

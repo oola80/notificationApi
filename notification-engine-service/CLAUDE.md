@@ -139,7 +139,7 @@ Configured via `.env` file in the service root (git-ignored). Required for local
 
 ## Key References
 
-- Design doc: `docs/08-notification-engine-service.md` (convenience copy) — authoritative at `../../docs/08-notification-engine-service.md`
+- Design doc: `docs/08-notification-engine-service.md`
 - Endpoints: `../../endpoints/endpoints-notification-engine-service.md`
 - DB schema script: `dbscripts/schema-notification-engine-service.sql`
 - DB objects script: `dbscripts/notification-engine-service-dbscripts.sql` — **must be updated on every database change**

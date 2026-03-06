@@ -14,7 +14,6 @@ interface PaginatedRecipientGroupsResponse {
   total: number;
   page: number;
   limit: number;
-  hasMore: boolean;
 }
 
 interface UseRecipientGroupsParams {

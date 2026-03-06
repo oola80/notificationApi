@@ -43,13 +43,11 @@ export interface CreateRuleDto {
 
 export interface UpdateRuleDto {
   name?: string;
-  eventType?: string;
   actions?: RuleAction[];
   conditions?: Record<string, unknown>;
   suppression?: Record<string, unknown>;
   deliveryPriority?: DeliveryPriority;
   priority?: number;
   isExclusive?: boolean;
-  isActive?: boolean;
   updatedBy?: string;
 }

@@ -86,7 +86,7 @@ Configured via `.env` file in the service root (git-ignored). Required for local
 
 ## Key References
 
-- Design doc: `docs/09-bulk-upload-service.md` (convenience copy) — authoritative at `../../docs/09-bulk-upload-service.md`
+- Design doc: `docs/09-bulk-upload-service.md`
 - Endpoints: `../../endpoints/endpoints-bulk-upload-service.md`
 - DB schema script: `dbscripts/schema-bulk-upload-service.sql`
 - DB objects script: `dbscripts/bulk-upload-service-dbscripts.sql` — **must be updated on every database change**

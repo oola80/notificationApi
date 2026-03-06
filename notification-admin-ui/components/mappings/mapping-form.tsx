@@ -140,10 +140,10 @@ function MappingForm({
                     <FormItem>
                       <FormLabel>Source ID</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., oms" {...field} />
+                        <Input placeholder="e.g., oms" disabled={isEditing} {...field} />
                       </FormControl>
                       <FormDescription>
-                        Unique source system identifier
+                        Unique source system identifier{isEditing ? " (cannot be changed)" : ""}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -159,11 +159,12 @@ function MappingForm({
                       <FormControl>
                         <Input
                           placeholder="e.g., order.shipped"
+                          disabled={isEditing}
                           {...field}
                         />
                       </FormControl>
                       <FormDescription>
-                        Source event type identifier
+                        Source event type identifier{isEditing ? " (cannot be changed)" : ""}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -218,26 +219,28 @@ function MappingForm({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="isActive"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Active</FormLabel>
-                        <FormDescription>
-                          Inactive mappings will not process incoming events
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                {isEditing && (
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Active</FormLabel>
+                          <FormDescription>
+                            Inactive mappings will not process incoming events
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

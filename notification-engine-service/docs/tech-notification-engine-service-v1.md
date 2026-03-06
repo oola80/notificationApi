@@ -1,7 +1,5 @@
 # Notification Engine Service — Technical Reference v1
 
-> This is a convenience copy. The authoritative version is at `../../docs/08-notification-engine-service.md`.
-
 ## 1. Overview
 
 | Attribute | Value |

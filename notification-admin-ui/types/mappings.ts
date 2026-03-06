@@ -35,9 +35,8 @@ export interface CreateMappingDto {
 }
 
 export interface UpdateMappingDto {
-  sourceId?: string;
-  eventType?: string;
   name?: string;
+  isActive?: boolean;
   description?: string;
   fieldMappings?: Record<string, unknown>;
   eventTypeMapping?: Record<string, unknown>;
@@ -50,11 +49,11 @@ export interface UpdateMappingDto {
 }
 
 export interface TestMappingPayload {
-  payload: Record<string, unknown>;
+  samplePayload: Record<string, unknown>;
 }
 
 export interface TestMappingResult {
-  success: boolean;
-  normalizedEvent: Record<string, unknown> | null;
-  errors: string[];
+  canonicalEvent: Record<string, unknown>;
+  warnings: string[];
+  missingRequiredFields: string[];
 }

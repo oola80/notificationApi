@@ -64,15 +64,20 @@ function MappingTestPanel({ mappingId }: MappingTestPanelProps) {
     setTestSuccess(null);
 
     try {
-      const result = await runTest({ payload: parsed });
-      setTestSuccess(result.success);
-      if (result.normalizedEvent) {
-        setOutput(JSON.stringify(result.normalizedEvent, null, 2));
+      const result = await runTest({ samplePayload: parsed });
+      const success = result.missingRequiredFields.length === 0;
+      setTestSuccess(success);
+      if (result.canonicalEvent) {
+        setOutput(JSON.stringify(result.canonicalEvent, null, 2));
       }
-      if (result.errors && result.errors.length > 0) {
-        setTestErrors(result.errors);
+      const allIssues = [
+        ...result.missingRequiredFields.map((f) => `Missing required field: ${f}`),
+        ...result.warnings,
+      ];
+      if (allIssues.length > 0) {
+        setTestErrors(allIssues);
       }
-      if (result.success) {
+      if (success) {
         toast.success("Mapping test passed");
       } else {
         toast.error("Mapping test failed");

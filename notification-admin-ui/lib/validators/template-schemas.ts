@@ -31,8 +31,6 @@ export const createTemplateSchema = z.object({
 export type CreateTemplateFormData = z.infer<typeof createTemplateSchema>;
 
 export const updateTemplateSchema = z.object({
-  name: z.string().min(1, "Name is required").max(255),
-  description: z.string().optional(),
   channels: z.array(channelVariantSchema).min(1, "At least one channel variant is required"),
   changeSummary: z.string().min(1, "Change summary is required"),
 });

@@ -1,5 +1,3 @@
-> *This is a convenience copy. The authoritative version is at `../../docs/13-notification-gateway-v2.md`.*
-
 # 13 — Notification Gateway
 
 **Notification API — Notification Gateway Deep-Dive**

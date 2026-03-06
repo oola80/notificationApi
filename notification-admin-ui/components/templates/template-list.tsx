@@ -252,7 +252,7 @@ function TemplateList() {
           <span>
             Showing {templates.length} of {data?.total ?? 0} templates
           </span>
-          {data?.hasMore && (
+          {data && data.page * data.limit < data.total && (
             <Button
               variant="outline"
               size="sm"

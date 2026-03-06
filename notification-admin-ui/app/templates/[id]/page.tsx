@@ -24,14 +24,13 @@ export default function TemplateDetailPage({
   const handleSubmit = async (data: unknown) => {
     const formData = data as UpdateTemplateFormData;
     const dto: UpdateTemplateDto = {
-      name: formData.name,
-      description: formData.description || undefined,
       channels: formData.channels.map((c) => ({
         channel: c.channel,
         subject: c.subject || undefined,
         body: c.body,
         metadata: c.metadata,
       })),
+      changeSummary: formData.changeSummary,
     };
 
     try {

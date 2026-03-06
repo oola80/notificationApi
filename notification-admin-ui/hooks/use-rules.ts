@@ -12,7 +12,6 @@ interface PaginatedRulesResponse {
   total: number;
   page: number;
   limit: number;
-  hasMore: boolean;
 }
 
 interface UseRulesParams {

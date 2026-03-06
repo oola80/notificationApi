@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+### Fix: hasMore pagination field & isActive not updatable via PUT (2026-03-06)
+
+- `hooks/use-rules.ts`, `hooks/use-templates.ts`, `hooks/use-recipient-groups.ts` — Removed `hasMore: boolean` from paginated response interfaces. Backend returns `{ data, total, page, limit }` only; `hasMore` was always `undefined`.
+- `components/templates/template-list.tsx` — Replaced `data?.hasMore` with computed check `data.page * data.limit < data.total`.
+- `types/rules.ts` — Removed `isActive` and `eventType` from `UpdateRuleDto`. Backend's `UpdateRuleDto` extends `PartialType(OmitType(CreateRuleDto, ['createdBy', 'eventType']))` and has no `isActive`; activation is only toggled via soft-delete (DELETE endpoint).
+
+### Fix: Update sends immutable fields & isActive on create (2026-03-06)
+
+- `app/event-mappings/[id]/page.tsx` — Removed `sourceId` and `eventType` from the update DTO (backend `UpdateEventMappingDto` excludes them via `OmitType`). Added `isActive` to update DTO.
+- `types/mappings.ts` — Removed `sourceId` and `eventType` from `UpdateMappingDto`. Added `isActive` field.
+- `components/mappings/mapping-form.tsx` — `sourceId` and `eventType` inputs are now disabled when editing. `isActive` toggle is only shown in edit mode (backend defaults new mappings to `true`).
+
 ### Fix: Turbopack dev server OOM crash (2026-03-01)
 
 - `.env.local` — Added `NODE_OPTIONS=--max-old-space-size=4096` to increase Node.js heap limit from default ~1.4GB to 4GB. Fixes "Jest worker encountered 2 child process exceptions, exceeding retry limit" runtime error caused by Turbopack worker processes exhausting memory during dev.

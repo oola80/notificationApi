@@ -1,5 +1,3 @@
-> *This is a convenience copy. The authoritative version is at `../../docs/17-provider-adapters.md`.*
-
 # 17 — Provider Adapter Services
 
 **Notification API — Provider Adapter Services Deep-Dive**

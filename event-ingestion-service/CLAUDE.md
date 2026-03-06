@@ -128,7 +128,7 @@ Configured via `.env` file in the service root (git-ignored). Required for local
 
 ## Key References
 
-- Design doc: `docs/07-event-ingestion-service.md` (convenience copy) — authoritative at `../../docs/07-event-ingestion-service.md`
+- Design doc: `docs/07-event-ingestion-service.md`
 - Endpoints: `../../endpoints/endpoints-event-ingestion-service.md`
 - DB schema script: `dbscripts/schema-event-ingestion-service.sql`
 - DB objects script: `dbscripts/event-ingestion-service-dbscripts.sql` — **must be updated on every database change**

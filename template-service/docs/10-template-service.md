@@ -1,5 +1,3 @@
-> **Note:** This is a convenience copy. The authoritative version is at `../../docs/10-template-service.md`.
-
 ---
 
 # 10 — Template Service
