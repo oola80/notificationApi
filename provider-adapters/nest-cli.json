@@ -27,6 +27,15 @@
         "tsConfigPath": "apps/adapter-whatsapp/tsconfig.app.json"
       }
     },
+    "adapter-braze": {
+      "type": "application",
+      "root": "apps/adapter-braze",
+      "entryFile": "main",
+      "sourceRoot": "apps/adapter-braze/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/adapter-braze/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",

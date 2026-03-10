@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Version:** | 2.6 |
-| **Date:** | 2026-02-28 |
+| **Version:** | 2.7 |
+| **Date:** | 2026-03-06 |
 | **Author:** | Architecture Team |
 | **Status:** | **[In Review]** |
 
@@ -14,6 +14,7 @@
 ## Table of Contents
 
 - [About This Changelog](#about-this-changelog)
+- [Version 4.2](#version-42--2026-03-06) — Braze Adapter Design Document Improvements
 - [Version 4.1](#version-41--2026-02-28) — Notification Admin UI Implementation Complete
 - [Version 4.0](#version-40--2026-02-28) — Notification Admin UI v2.0 (Architectural Simplification)
 - [Version 3.9](#version-39--2026-02-27) — Auth/RBAC Decoupling & Architecture Restructuring
@@ -56,6 +57,25 @@ This document tracks all notable changes to the Notification API documentation a
 > **Info:** **Change Types**
 >
 > Each entry is categorized using one of the following types: **Added**, **Changed**, **Fixed**, **Removed**, **Deprecated**.
+
+---
+
+## Version 4.2 — 2026-03-06
+
+**Braze Adapter Design Document — Accuracy & Completeness Improvements**
+
+Major rewrite of the Braze adapter reference document (`provider-adapters/docs/adapter-braze.md`) to improve API accuracy, explain Braze-specific concepts, and document strategic decisions.
+
+| Type | Description | Affected Document(s) |
+|---|---|---|
+| **Added** | Braze External ID deep dive — explains `external_id` vs `braze_id` vs `user_alias`, mapping to `customerId`, user existence prerequisite, DTO gap and planned `customerId` fix | provider-adapters/docs/adapter-braze.md |
+| **Added** | Braze particularities & strategy section — user existence prerequisite, `app_id` requirement, subscription groups, WhatsApp Braze vs Meta differences, media limitations, multi-channel design, email `from` format | provider-adapters/docs/adapter-braze.md |
+| **Added** | Profile sync strategy comparison table (just-in-time vs pre-provisioned) with trade-offs and detailed flows | provider-adapters/docs/adapter-braze.md |
+| **Added** | Example JSON payloads for all four channels (email, SMS, WhatsApp template, WhatsApp text) | provider-adapters/docs/adapter-braze.md |
+| **Changed** | Corrected send mappings — `external_user_ids` (not `external_ids`), `app_id` in all channels, WhatsApp `message_type`+`message` structure, email `from` format, SMS `media_items` for MMS | provider-adapters/docs/adapter-braze.md |
+| **Fixed** | `/users/track` rate limit corrected from 50,000/min to 3,000/3s per current Braze docs | provider-adapters/docs/adapter-braze.md |
+| **Added** | Warning about Braze 201 responses with silent failures (errors array) | provider-adapters/docs/adapter-braze.md |
+| **Added** | `BRAZE_FROM_EMAIL` and `BRAZE_FROM_NAME` environment variables | provider-adapters/docs/adapter-braze.md |
 
 ---
 

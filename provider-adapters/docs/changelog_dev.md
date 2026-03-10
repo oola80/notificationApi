@@ -6,6 +6,190 @@
 
 ## [Unreleased]
 
+### Feature: adapter-braze Phase 4 — Webhooks (Postbacks + Currents), Final Polish & Full E2E (2026-03-09)
+
+#### libs/common/
+- `src/dto/webhook-event.dto.ts` — Extended `WebhookEventType` enum with 5 new values: `SENT`, `READ`, `RECEIVED`, `TEMP_FAIL`, `SPAM_COMPLAINT`. Required for Braze multi-channel webhook normalization (WhatsApp read receipts, push send confirmations, SMS inbound, email soft bounces, spam reports).
+
+#### apps/adapter-braze/ — Phase 4 Webhook Processing
+
+##### webhooks/interfaces/ — Braze Webhook Interfaces
+- `BrazePostbackPayload` — Individual transactional postback event (event_type, dispatch_id, message_id, external_user_id, email_address, phone_number, device_id, timestamp, key_value_pairs, message_extras)
+- `BrazeCurrentsPayload` — Batched Currents events wrapper (events array)
+- `BrazeCurrentsEvent` — Individual Currents event (epoch timestamp, properties for custom data)
+- `BrazeWebhookPayload` — Union type (postback | currents)
+
+##### webhooks/ — Webhook Processing Pipeline
+- **WebhooksModule:** Imports `AppRabbitMQModule`, provides verification/normalizer/service/controller
+- **WebhookVerificationService:** Verifies Braze webhooks via shared secret:
+  - Compares `X-Braze-Webhook-Key` header against `BRAZE_WEBHOOK_KEY` env var
+  - Constant-time comparison using `crypto.timingSafeEqual`
+  - Length pre-check to prevent `timingSafeEqual` crash on mismatched lengths
+  - Increments `adapter_webhook_verification_failures_total` metric on failure
+- **WebhookNormalizerService:** Maps 16 Braze event types to `WebhookEventDto`:
+  - Email (7): Delivery→DELIVERED, Bounce→BOUNCED, SoftBounce→TEMP_FAIL, Open→OPENED, Click→CLICKED, SpamReport→SPAM_COMPLAINT, Unsubscribe→UNSUBSCRIBED
+  - SMS (3): Delivery→DELIVERED, Rejection→BOUNCED, InboundReceive→RECEIVED
+  - WhatsApp (4): Send→SENT, Delivery→DELIVERED, Read→READ, Failure→FAILED
+  - Push (2): pushnotification.Send→SENT, pushnotification.Open→OPENED
+  - Extracts `providerMessageId` from `dispatch_id` (fallback: `message_id`)
+  - Extracts `recipientAddress` from `email_address` / `phone_number` / `device_id`
+  - Extracts `notificationId` from `key_value_pairs` or `message_extras` (postbacks) / `properties` (Currents)
+  - Sets `providerId: 'braze'`
+  - Returns `null` for unknown event types (logged as warning, skipped)
+  - Currents epoch timestamps (seconds) converted to ISO-8601
+- **WebhooksService:** Pipeline orchestrator:
+  1. Verify shared secret → on failure: log warning, return (no throw)
+  2. Detect payload type: postback (single event) vs Currents (events array)
+  3. Normalize → publish to RabbitMQ (fire-and-forget via `RabbitMQPublisherService`, routing key `adapter.webhook.braze`)
+  4. Record metrics per event (`adapter_webhook_received_total`)
+  - Currents batch: iterates all events, skips unknown types, continues on publish failure
+  - RabbitMQ failures: logged + metric incremented, do not throw
+- **WebhooksController:** `POST /webhooks/inbound`:
+  - Always returns `200 { status: 'ok' }` — never throws (stops Braze retries)
+  - Extracts `X-Braze-Webhook-Key` header for verification
+  - Verification failure: logged but still returns 200
+
+##### Integration
+- Updated `app.module.ts` to import `WebhooksModule`
+- Updated `test/test-utils.ts` to include `WebhooksModule` in E2E test app
+
+#### Testing
+- 55 unit tests across 3 suites:
+  - `webhook-verification.service.spec.ts` — valid key, invalid key (wrong/empty/single-char diff), missing header (undefined/null), timing-safe comparison (last/first char, length mismatch), unconfigured webhook key
+  - `webhook-normalizer.service.spec.ts` — all 16 event type mappings (7 email, 3 SMS, 4 WhatsApp, 2 push), unknown event type handling, field extraction (dispatch_id/message_id fallback, email/phone/device recipient, timestamp, notificationId from key_value_pairs/message_extras/properties, metadata), Currents epoch conversion, missing fields graceful handling
+  - `webhooks.service.spec.ts` — happy path postback, verification failure (no publish), batch Currents (3 events), skip unknown in batch, RabbitMQ failure (fire-and-forget resolve), batch with individual publish failure, unknown postback event, empty batch, metrics labels
+- 11 E2E tests in `test/webhooks.e2e-spec.ts`:
+  - Valid postback (full field verification), invalid key (200 but no publish), missing key header (200 but no publish), Currents batch (3 events, multi-channel), event normalization (email.Bounce→bounced, whatsapp.Send→sent, pushnotification.Open→opened), unknown event type, metrics counter verification
+
+#### Endpoints Updated
+- `endpoints/endpoints-provider-adapters.md` — Braze `POST /webhooks/inbound` status updated to Done. All Braze endpoints now Done.
+
+### Feature: adapter-braze Phase 3 — WhatsApp + Push Channels (2026-03-09)
+
+#### apps/adapter-braze/ — WhatsApp & Push Channel Support
+
+##### braze-client/interfaces/ — New Interfaces
+- `BrazeWhatsAppMessage`, `BrazeWhatsAppMessageBody`, `BrazeWhatsAppVariable`, `BrazeWhatsAppHeader` — WhatsApp template message types
+- `BrazeApplePushMessage`, `BrazeAndroidPushMessage` — iOS and Android push message types
+- `BrazeSendPayload.messages` — Extended with `whatsapp?`, `apple_push?`, `android_push?` fields
+
+##### send/ — Extended Send Pipeline
+- **SendService:** Extended to support all 4 channels (email, sms, whatsapp, push):
+  - `SUPPORTED_CHANNELS` updated from `[email, sms]` to `[email, sms, whatsapp, push]`
+  - `buildWhatsAppMessage()` — Builds `messages.whatsapp` with `subscription_group_id` from `BRAZE_WHATSAPP_SUBSCRIPTION_GROUP`, `message_type: 'template_message'`, maps `metadata.templateName` → `template_name`, `metadata.templateLanguage` → `template_language_code`, `metadata.templateParameters` → Braze `variables` array (`{ key, value }`). IMAGE media headers included when first media item is image type. Throws `isMissingConfig` error (→ BZ-010) if subscription group missing.
+  - `buildApplePushMessage()` — Builds `messages.apple_push` with `alert: { title, body }`, `mutable_content` + `media_url` when media present.
+  - `buildAndroidPushMessage()` — Builds `messages.android_push` with `title`, `alert`, `image_url` when media present.
+  - Push sends both `apple_push` and `android_push` simultaneously (Braze delivers to whichever platform the user has).
+
+#### Testing
+- 24 unit tests across 1 suite (Phase 2: 16 → Phase 3: +8 tests):
+  - WhatsApp template send (with parameters, with IMAGE media, without media, non-image media ignored)
+  - WhatsApp missing subscription group → failure
+  - Push send (both platforms, with media, without media)
+- 18 E2E tests across 2 files (Phase 2: 13 → Phase 3: +5 tests):
+  - WhatsApp template send, payload structure, IMAGE header with media
+  - WhatsApp missing subscription group → failure
+  - Push send, dual platform payload, push with media
+
+### Feature: adapter-braze Phase 2 — Braze HTTP Client, Email Hashing & Send Pipeline (Email + SMS) (2026-03-09)
+
+#### libs/common/
+- `src/dto/send-request.dto.ts` — Added optional `customerId?: string` field to `RecipientDto` (decorated with `@IsOptional()`, `@IsString()`). Carries Braze `external_id` (hashed email). Other adapters (Mailgun, WhatsApp) unaffected — field is purely additive.
+
+#### apps/adapter-braze/ — Phase 2 Modules
+
+##### braze-client/ — Braze REST API HTTP Client
+- **BrazeClientModule:** Imports `HttpModule.registerAsync` with configurable timeout from `braze.timeoutMs`, provides `BrazeClientService`
+- **BrazeClientService:** Low-level HTTP client for Braze REST API:
+  - `sendMessage(payload)` — POST to `{BRAZE_REST_ENDPOINT}/messages/send` with Bearer auth. Checks response `errors` array even on 201 (throws with `isBrazePartialError` flag for 201-with-errors).
+  - `trackUser(payload)` — POST to `{BRAZE_REST_ENDPOINT}/users/track` for profile upsert.
+- **Interfaces:** `BrazeEmailMessage`, `BrazeSmsMessage`, `BrazeSendPayload`, `BrazeSendResponse`, `BrazeError`, `BrazeUserAttribute`, `BrazeTrackPayload`, `BrazeTrackResponse`, `BrazeAttachment`, `BrazeSmsMediaItem`
+
+##### hashing/ — Email Hashing Service
+- **HashingModule:** Provides `HashingService`, `HashingController`
+- **HashingService:** SHA-256 email hashing with pepper:
+  - `normalizeEmail(email)` — Trim, NFKC normalization, lowercase
+  - `hashEmail(email)` — `sha256(pepper + normalize(email))` → 64-char hex digest
+  - Pepper cached in-memory with configurable TTL from `PEPPER_CACHE_TTL`
+- **HashingController:** `POST /v1/customers/hash-email` — Accepts `{ email }`, returns `{ emailHash, algo, algoVersion, normalizedEmail }`
+- **DTOs:** `HashEmailRequestDto` (with `@IsEmail()`), `HashEmailResponseDto`
+
+##### profile-sync/ — Just-in-Time Profile Sync with LRU Cache
+- **ProfileSyncModule:** Imports `BrazeClientModule`, `HashingModule`, provides `ProfileSyncService`
+- **ProfileSyncService:** `ensureProfile(recipient, channel)` → returns `external_id`:
+  - **Sync enabled** (`BRAZE_PROFILE_SYNC_ENABLED=true`): Hash email → check LRU cache → on miss, call `/users/track` (set email for email channel, phone for SMS/WhatsApp) → cache with TTL. Throws BZ-006 on sync failure.
+  - **Sync disabled** (pre-provisioned): Use `recipient.customerId` directly. Throws BZ-007 if missing.
+  - LRU cache: `lru-cache` npm package, max 10,000 entries, TTL from `BRAZE_PROFILE_CACHE_TTL_SECONDS`
+
+##### send/ — Send Pipeline (Email + SMS)
+- **SendModule:** Imports `BrazeClientModule`, `ProfileSyncModule`, provides `SendService`, `ErrorClassifierService`, `SendController`
+- **SendService:** Orchestrates Braze send pipeline:
+  1. Channel validation (email, sms — WhatsApp/push not yet implemented)
+  2. Profile sync via `ProfileSyncService.ensureProfile()`
+  3. Build channel-specific Braze payload (email: subject, body, from, attachments, extras; SMS: body, subscription_group_id, media_items)
+  4. Call `BrazeClientService.sendMessage()`
+  5. Extract `dispatch_id` as `providerMessageId`
+  6. Prometheus metrics: `adapter_send_total`, `adapter_send_duration_seconds`, `adapter_send_errors_total` (providerId: `braze`)
+  - Email `from` format: `"${BRAZE_FROM_NAME} <${BRAZE_FROM_EMAIL}>"`
+  - Email attachments mapped from `content.media[]` → `{ file_name, url }`
+  - Email extras: `notificationId`, `correlationId` from metadata
+  - SMS requires `BRAZE_SMS_SUBSCRIPTION_GROUP` (throws if missing)
+- **ErrorClassifierService:** Classifies Braze errors:
+  - 201-with-errors → BZ-007 non-retryable (detected via `isBrazePartialError` flag)
+  - 400 → BZ-001 non-retryable, 401 → BZ-003 non-retryable, 429 → BZ-004 retryable, 500/503 → BZ-002 retryable
+  - Network errors (ECONNREFUSED/ENOTFOUND/ETIMEDOUT/ECONNRESET/ECONNABORTED) → BZ-002 retryable
+  - Unknown → PA-003
+- **SendController:** `POST /send` with `@HttpCode(200)` — always returns 200 with `SendResultDto` body
+
+#### app.module.ts
+- Added imports: `HashingModule`, `SendModule`
+
+#### Dependencies
+- Added `lru-cache` npm package for profile sync LRU cache
+
+#### Testing
+- 63 unit tests across 7 suites:
+  - `hashing.service.spec.ts` — normalization (trim, lowercase, NFKC), deterministic output, different peppers produce different hashes, pepper caching
+  - `hashing.controller.spec.ts` — hash-email endpoint response fields
+  - `braze-client.service.spec.ts` — sendMessage auth/URL/response, 201-with-errors detection, error propagation, timeout handling, trackUser
+  - `profile-sync.service.spec.ts` — cache hit, cache miss with sync, disabled mode, sync failure, no-cache-on-failure
+  - `send.service.spec.ts` — email success, SMS success, payload building, attachments, extras, unsupported channel, profile sync failure, Braze API errors (retryable/non-retryable), metrics, missing SMS subscription group
+  - `send.controller.spec.ts` — delegation, unexpected error handling
+  - `error-classifier.service.spec.ts` — all HTTP status mappings, 201-with-errors, network errors, axios errors without response
+- 13 E2E tests across 2 files:
+  - `app.e2e-spec.ts` — health, capabilities, metrics (Phase 1)
+  - `send.e2e-spec.ts` — email send, SMS send, validation errors (missing recipient, missing body, invalid channel), unsupported channel (whatsapp, push), response shape, Braze 429 retryable, Braze 401 non-retryable
+
+### Feature: adapter-braze Phase 1 scaffold — Health, Capabilities, Metrics (2026-03-09)
+
+#### Monorepo Registration
+- `nest-cli.json` — Added adapter-braze project entry (type: application, entryFile: main, sourceRoot: apps/adapter-braze/src)
+- `package.json` — Added npm scripts: build:braze, start:dev:braze, start:debug:braze, start:prod:braze, test:e2e:braze
+
+#### apps/adapter-braze/ — Braze Multi-Channel Adapter Application
+- **main.ts:** Bootstrap with Pino logger, DtoValidationPipe, HttpExceptionFilter, LoggingInterceptor, CORS, port 3172
+- **app.module.ts:** BrazeConfigModule, LoggerModule, MetricsModule, HealthModule
+- **config/:** `BrazeConfigModule` (ConfigModule.forRoot isGlobal), `braze.config.ts` (registerAs 'braze': port, nodeEnv, apiKey, restEndpoint, appId, webhookKey, fromEmail, fromName, smsSubscriptionGroup, whatsappSubscriptionGroup, profileSyncEnabled, profileCacheTtlSeconds, timeoutMs, emailHashPepper, pepperCacheTtl), `rabbitmq.config.ts` (registerAs 'rabbitmq'), `env.validation.ts` (class-validator: required — BRAZE_API_KEY, BRAZE_REST_ENDPOINT, BRAZE_APP_ID, BRAZE_WEBHOOK_KEY, BRAZE_FROM_EMAIL, EMAIL_HASH_PEPPER; optional with defaults — the rest)
+- **errors/:** `BRAZE_ERROR_CODES` (10 BZ-prefixed codes + inherited PA- base codes): BZ-001 invalid request, BZ-002 API unavailable, BZ-003 authentication failed, BZ-004 rate limited, BZ-005 unsupported channel, BZ-006 profile sync failed, BZ-007 user not found, BZ-008 webhook verification failed, BZ-009 invalid webhook payload, BZ-010 missing subscription group
+- **health/:** `HealthModule` (imports HttpModule), `HealthController` (GET /health, GET /capabilities), `BrazeHealthService` (extends BaseHealthService, calls GET `{BRAZE_REST_ENDPOINT}/email/hard_bounces?limit=0` with Bearer API key for connectivity check)
+- **GET /capabilities** returns: providerId 'braze', channels ['email', 'sms', 'whatsapp', 'push'], supportsMediaUrls true, supportsAttachments false, maxRecipientsPerRequest 50, webhookPath '/webhooks/inbound'
+- **.env.example:** All 14 Braze env vars + 5 RabbitMQ env vars documented
+
+#### Testing
+- E2E test setup: jest-e2e.json, test-utils.ts (createTestApp with HealthModule), app.e2e-spec.ts (GET /health shape, GET /capabilities returns correct channels/features, GET /metrics returns Prometheus format)
+
+### Documentation: Improve Braze adapter design document (2026-03-06)
+
+#### docs/
+- `adapter-braze.md` — Major rewrite with three new sections and corrected API mappings:
+  - **Braze External ID — Deep Dive:** Explains what `external_id` is, how it differs from `braze_id`/`user_alias`, mapping to our `customerId`, user existence prerequisite, and the DTO gap (planned `customerId` addition to `RecipientDto`).
+  - **Braze Particularities & Strategy:** Documents user existence prerequisite (vs fire-and-forget providers), `app_id` requirement for all channels, subscription group management, WhatsApp differences (Braze structured `message_type`+`message` vs Meta native API), media limitations (IMAGE only for WhatsApp templates via API), multi-channel from single adapter, email `from` field format.
+  - **Profile Sync Module:** Expanded with strategy comparison table (just-in-time vs pre-provisioned), trade-offs, and detailed flows for both strategies.
+  - **Corrected Send Mappings:** Fixed all four channel mappings — `external_user_ids` (not `external_ids`), `app_id` added to all channels, WhatsApp uses `message_type`+`message` structure, email includes `from` format, SMS includes `media_items` for MMS. Added example JSON payloads for email, SMS, WhatsApp template, and WhatsApp text.
+  - **Corrected Rate Limits:** Updated `/users/track` from 50,000/min to 3,000/3s per current Braze docs.
+  - Added warning about Braze 201 responses with errors array (silent failures).
+  - Added `BRAZE_FROM_EMAIL` and `BRAZE_FROM_NAME` to environment variables table.
+
 ### Bugfix: WHATSAPP_TEST_MODE=false incorrectly evaluated as true (2026-03-02)
 
 #### apps/adapter-whatsapp/

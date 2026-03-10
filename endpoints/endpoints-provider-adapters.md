@@ -8,11 +8,11 @@ All 4 adapters (adapter-mailgun :3171, adapter-braze :3172, adapter-whatsapp :31
 
 | Method | Path | Description | adapter-mailgun | adapter-braze | adapter-whatsapp | adapter-aws-ses |
 |--------|------|-------------|-----------------|---------------|------------------|-----------------|
-| POST | `/send` | Accept a SendRequest, translate to provider API, return SendResult | Done | Not Started | Done | Not Started |
-| GET | `/health` | Liveness + provider connectivity check; returns AdapterHealthResponse | Done | Not Started | Done | Not Started |
-| GET | `/capabilities` | Returns adapter capabilities (channels, attachments, media, recipients); returns AdapterCapabilitiesResponse | Done | Not Started | Done | Not Started |
-| POST | `/webhooks/inbound` | Receive provider webhook callbacks; verify signature, normalize event, publish to RabbitMQ | Done | Not Started | Not Started | Not Started |
-| GET | `/metrics` | Prometheus metrics (send latency, success/error counts, webhook processing) | Done | Not Started | Done | Not Started |
+| POST | `/send` | Accept a SendRequest, translate to provider API, return SendResult | Done | Done | Done | Not Started |
+| GET | `/health` | Liveness + provider connectivity check; returns AdapterHealthResponse | Done | Done | Done | Not Started |
+| GET | `/capabilities` | Returns adapter capabilities (channels, attachments, media, recipients); returns AdapterCapabilitiesResponse | Done | Done | Done | Not Started |
+| POST | `/webhooks/inbound` | Receive provider webhook callbacks; verify signature, normalize event, publish to RabbitMQ | Done | Done | Not Started | Not Started |
+| GET | `/metrics` | Prometheus metrics (send latency, success/error counts, webhook processing) | Done | Done | Done | Not Started |
 
 ## Adapter-Specific Notes
 
@@ -26,11 +26,12 @@ All 4 adapters (adapter-mailgun :3171, adapter-braze :3172, adapter-whatsapp :31
 
 ### adapter-braze (:3172)
 
-| Endpoint | Notes |
-|----------|-------|
-| `POST /send` | Translates SendRequest to Braze `/messages/send` payload. Supports 4 channel message keys (email, SMS, WhatsApp, push). Optional profile sync via `/users/track`. |
-| `POST /webhooks/inbound` | Handles both transactional postbacks (real-time, email only) and Currents events (batched ~5 min, all channels). Verifies via `X-Braze-Webhook-Key` shared secret. |
-| `GET /capabilities` | Reports: email/sms/whatsapp/push channels, supports media URLs (true), max 25 MB, 1 recipient per request. |
+| Endpoint | Notes | Status |
+|----------|-------|--------|
+| `POST /send` | Translates SendRequest to Braze `/messages/send` payload. All 4 channels implemented (email, SMS, WhatsApp, push). Profile sync via `/users/track` with LRU cache. WhatsApp requires `BRAZE_WHATSAPP_SUBSCRIPTION_GROUP`. Push sends to both iOS and Android simultaneously. | Done |
+| `POST /v1/customers/hash-email` | SHA-256 email hashing endpoint. Accepts `{ email }`, returns `{ emailHash, algo, algoVersion, normalizedEmail }`. | Done |
+| `POST /webhooks/inbound` | Handles both transactional postbacks (real-time, email only) and Currents events (batched ~5 min, all channels). Verifies via `X-Braze-Webhook-Key` shared secret. Always returns 200 (fire-and-forget). | Done |
+| `GET /capabilities` | Reports: email/sms/whatsapp/push channels, supports media URLs (true), max 25 MB, 1 recipient per request. | Done |
 
 ### adapter-whatsapp (:3173)
 

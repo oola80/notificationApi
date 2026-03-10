@@ -18,6 +18,10 @@ export class RecipientDto {
   @IsString()
   @IsOptional()
   name?: string;
+
+  @IsString()
+  @IsOptional()
+  customerId?: string;
 }
 
 export class MediaDto {

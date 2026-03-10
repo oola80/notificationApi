@@ -6,6 +6,11 @@ export enum WebhookEventType {
   FAILED = 'failed',
   COMPLAINED = 'complained',
   UNSUBSCRIBED = 'unsubscribed',
+  SENT = 'sent',
+  READ = 'read',
+  RECEIVED = 'received',
+  TEMP_FAIL = 'temp_fail',
+  SPAM_COMPLAINT = 'spam_complaint',
 }
 
 export class WebhookEventDto {

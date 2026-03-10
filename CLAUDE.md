@@ -13,6 +13,7 @@ Auth/RBAC decoupled into standalone services (moved to separate repositories). `
 | template-service | Phase 5 complete | 250 unit / 21 suites, 4 E2E files |
 | channel-router-service | Phase 4 complete | 432 unit / 46 suites, 5 E2E files |
 | provider-adapters/adapter-mailgun | Phase 3 complete | 204 unit / 28 suites, 17 E2E / 3 files |
+| provider-adapters/adapter-braze | Phase 4 complete | 55 unit / 3 suites, 27 E2E / 3 files |
 | provider-adapters/adapter-whatsapp | Phase 1 complete | 3 E2E spec files |
 | bulk-upload-service | Phase 4 complete | 387 unit / 23 suites, 24 E2E / 4 files |
 | audit-service | Phase 4 complete | 338 unit / 41 suites, 58 E2E / 8 files |

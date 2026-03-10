@@ -26,7 +26,7 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 
 ## Implementation Status
 
-**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). **adapter-whatsapp Phase 1 complete** — Send pipeline + health (POST /send, GET /health, GET /capabilities, GET /metrics). **libs/common MetadataDto** extended with `templateName`, `templateLanguage`, `templateParameters` (`TemplateParameterDto[]` — named parameter objects with `name`/`value` fields) for WhatsApp Meta template dispatch. Named parameters emitted to Meta API as `{ type: 'text', parameter_name, text }`. All other adapters not started.
+**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). **adapter-braze Phase 4 complete** — Full multi-channel adapter: send pipeline (email, SMS, WhatsApp, push), profile sync with LRU cache, email hashing, webhook processing (transactional postbacks + Currents batches, 16 event type mappings, shared secret verification with timing-safe comparison, fire-and-forget RabbitMQ publishing). All endpoints Done. **adapter-whatsapp Phase 1 complete** — Send pipeline + health (POST /send, GET /health, GET /capabilities, GET /metrics). **libs/common MetadataDto** extended with `templateName`, `templateLanguage`, `templateParameters` (`TemplateParameterDto[]` — named parameter objects with `name`/`value` fields) for WhatsApp Meta template dispatch. Named parameters emitted to Meta API as `{ type: 'text', parameter_name, text }`. **libs/common WebhookEventType** extended with `SENT`, `READ`, `RECEIVED`, `TEMP_FAIL`, `SPAM_COMPLAINT` for Braze multi-channel webhook support. All other adapters not started.
 
 - **Phase 3:** Webhook processing pipeline (`WebhooksModule`: `WebhookVerificationService` with HMAC-SHA256 + timing-safe comparison + 5-min replay protection, `WebhookNormalizerService` with 7 event type mappings + field extraction + metadata, `WebhooksService` pipeline orchestrator with fire-and-forget pattern, `WebhooksController` POST /webhooks/inbound with 200/401 responses). Interfaces: `MailgunWebhookPayload`, `MailgunWebhookSignature`, `MailgunWebhookEventData`. 204 unit tests across 28 suites, 17 E2E tests across 3 files.
 
@@ -183,6 +183,66 @@ provider-adapters/
   tsconfig.json                  # ES2023 target, nodenext modules, @app/common paths
   tsconfig.build.json            # Build-specific TS config
   apps/
+    adapter-braze/
+      .env.example                 # Environment variables template
+      tsconfig.app.json            # App-specific TS config extending root
+      src/
+        main.ts                    # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3172
+        app.module.ts              # Root module: BrazeConfigModule, LoggerModule, MetricsModule, HealthModule, HashingModule, SendModule, WebhooksModule
+        config/
+          config.module.ts         # ConfigModule.forRoot (isGlobal, env validation, braze + rabbitmq configs)
+          braze.config.ts          # registerAs 'braze': port, nodeEnv, apiKey, restEndpoint, appId, webhookKey, fromEmail, fromName, subscriptionGroups, profileSync, timeout, hashing
+          rabbitmq.config.ts       # registerAs 'rabbitmq': host, port, vhost, user, password
+          env.validation.ts        # class-validator EnvironmentVariables + validate()
+        errors/
+          braze-errors.ts          # BRAZE_ERROR_CODES (10 BZ-prefixed + inherited PA- base)
+        braze-client/
+          braze-client.module.ts   # HttpModule.registerAsync (configurable timeout), provides BrazeClientService
+          braze-client.service.ts  # Braze REST API client (sendMessage, trackUser)
+          braze-client.service.spec.ts
+          interfaces/
+            braze.interfaces.ts    # BrazeEmailMessage, BrazeSmsMessage, BrazeWhatsAppMessage, BrazePushMessage, BrazeSendPayload, etc.
+        hashing/
+          hashing.module.ts
+          hashing.controller.ts    # POST /v1/customers/hash-email
+          hashing.service.ts       # SHA-256 email hashing with pepper
+          hashing.controller.spec.ts
+          hashing.service.spec.ts
+          dto/
+            hash-email.dto.ts      # HashEmailRequestDto/ResponseDto
+        profile-sync/
+          profile-sync.module.ts
+          profile-sync.service.ts  # Just-in-time /users/track sync with LRU cache
+          profile-sync.service.spec.ts
+        send/
+          send.module.ts           # Imports BrazeClientModule + ProfileSyncModule, provides SendService, ErrorClassifierService, SendController
+          send.service.ts          # Multi-channel send orchestration (email, SMS, WhatsApp, push)
+          send.controller.ts       # POST /send (@HttpCode(200))
+          error-classifier.service.ts  # HTTP status → error classification
+          send.service.spec.ts
+          send.controller.spec.ts
+          error-classifier.service.spec.ts
+        health/
+          health.module.ts         # Imports HttpModule, provides BrazeHealthService + HealthController
+          health.controller.ts     # GET /health, GET /capabilities
+          braze-health.service.ts  # Extends BaseHealthService, pings /email/hard_bounces
+        webhooks/
+          webhooks.module.ts       # Imports AppRabbitMQModule, provides verification/normalizer/service/controller
+          webhooks.controller.ts   # POST /webhooks/inbound (always 200, fire-and-forget)
+          webhooks.service.ts      # Pipeline: verify → normalize → publish → metrics
+          webhook-verification.service.ts    # Shared secret verification (timingSafeEqual)
+          webhook-normalizer.service.ts      # 16 Braze event types → WebhookEventDto
+          webhook-verification.service.spec.ts
+          webhook-normalizer.service.spec.ts
+          webhooks.service.spec.ts
+          interfaces/
+            braze-webhook.interfaces.ts  # BrazePostbackPayload, BrazeCurrentsPayload, BrazeCurrentsEvent
+      test/
+        test-utils.ts              # E2E test helper (createTestApp with all modules)
+        app.e2e-spec.ts            # E2E: health, capabilities, metrics
+        send.e2e-spec.ts           # E2E: POST /send (all channels, validation, errors)
+        webhooks.e2e-spec.ts       # E2E: POST /webhooks/inbound (postbacks, Currents, verification)
+        jest-e2e.json              # Jest E2E config
     adapter-whatsapp/
       tsconfig.app.json          # App-specific TS config extending root
       src/
