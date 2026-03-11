@@ -78,10 +78,10 @@ export function fieldMappingsToApi(
 export function fieldMappingsFromApi(
   raw: Record<string, unknown>,
 ): FieldMappingEntry[] {
-  return Object.entries(raw).map(([targetField, value]) => {
+  return Object.entries(raw).map(([key, value]) => {
     const mapping = value as Record<string, unknown> | undefined;
     return {
-      targetField,
+      targetField: (mapping?.target as string) ?? key,
       sourceField: (mapping?.source as string) ?? "",
       transform: (mapping?.transform as TransformType) ?? "none",
       required: (mapping?.required as boolean) ?? false,

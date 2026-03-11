@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check } from "lucide-react";
+import { ArrowLeft, Copy, Check, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -20,10 +20,11 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
+  ScrollArea,
 } from "@/components/ui";
 import { StatusBadge, PageHeader, ChannelIcon } from "@/components/shared";
 import { LifecycleTimeline } from "./lifecycle-timeline";
-import { useNotificationTrace, useDeliveryReceipts } from "@/hooks/use-notifications";
+import { useNotificationTrace, useDeliveryReceipts, useProviderDeliveryAttempts } from "@/hooks/use-notifications";
 import { formatDate, truncate } from "@/lib/formatters";
 
 // --- Copy button helper ---
@@ -100,6 +101,27 @@ interface NotificationDetailProps {
 function NotificationDetail({ notificationId }: NotificationDetailProps) {
   const { data: trace, isLoading: traceLoading, error: traceError } = useNotificationTrace(notificationId);
   const { data: receiptsData, isLoading: receiptsLoading } = useDeliveryReceipts(notificationId);
+  const { data: attemptsData, isLoading: attemptsLoading } = useProviderDeliveryAttempts(notificationId);
+  const [expandedReceipts, setExpandedReceipts] = React.useState<Set<string>>(new Set());
+  const [expandedAttempts, setExpandedAttempts] = React.useState<Set<string>>(new Set());
+
+  const toggleReceipt = (id: string) => {
+    setExpandedReceipts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAttempt = (id: string) => {
+    setExpandedAttempts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (traceLoading) return <DetailSkeleton />;
 
@@ -187,6 +209,7 @@ function NotificationDetail({ notificationId }: NotificationDetailProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10" />
                         <TableHead>Channel</TableHead>
                         <TableHead>Provider</TableHead>
                         <TableHead>Status</TableHead>
@@ -196,28 +219,59 @@ function NotificationDetail({ notificationId }: NotificationDetailProps) {
                     </TableHeader>
                     <TableBody>
                       {receipts.map((receipt) => (
-                        <TableRow key={receipt.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              <ChannelIcon channel={receipt.channel} size={14} />
-                              <span className="capitalize">{receipt.channel}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {receipt.provider}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={receipt.status} />
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {receipt.providerMessageId
-                              ? truncate(receipt.providerMessageId, 20)
-                              : "—"}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {formatDate(receipt.receivedAt)}
-                          </TableCell>
-                        </TableRow>
+                        <React.Fragment key={receipt.id}>
+                          <TableRow
+                            className={receipt.rawResponse ? "cursor-pointer hover:bg-muted/50" : ""}
+                            onClick={() => receipt.rawResponse && toggleReceipt(receipt.id)}
+                          >
+                            <TableCell className="w-10">
+                              {receipt.rawResponse ? (
+                                expandedReceipts.has(receipt.id) ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )
+                              ) : null}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <ChannelIcon channel={receipt.channel} size={14} />
+                                <span className="capitalize">{receipt.channel}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {receipt.provider}
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={receipt.status} />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {receipt.providerMessageId
+                                ? truncate(receipt.providerMessageId, 20)
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {formatDate(receipt.receivedAt)}
+                            </TableCell>
+                          </TableRow>
+                          {expandedReceipts.has(receipt.id) && receipt.rawResponse && (
+                            <TableRow>
+                              <TableCell colSpan={6} className="bg-muted/30 p-0">
+                                <div className="p-4 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-muted-foreground">Raw Webhook Response</span>
+                                    <CopyButton value={JSON.stringify(receipt.rawResponse, null, 2)} />
+                                  </div>
+                                  <ScrollArea className="max-h-64">
+                                    <pre className="whitespace-pre-wrap rounded border bg-muted/50 p-3 text-xs">
+                                      {JSON.stringify(receipt.rawResponse, null, 2)}
+                                    </pre>
+                                  </ScrollArea>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       ))}
                     </TableBody>
                   </Table>
@@ -225,6 +279,14 @@ function NotificationDetail({ notificationId }: NotificationDetailProps) {
               )}
             </CardContent>
           </Card>
+
+          {/* Provider Delivery Attempts */}
+          <ProviderAttemptsCard
+            attempts={attemptsData?.attempts ?? []}
+            isLoading={attemptsLoading}
+            expandedAttempts={expandedAttempts}
+            toggleAttempt={toggleAttempt}
+          />
 
           {/* Rendered Content Preview */}
           <RenderedContentPreview timeline={timeline} />
@@ -333,6 +395,214 @@ function NotificationDetail({ notificationId }: NotificationDetailProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+// --- Attempt expanded details ---
+
+function AttemptDetails({ attempt }: { attempt: import("@/types").ProviderDeliveryAttempt }) {
+  // Extract provider API payload and response from providerResponse (adapter returns { sentPayload, apiResponse })
+  const providerResp = attempt.providerResponse as Record<string, unknown> | null;
+  const providerSentPayload = providerResp?.sentPayload as Record<string, unknown> | undefined;
+  const providerApiResponse = providerResp?.apiResponse as Record<string, unknown> | undefined;
+  // If providerResponse doesn't have the sentPayload/apiResponse structure, show it as-is
+  const isStructuredResponse = providerResp && ("sentPayload" in providerResp || "apiResponse" in providerResp);
+  const rawProviderResponse = !isStructuredResponse ? providerResp : null;
+
+  // Extract CRS-level sent payload from metadata (the SendRequest to the adapter)
+  const crsSentPayload = (attempt.metadata as Record<string, unknown> | null)?.sentPayload as Record<string, unknown> | undefined;
+  const otherMetadata = attempt.metadata
+    ? Object.fromEntries(Object.entries(attempt.metadata).filter(([k]) => k !== "sentPayload"))
+    : null;
+  const hasOtherMetadata = otherMetadata && Object.keys(otherMetadata).length > 0;
+
+  return (
+    <div className="p-4 space-y-3">
+      {providerSentPayload && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground">Provider API Request</span>
+            <CopyButton value={JSON.stringify(providerSentPayload, null, 2)} />
+          </div>
+          <ScrollArea className="max-h-80">
+            <pre className="whitespace-pre-wrap rounded border bg-muted/50 p-3 text-xs">
+              {JSON.stringify(providerSentPayload, null, 2)}
+            </pre>
+          </ScrollArea>
+        </div>
+      )}
+      {providerApiResponse && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Provider API Response</span>
+            <CopyButton value={JSON.stringify(providerApiResponse, null, 2)} />
+          </div>
+          <ScrollArea className="max-h-64">
+            <pre className="whitespace-pre-wrap rounded border bg-muted/50 p-3 text-xs">
+              {JSON.stringify(providerApiResponse, null, 2)}
+            </pre>
+          </ScrollArea>
+        </div>
+      )}
+      {rawProviderResponse && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Provider Response</span>
+            <CopyButton value={JSON.stringify(rawProviderResponse, null, 2)} />
+          </div>
+          <ScrollArea className="max-h-64">
+            <pre className="whitespace-pre-wrap rounded border bg-muted/50 p-3 text-xs">
+              {JSON.stringify(rawProviderResponse, null, 2)}
+            </pre>
+          </ScrollArea>
+        </div>
+      )}
+      {attempt.errorMessage && (
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-muted-foreground">Error Message</span>
+          <pre className="whitespace-pre-wrap rounded border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+            {attempt.errorMessage}
+          </pre>
+        </div>
+      )}
+      {crsSentPayload && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Adapter Request Payload</span>
+            <CopyButton value={JSON.stringify(crsSentPayload, null, 2)} />
+          </div>
+          <ScrollArea className="max-h-64">
+            <pre className="whitespace-pre-wrap rounded border bg-muted/50 p-3 text-xs">
+              {JSON.stringify(crsSentPayload, null, 2)}
+            </pre>
+          </ScrollArea>
+        </div>
+      )}
+      {hasOtherMetadata && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Metadata</span>
+            <CopyButton value={JSON.stringify(otherMetadata, null, 2)} />
+          </div>
+          <ScrollArea className="max-h-48">
+            <pre className="whitespace-pre-wrap rounded border bg-muted/50 p-3 text-xs">
+              {JSON.stringify(otherMetadata, null, 2)}
+            </pre>
+          </ScrollArea>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Provider delivery attempts card ---
+
+function ProviderAttemptsCard({
+  attempts,
+  isLoading,
+  expandedAttempts,
+  toggleAttempt,
+}: {
+  attempts: import("@/types").ProviderDeliveryAttempt[];
+  isLoading: boolean;
+  expandedAttempts: Set<string>;
+  toggleAttempt: (id: string) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">
+          Provider Delivery Attempts
+          {!isLoading && (
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              ({attempts.length})
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }, (_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : attempts.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            No delivery attempts recorded.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10" />
+                  <TableHead>Attempt</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Provider Message ID</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Timestamp</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {attempts.map((attempt) => {
+                  const hasDetails = attempt.providerResponse || attempt.errorMessage || attempt.metadata;
+                  return (
+                    <React.Fragment key={attempt.id}>
+                      <TableRow
+                        className={hasDetails ? "cursor-pointer hover:bg-muted/50" : ""}
+                        onClick={() => hasDetails && toggleAttempt(attempt.id)}
+                      >
+                        <TableCell className="w-10">
+                          {hasDetails ? (
+                            expandedAttempts.has(attempt.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          #{attempt.attemptNumber}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <ChannelIcon channel={attempt.channel} size={14} />
+                            <span className="capitalize">{attempt.channel}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={attempt.status} />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {attempt.providerMessageId
+                            ? truncate(attempt.providerMessageId, 20)
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {attempt.durationMs != null ? `${attempt.durationMs}ms` : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {formatDate(attempt.attemptedAt)}
+                        </TableCell>
+                      </TableRow>
+                      {expandedAttempts.has(attempt.id) && hasDetails && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="bg-muted/30 p-0">
+                            <AttemptDetails attempt={attempt} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

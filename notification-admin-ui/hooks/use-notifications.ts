@@ -8,6 +8,7 @@ import type {
   CorrelationTraceResponse,
   CycleTraceResponse,
   ReceiptsResponse,
+  DeliveryAttemptsResponse,
 } from "@/types";
 
 export function useNotificationLogs(params?: AuditSearchParams) {
@@ -79,6 +80,22 @@ export function useDeliveryReceipts(notificationId: string, enabled = true) {
   return useApiGet<ReceiptsResponse>(
     "audit",
     `/api/v1/audit/receipts/${notificationId}`,
-    { enabled: enabled && !!notificationId },
+    {
+      enabled: enabled && !!notificationId,
+      onErrorRetry: () => {},
+      onError: () => {},
+    },
+  );
+}
+
+export function useProviderDeliveryAttempts(notificationId: string, enabled = true) {
+  return useApiGet<DeliveryAttemptsResponse>(
+    "channelRouter",
+    `/api/v1/delivery-attempts/${notificationId}`,
+    {
+      enabled: enabled && !!notificationId,
+      onErrorRetry: () => {},
+      onError: () => {},
+    },
   );
 }

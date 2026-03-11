@@ -105,15 +105,20 @@ export class StatusConsumer implements OnModuleInit {
     const eventType = DELIVERY_STATUS_MAP[statusKey] ?? `DELIVERY_${statusKey.toUpperCase()}`;
     const actor = 'channel-router-service';
 
+    const providerName = message.providerName ?? message.provider ?? null;
+    const correlationId = message.metadata?.correlationId ?? message.correlationId ?? null;
+    const cycleId = message.metadata?.cycleId ?? message.cycleId ?? null;
+    const providerMessageId = message.providerMessageId ?? message.metadata?.providerMessageId ?? null;
+
     const auditEvent = {
       notificationId: message.notificationId ?? null,
-      correlationId: message.correlationId ?? null,
-      cycleId: message.cycleId ?? null,
+      correlationId,
+      cycleId,
       eventType,
       actor,
       metadata: {
         channel: message.channel,
-        provider: message.provider,
+        provider: providerName,
         fromStatus: message.fromStatus,
         toStatus: message.toStatus,
       },
@@ -122,15 +127,15 @@ export class StatusConsumer implements OnModuleInit {
 
     let deliveryReceipt: Record<string, any> | null = null;
 
-    if (statusKey === 'sent' && message.providerMessageId) {
+    if (statusKey === 'sent' && providerMessageId) {
       deliveryReceipt = {
         notificationId: message.notificationId ?? null,
-        correlationId: message.correlationId ?? null,
-        cycleId: message.cycleId ?? null,
+        correlationId,
+        cycleId,
         channel: message.channel ?? 'unknown',
-        provider: message.provider ?? 'unknown',
+        provider: providerName ?? 'unknown',
         status: 'sent',
-        providerMessageId: message.providerMessageId,
+        providerMessageId,
         rawResponse: message.providerResponse ?? null,
       };
 

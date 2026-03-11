@@ -11,11 +11,46 @@ export const CHANNEL_LABELS: Record<ChannelOption, string> = {
   push: "Push",
 };
 
+export const WHATSAPP_LANGUAGE_OPTIONS = [
+  { value: "en", label: "English" },
+  { value: "en_US", label: "English (US)" },
+  { value: "es", label: "Spanish" },
+  { value: "es_MX", label: "Spanish (Mexico)" },
+  { value: "es_AR", label: "Spanish (Argentina)" },
+  { value: "pt_BR", label: "Portuguese (Brazil)" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "it", label: "Italian" },
+  { value: "ja", label: "Japanese" },
+  { value: "ko", label: "Korean" },
+  { value: "zh_CN", label: "Chinese (Simplified)" },
+  { value: "ar", label: "Arabic" },
+  { value: "hi", label: "Hindi" },
+] as const;
+
+const metaTemplateParameterSchema = z.object({
+  name: z.string().min(1, "Parameter name is required"),
+  field: z.string().min(1, "Event field is required"),
+});
+
+export type MetaTemplateParameter = z.infer<typeof metaTemplateParameterSchema>;
+
 const channelVariantSchema = z.object({
   channel: z.enum(CHANNEL_OPTIONS),
   subject: z.string().optional(),
   body: z.string().min(1, "Body content is required"),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  metaTemplateName: z.string().optional(),
+  metaTemplateLanguage: z.string().optional(),
+  metaTemplateParameters: z.array(metaTemplateParameterSchema).optional(),
+}).superRefine((data, ctx) => {
+  if (data.channel === "whatsapp" && (!data.metaTemplateName || data.metaTemplateName.trim() === "")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Meta template name is required for WhatsApp channels",
+      path: ["metaTemplateName"],
+    });
+  }
 });
 
 export type ChannelVariantFormData = z.infer<typeof channelVariantSchema>;

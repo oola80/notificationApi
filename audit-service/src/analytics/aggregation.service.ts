@@ -127,6 +127,47 @@ export class AggregationService {
     }
   }
 
+  async runManualAggregation(
+    period?: 'hourly' | 'daily',
+  ): Promise<{ hourly: boolean; daily: boolean }> {
+    const result = { hourly: false, daily: false };
+    const now = new Date();
+
+    if (!period || period === 'hourly') {
+      const currentHourEnd = new Date(now);
+      currentHourEnd.setMinutes(0, 0, 0);
+      // If we're past the hour mark, include the current partial hour
+      if (now.getMinutes() > 0) {
+        currentHourEnd.setHours(currentHourEnd.getHours() + 1);
+      }
+
+      // Aggregate 24 one-hour windows
+      for (let i = 0; i < 24; i++) {
+        const windowEnd = new Date(currentHourEnd);
+        windowEnd.setHours(windowEnd.getHours() - i);
+        const windowStart = new Date(windowEnd);
+        windowStart.setHours(windowStart.getHours() - 1);
+        await this.aggregate('hourly', windowStart, windowEnd);
+      }
+      result.hourly = true;
+    }
+
+    if (!period || period === 'daily') {
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      await this.aggregate('daily', todayStart, now);
+      result.daily = true;
+    }
+
+    this.logger.log({
+      msg: 'Manual aggregation complete',
+      period: period ?? 'both',
+      result,
+    });
+
+    return result;
+  }
+
   private computeCrossTotal(rows: AggregationRow[]): AggregationRow {
     const total: AggregationRow = {
       channel: '_all',

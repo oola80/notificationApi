@@ -43,6 +43,7 @@ export class SendService {
 
   async send(request: SendRequestDto): Promise<SendResultDto> {
     const startTime = Date.now();
+    let builtMessage: WhatsAppMessage | null = null;
 
     try {
       // Step 1: Validate channel is whatsapp
@@ -61,10 +62,10 @@ export class SendService {
       const to = this.formatPhoneNumber(request.recipient.address);
 
       // Step 3: Build Meta API message payload
-      const message = this.buildMessage(request, to);
+      builtMessage = this.buildMessage(request, to);
 
       // Step 4: Send via WhatsApp client
-      const response = await this.whatsappClient.sendMessage(message);
+      const response = await this.whatsappClient.sendMessage(builtMessage);
 
       // Step 5: Extract provider message ID
       const providerMessageId = response.messages?.[0]?.id ?? null;
@@ -88,7 +89,7 @@ export class SendService {
         retryable: false,
         errorMessage: null,
         httpStatus: 200,
-        providerResponse: response,
+        providerResponse: { sentPayload: builtMessage, apiResponse: response },
       };
     } catch (error) {
       const durationSeconds = (Date.now() - startTime) / 1000;
@@ -116,7 +117,7 @@ export class SendService {
         retryable: classified.retryable,
         errorMessage: classified.errorMessage,
         httpStatus: classified.httpStatus,
-        providerResponse: null,
+        providerResponse: builtMessage ? { sentPayload: builtMessage } : null,
       };
     }
   }

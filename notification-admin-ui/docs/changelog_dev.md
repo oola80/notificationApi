@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### Added: XLSX export button for audit logs (2026-03-11)
+
+- `components/audit/xlsx-export.tsx` — New `XlsxExportButton` component mirroring CSV export pattern. Uses `FileSpreadsheet` icon, toast notifications via sonner.
+- `hooks/use-audit.ts` — Added `useXlsxExport()` hook that fetches binary XLSX from `GET /audit/logs/export` via raw `fetch`. Requires date range (from/to), passes all active filters as query params, downloads blob via anchor element.
+- `components/audit/audit-log-viewer.tsx` — Added `<XlsxExportButton>` next to existing CSV export button in toolbar.
+
+### Added: Refresh Analytics button on dashboard (2026-03-11)
+
+- `app/dashboard/page.tsx` — Added "Refresh Analytics" button (with spinning RefreshCw icon) next to the PageHeader. Triggers `POST /audit/analytics/aggregate` to force analytics aggregation on demand. Shows loading state while running, toast on success/failure, and auto-refreshes summary data via SWR invalidation.
+- `hooks/use-dashboard.ts` — Added `useTriggerAggregation()` mutation hook using `useApiMutation`.
+
 ### Fix: hasMore pagination field & isActive not updatable via PUT (2026-03-06)
 
 - `hooks/use-rules.ts`, `hooks/use-templates.ts`, `hooks/use-recipient-groups.ts` — Removed `hasMore: boolean` from paginated response interfaces. Backend returns `{ data, total, page, limit }` only; `hasMore` was always `undefined`.

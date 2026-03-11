@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Feature: GET delivery attempts by notification ID endpoint (2026-03-10)
+
+- `src/delivery/delivery-attempts.controller.ts` — New `@Controller('api/v1/delivery-attempts')` with `@Get(':notificationId')` endpoint. Returns `{ notificationId, attempts }` with `providerResponse` JSONB. Thin controller injecting `DeliveryAttemptsRepository` directly.
+- `src/delivery/delivery-attempts.controller.spec.ts` — 3 unit tests: happy path, empty results, error propagation.
+- `src/delivery/delivery.module.ts` — Registered `DeliveryAttemptsController` in module controllers.
+- `src/delivery/delivery-pipeline.service.ts` — `persistDeliveryAttempt()` now accepts optional `sentPayload` parameter (the `SendRequest` sent to the adapter) and stores it in `delivery_attempts.metadata` as `{ sentPayload }` JSONB. All three call sites (SENT, RETRYING, non-retryable FAILED) pass the `sendRequest`.
+
 ### Changed: templateParameters type from string[] to Array<{ name, value }> for named Meta parameters (2026-03-02)
 
 - `src/delivery/interfaces/dispatch-message.interface.ts` — Changed `templateParameters` type from `string[]` to `Array<{ name: string; value: string }>`.

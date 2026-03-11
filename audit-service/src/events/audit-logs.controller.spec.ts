@@ -1,9 +1,11 @@
 import { AuditLogsController } from './audit-logs.controller';
 import { AuditLogsService } from './audit-logs.service';
+import { AuditExportService } from './audit-export.service';
 
 describe('AuditLogsController', () => {
   let controller: AuditLogsController;
   let mockService: any;
+  let mockExportService: any;
 
   beforeEach(() => {
     mockService = {
@@ -13,8 +15,13 @@ describe('AuditLogsController', () => {
       }),
     };
 
+    mockExportService = {
+      generateExportWorkbook: jest.fn(),
+    };
+
     controller = new AuditLogsController(
       mockService as unknown as AuditLogsService,
+      mockExportService as unknown as AuditExportService,
     );
   });
 

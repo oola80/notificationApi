@@ -53,6 +53,21 @@ export const ERROR_CODES: Record<string, ErrorDefinition> = {
     details: 'INTERNAL_SERVER_ERROR',
     message: 'An unexpected error occurred',
   },
+  'AUD-010': {
+    status: 500,
+    details: 'AGGREGATION_FAILED',
+    message: 'Analytics aggregation failed',
+  },
+  'AUD-011': {
+    status: 400,
+    details: 'EXPORT_DATE_RANGE_REQUIRED',
+    message: 'Both from and to date parameters are required for export',
+  },
+  'AUD-012': {
+    status: 400,
+    details: 'EXPORT_ROW_LIMIT_EXCEEDED',
+    message: 'Export result exceeds the maximum row limit and has been truncated',
+  },
 };
 
 export function createErrorResponse(

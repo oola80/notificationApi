@@ -36,7 +36,6 @@ export interface CreateMappingDto {
 
 export interface UpdateMappingDto {
   name?: string;
-  isActive?: boolean;
   description?: string;
   fieldMappings?: Record<string, unknown>;
   eventTypeMapping?: Record<string, unknown>;

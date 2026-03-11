@@ -2,6 +2,10 @@
 
 Unified notification platform for eCommerce — consolidates fragmented notifications from multiple source systems into a single event-driven microservices system. Source systems are onboarded dynamically via runtime mapping configuration (no code changes required).
 
+## Ignored Folders
+
+- **`prompts/`** — Contains internal prompt files. Ignore for all coding and design purposes.
+
 ## Project Status
 
 Auth/RBAC decoupled into standalone services (moved to separate repositories). `notification-gateway` deprecated. `notification-admin-ui` simplified (no auth, direct microservice communication).
@@ -14,6 +18,7 @@ Auth/RBAC decoupled into standalone services (moved to separate repositories). `
 | channel-router-service | Phase 4 complete | 432 unit / 46 suites, 5 E2E files |
 | provider-adapters/adapter-mailgun | Phase 3 complete | 204 unit / 28 suites, 17 E2E / 3 files |
 | provider-adapters/adapter-braze | Phase 4 complete | 55 unit / 3 suites, 27 E2E / 3 files |
+| provider-adapters/adapter-aws-ses | Phase 3 complete | ~170 unit / 13 suites, 3 E2E files |
 | provider-adapters/adapter-whatsapp | Phase 1 complete | 3 E2E spec files |
 | bulk-upload-service | Phase 4 complete | 387 unit / 23 suites, 24 E2E / 4 files |
 | audit-service | Phase 4 complete | 338 unit / 41 suites, 58 E2E / 8 files |

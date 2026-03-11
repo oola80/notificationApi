@@ -1,6 +1,6 @@
 "use client";
 
-import { useApiGet } from "./use-api";
+import { useApiGet, useApiMutation } from "./use-api";
 import type { DashboardSummary, AnalyticsResponse, AnalyticsQueryParams } from "@/types";
 
 const POLLING_INTERVAL = parseInt(
@@ -13,6 +13,18 @@ export function useDashboardSummary() {
     "audit",
     "/api/v1/audit/analytics/summary",
     { refreshInterval: POLLING_INTERVAL },
+  );
+}
+
+export function useTriggerAggregation() {
+  return useApiMutation<
+    { hourly: boolean; daily: boolean },
+    { period?: "hourly" | "daily" }
+  >(
+    "audit",
+    "/api/v1/audit/analytics/aggregate",
+    "POST",
+    [["audit", "/api/v1/audit/analytics/summary"]],
   );
 }
 

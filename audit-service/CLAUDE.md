@@ -61,6 +61,7 @@ The `.env` file (git-ignored) provides local development settings. Key variables
 | `ANALYTICS_DAILY_CRON` | `15 0 * * *` | Cron for daily aggregation |
 | `SEARCH_MAX_RESULTS` | `200` | Maximum search query results |
 | `LOG_LEVEL` | `info` | Log level (debug/info/warn/error) |
+| `EXPORT_MAX_ROWS` | `50000` | Maximum rows for XLSX export |
 
 ## Dependencies
 
@@ -108,6 +109,8 @@ The `.env` file (git-ignored) provides local development settings. Key variables
 
 ## Implementation Status
 
+**Phase 5 in progress** — XLSX export endpoint (`GET /audit/logs/export` via ExcelJS with styled headers, status-based cell coloring, auto-column widths, 50K row limit), manual aggregation trigger (`POST /audit/analytics/aggregate`), enhanced status consumer field extraction (providerName/correlationId/cycleId from metadata). New error codes: AUD-010 (AGGREGATION_FAILED), AUD-011 (EXPORT_DATE_RANGE_REQUIRED), AUD-012 (EXPORT_ROW_LIMIT_EXCEEDED). New env var: `EXPORT_MAX_ROWS` (default 50000). New dependency: `exceljs`.
+
 **Phase 4 complete** — DLQ monitoring with CRUD + reprocessing, analytics aggregation engine with cron jobs, and data retention scheduling. 338 unit tests across 41 suites, 58 E2E tests across 8 suites.
 
 - **Phase 1:** NestJS scaffold (main.ts bootstrap with Pino, global pipes/filters/interceptors, CORS, port 3156), Config module (appConfig, databaseConfig, rabbitmqConfig, env validation), Common module (@Global, 9 AUD-prefixed error codes, HttpExceptionFilter, DtoValidationPipe, LoggingInterceptor, PgBaseRepository), TypeORM entities (AuditEvent, DeliveryReceipt, NotificationAnalytics, DlqEntry), 4 repositories extending PgBaseRepository, 4 feature modules (Events, Receipts, Analytics, DLQ), Metrics module (@Global, 15 custom metrics: 6 counters, 5 histograms, 4 gauges, GET /metrics), Health module (GET /health liveness, GET /health/ready readiness with DB + RabbitMQ + DLQ pending + consumers), Database scripts (4 tables, 14 indexes, search_vector trigger, purge function, CHECK constraint).
@@ -133,7 +136,7 @@ audit-service/
     app.module.ts              # Root module: Config, Logger, TypeORM, Common, Metrics, Events, Receipts, Analytics, DLQ, Search, Trace, Consumers, Health
     common/
       common.module.ts         # @Global() module
-      errors.ts                # Error registry (9 AUD-prefixed codes) + createErrorResponse()
+      errors.ts                # Error registry (12 AUD-prefixed codes) + createErrorResponse()
       errors.spec.ts
       interfaces/
         error-response.interface.ts  # { code, details, message, status, stack? }
@@ -157,14 +160,17 @@ audit-service/
       env.validation.spec.ts
     events/
       events.module.ts         # TypeORM feature, controllers + services + exports AuditEventsRepository
-      audit-logs.controller.ts       # GET /audit/logs — paginated logs with filters
+      audit-logs.controller.ts       # GET /audit/logs — paginated logs with filters, GET /audit/logs/export — XLSX export
       audit-logs.controller.spec.ts
       audit-logs.service.ts          # Filter delegation, date range validation, response transform
       audit-logs.service.spec.ts
-      audit-events.repository.ts     # Extends PgBaseRepository + findWithFilters, fullTextSearch, findByNotificationIdOrdered, findDistinctNotificationIds
+      audit-export.service.ts        # XLSX export via ExcelJS (styled headers, status coloring, auto-widths, row limit)
+      audit-export.service.spec.ts
+      audit-events.repository.ts     # Extends PgBaseRepository + findWithFilters, fullTextSearch, findByNotificationIdOrdered, findDistinctNotificationIds, findForExport
       audit-events.repository.spec.ts
       dto/
         list-audit-logs-query.dto.ts # Query params: notificationId, correlationId, cycleId, eventType, actor, from, to, q, page, pageSize
+        export-audit-logs-query.dto.ts # Query params for XLSX export: same filters + required from/to
       entities/
         audit-event.entity.ts        # 10 columns, UUID PK, tsvector search_vector
         audit-event.entity.spec.ts
@@ -197,16 +203,17 @@ audit-service/
         trace-response.interface.ts  # TimelineEntry, NotificationTraceResponse, CorrelationTraceResponse, CycleTraceResponse
     analytics/
       analytics.module.ts      # TypeORM feature + ScheduleModule, controller + services
-      analytics.controller.ts  # GET /audit/analytics, GET /audit/analytics/summary
+      analytics.controller.ts  # GET /audit/analytics, GET /audit/analytics/summary, POST /audit/analytics/aggregate
       analytics.controller.spec.ts
       analytics.service.ts     # Query + summary computation
       analytics.service.spec.ts
-      aggregation.service.ts   # @Cron hourly/daily rollups, idempotent upsert
+      aggregation.service.ts   # @Cron hourly/daily rollups, idempotent upsert, runManualAggregation()
       aggregation.service.spec.ts
       notification-analytics.repository.ts  # Extends PgBaseRepository + findWithFilters, upsertRow, aggregateFromReceipts, countSuppressed, findForSummary
       notification-analytics.repository.spec.ts
       dto/
         query-analytics.dto.ts # period, from (required), to (required), channel, eventType, page, pageSize
+        trigger-aggregation.dto.ts # Optional period ('hourly' | 'daily') for manual aggregation
       entities/
         notification-analytics.entity.ts  # 14 columns, UUID PK, COALESCE-based unique index
         notification-analytics.entity.spec.ts

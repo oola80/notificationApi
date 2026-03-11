@@ -181,6 +181,70 @@ export function useReprocessDlq(): UseReprocessDlqReturn {
   return { trigger, isMutating, error, reset };
 }
 
+// --- XLSX Export (server-side) ---
+
+interface UseXlsxExportReturn {
+  trigger: (params?: AuditSearchParams) => Promise<void>;
+  isExporting: boolean;
+  error: Error | null;
+}
+
+export function useXlsxExport(): UseXlsxExportReturn {
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [error, setError] = React.useState<Error | null>(null);
+
+  const trigger = React.useCallback(
+    async (params?: AuditSearchParams) => {
+      if (!params?.from || !params?.to) {
+        throw new Error("Date range (from/to) is required for XLSX export");
+      }
+
+      setIsExporting(true);
+      setError(null);
+      try {
+        const baseUrl = getServiceUrl("audit");
+        const queryParams = new URLSearchParams();
+        queryParams.set("from", params.from);
+        queryParams.set("to", params.to);
+        if (params.notificationId) queryParams.set("notificationId", params.notificationId);
+        if (params.correlationId) queryParams.set("correlationId", params.correlationId);
+        if (params.cycleId) queryParams.set("cycleId", params.cycleId);
+        if (params.eventType) queryParams.set("eventType", params.eventType);
+        if (params.actor) queryParams.set("actor", params.actor);
+        if (params.q) queryParams.set("q", params.q);
+
+        const url = `${baseUrl}/api/v1/audit/logs/export?${queryParams.toString()}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => null);
+          const message = errorBody?.message ?? `Export failed (${response.status})`;
+          throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = blobUrl;
+        anchor.download = `audit-export-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, "-")}.xlsx`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        setError(e);
+        throw e;
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [],
+  );
+
+  return { trigger, isExporting, error };
+}
+
 // --- CSV Export (fetch all pages) ---
 
 interface UseCsvExportReturn {

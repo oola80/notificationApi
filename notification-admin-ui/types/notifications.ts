@@ -102,6 +102,29 @@ export interface ReceiptsResponse {
   receipts: DeliveryReceipt[];
 }
 
+// --- Channel-router delivery attempts response ---
+
+export interface ProviderDeliveryAttempt {
+  id: string;
+  notificationId: string;
+  correlationId: string | null;
+  channel: string;
+  providerId: string;
+  attemptNumber: number;
+  status: string;
+  providerResponse: Record<string, unknown> | null;
+  providerMessageId: string | null;
+  errorMessage: string | null;
+  metadata: Record<string, unknown> | null;
+  attemptedAt: string;
+  durationMs: number | null;
+}
+
+export interface DeliveryAttemptsResponse {
+  notificationId: string;
+  attempts: ProviderDeliveryAttempt[];
+}
+
 // --- Audit-service logs response (meta-based pagination) ---
 
 export interface AuditLogsMeta {

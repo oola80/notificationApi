@@ -37,7 +37,6 @@ import {
 import {
   PageHeader,
   ChannelIcon,
-  StatusBadge,
   ConfirmDialog,
   EmptyState,
   PageSkeleton,
@@ -50,6 +49,7 @@ import {
   useProviders,
   useRegisterProvider,
   useDeleteProvider,
+  useUpdateProvider,
 } from "@/hooks/use-channels";
 import {
   updateChannelSchema,
@@ -315,6 +315,36 @@ function ChannelConfigForm({ channel, onSubmit }: ChannelConfigFormProps) {
   );
 }
 
+// --- Provider Active Toggle ---
+
+function ProviderActiveToggle({ provider }: { provider: Provider }) {
+  const updateProvider = useUpdateProvider(provider.id);
+  const [checked, setChecked] = React.useState(provider.isActive);
+
+  React.useEffect(() => {
+    setChecked(provider.isActive);
+  }, [provider.isActive]);
+
+  const handleToggle = async (value: boolean) => {
+    setChecked(value);
+    try {
+      await updateProvider.trigger({ isActive: value });
+      toast.success(`Provider "${provider.providerName}" ${value ? "activated" : "deactivated"}`);
+    } catch {
+      setChecked(provider.isActive);
+      toast.error("Failed to update provider status");
+    }
+  };
+
+  return (
+    <Switch
+      checked={checked}
+      onCheckedChange={handleToggle}
+      disabled={updateProvider.isMutating}
+    />
+  );
+}
+
 // --- Provider Table ---
 
 interface ProviderTableProps {
@@ -350,9 +380,7 @@ function ProviderTable({ providers, onDelete }: ProviderTableProps) {
               </TableCell>
               <TableCell className="text-center">{provider.routingWeight}</TableCell>
               <TableCell className="text-center">
-                <StatusBadge
-                  status={provider.isActive ? "active" : "inactive"}
-                />
+                <ProviderActiveToggle provider={provider} />
               </TableCell>
               <TableCell>
                 <Button

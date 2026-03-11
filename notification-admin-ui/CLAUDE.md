@@ -14,6 +14,8 @@ Next.js admin frontend for the Notification API platform. Connects directly to 7
 
 ## Implementation Status
 
+**Phase 14 complete** — Provider Payloads & Notification Detail Enhancements. Enhanced `/logs/[id]` notification detail page with: "Provider Delivery Attempts" card showing delivery attempt rows from channel-router-service with expandable `providerResponse` JSON, `errorMessage`, and `metadata`; expandable delivery receipt rows showing `rawResponse` webhook JSON; `useProviderDeliveryAttempts` SWR hook + `ProviderDeliveryAttempt`/`DeliveryAttemptsResponse` types. Audit log viewer notification ID cells are now clickable links to `/logs/{id}`. XLSX export button (`XlsxExportButton` component + `useXlsxExport` hook) for server-side Excel export via audit-service.
+
 **Phase 13 complete** — Audit Trail, DLQ Viewer & Polish. Tabbed audit page: Audit Logs tab with full-text search, event type/actor/date range filters, expandable rows showing metadata and payload JSON with copy-to-clipboard IDs, CSV export fetching all pages. Dead Letter Queue tab with status filter, status count badges, DataTable with row actions (Investigate, Reprocess, Discard) following strict state machine transitions (pending→investigated/discarded, investigated→reprocessed/discarded). Polish: React error boundary component, Next.js error.tsx for all 10 route groups + global, loading.tsx with PageSkeleton for all routes, per-page metadata titles via title template, removed test-components page, DLQ status variants in StatusBadge. SWR hooks in `hooks/use-audit.ts` (`useAuditLogs`, `useAuditSearch`, `useDlqEntries`, `useUpdateDlqStatus`, `useReprocessDlq`, `useCsvExport`). Components in `components/audit/` (AuditLogViewer, AuditDetailRow, CsvExportButton, DlqViewer).
 
 | Phase | Description | Status |
@@ -31,6 +33,7 @@ Next.js admin frontend for the Notification API platform. Connects directly to 7
 | Phase 11 | Recipient Groups & Settings Modules | **Done** |
 | Phase 12 | Dashboard & Analytics Module | **Done** |
 | Phase 13 | Audit Trail, DLQ Viewer & Polish | **Done** |
+| Phase 14 | Provider Payloads & Notification Detail Enhancements | **Done** |
 
 ## Backend Integration
 
@@ -50,6 +53,7 @@ Direct microservice communication (no BFF/gateway proxy). Each UI feature talks 
 | Notification Trace | audit-service | 3156 | `/api/v1/trace` |
 | Audit Logs & Search | audit-service | 3156 | `/api/v1/logs`, `/api/v1/search` |
 | Dead Letter Queue | audit-service | 3156 | `/api/v1/dlq` |
+| Provider Delivery Attempts | channel-router-service | 3154 | `/api/v1/delivery-attempts` |
 | Bulk Upload | bulk-upload-service | 3158 | `/api/v1/uploads` |
 
 ## Key Dependencies
@@ -146,7 +150,7 @@ notification-admin-ui/
 │   ├── bulk-upload/                # Bulk upload components
 │   ├── recipient-groups/           # Recipient group components
 │   ├── settings/                   # Settings components
-│   ├── audit/                      # Audit trail & DLQ components
+│   ├── audit/                      # Audit trail & DLQ components (AuditLogViewer, AuditDetailRow, CsvExportButton, XlsxExportButton, DlqViewer)
 │   └── shared/                     # Cross-feature shared components (+ ErrorBoundary)
 ├── hooks/
 │   ├── use-api.ts                  # SWR hooks (useApiGet, useApiMutation)
@@ -154,11 +158,11 @@ notification-admin-ui/
 │   ├── use-rules.ts                # Rule hooks (useRules, useRule, useCreateRule, useUpdateRule, useDeleteRule)
 │   ├── use-templates.ts            # Template hooks (useTemplates, useTemplate, useCreateTemplate, useUpdateTemplate, useDeleteTemplate, useRenderTemplate, usePreviewTemplate, useRollbackTemplate)
 │   ├── use-channels.ts             # Channel/provider hooks (useChannels, useChannel, useUpdateChannel, useProviders, useRegisterProvider, useUpdateProvider, useDeleteProvider)
-│   ├── use-notifications.ts       # Notification log/trace hooks (useNotificationLogs, useNotificationSearch, useNotificationTrace, useCorrelationTrace, useCycleTrace, useDeliveryReceipts)
+│   ├── use-notifications.ts       # Notification log/trace hooks (useNotificationLogs, useNotificationSearch, useNotificationTrace, useCorrelationTrace, useCycleTrace, useDeliveryReceipts, useProviderDeliveryAttempts)
 │   ├── use-bulk-upload.ts         # Bulk upload hooks (useUploads, useUpload, useUploadStatus, useCreateUpload, useRetryUpload, useDeleteUpload, useDownloadResult, useUploadErrors)
 │   ├── use-recipient-groups.ts    # Recipient group hooks (useRecipientGroups, useRecipientGroup, useCreateRecipientGroup, useUpdateRecipientGroup, useDeleteRecipientGroup, useRecipientGroupMembers, useAddRecipientGroupMember, useRemoveRecipientGroupMember)
 │   ├── use-dashboard.ts           # Dashboard hooks (useDashboardSummary, useAnalytics)
-│   ├── use-audit.ts               # Audit hooks (useAuditLogs, useAuditSearch, useDlqEntries, useUpdateDlqStatus, useReprocessDlq, useCsvExport)
+│   ├── use-audit.ts               # Audit hooks (useAuditLogs, useAuditSearch, useDlqEntries, useUpdateDlqStatus, useReprocessDlq, useXlsxExport, useCsvExport)
 │   └── use-settings.ts            # Settings hooks (useSystemConfigs, useUpdateSystemConfig)
 ├── lib/
 │   ├── api-client.ts               # Multi-service fetch wrapper (ApiError, swrFetcher)

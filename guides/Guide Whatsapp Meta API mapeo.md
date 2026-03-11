@@ -18,6 +18,8 @@ Esta guia explica como el sistema NotificationAPI transforma los datos de entrad
 8. [Errores Comunes y Solucion](#8-errores-comunes-y-solucion)
 9. [Modo de Pruebas (Test Mode)](#9-modo-de-pruebas-test-mode)
 10. [Variables de Entorno](#10-variables-de-entorno)
+11. [Como Meta API Maneja Templates con Parametros Nombrados](#11-como-meta-api-maneja-templates-con-parametros-nombrados)
+12. [Mapeo de EventType a Template de Meta](#12-mapeo-de-eventtype-a-template-de-meta)
 
 ---
 
@@ -661,6 +663,362 @@ Esto es util para:
 | `WHATSAPP_PORT` | Puerto HTTP del adapter | `3173` | No |
 | `WHATSAPP_TEST_MODE` | Enviar siempre `hello_world` | `false` | No |
 | `WHATSAPP_TLS_REJECT_UNAUTHORIZED` | Verificacion TLS | `true` | No |
+
+---
+
+## 11. Como Meta API Maneja Templates con Parametros Nombrados
+
+### Identificacion del Template
+
+Meta identifica un template de WhatsApp mediante la combinacion de **dos campos obligatorios**:
+
+- **`name`** — El nombre unico del template (snake_case), tal como fue registrado y aprobado en Meta Business Manager. Ejemplo: `order_delay_notification`.
+- **`language.code`** — El codigo de idioma/locale del template. Ejemplo: `es_MX`, `en_US`, `pt_BR`.
+
+Un mismo nombre de template puede tener multiples versiones en distintos idiomas. Meta selecciona la version correcta usando la combinacion exacta de `name` + `language.code`.
+
+```json
+{
+  "template": {
+    "name": "order_delay_notification",
+    "language": { "code": "es_MX" }
+  }
+}
+```
+
+> **Importante:** Si el `name` o el `language.code` no coinciden exactamente con un template aprobado, Meta rechaza el mensaje con un error de template no encontrado.
+
+### Categorias de Templates
+
+Meta clasifica los templates en tres categorias, cada una con reglas de aprobacion y costos distintos:
+
+| Categoria | Uso | Ejemplos |
+|---|---|---|
+| **Utility** | Mensajes transaccionales iniciados por una accion del usuario | Confirmacion de pedido, actualizacion de envio, recordatorio de pago |
+| **Marketing** | Mensajes promocionales o de reengagement | Ofertas, descuentos, newsletters, recuperacion de carrito |
+| **Authentication** | Codigos de verificacion y OTP | Codigos de un solo uso, verificacion de cuenta |
+
+> **Nota:** Los templates de tipo *Utility* y *Authentication* tienen mayor tasa de aprobacion y menor costo por mensaje que los de *Marketing*.
+
+### Parametros: Nombrados vs Posicionales
+
+Meta soporta dos formas de pasar parametros a un template:
+
+#### Parametros Nombrados (Recomendado — usado por nuestro sistema)
+
+Cada parametro incluye un campo `parameter_name` que indica a que variable del template corresponde. **El orden no importa**, Meta empareja por nombre:
+
+```json
+{
+  "type": "body",
+  "parameters": [
+    { "type": "text", "parameter_name": "order_id", "text": "ORD-2024-001" },
+    { "type": "text", "parameter_name": "customer_name", "text": "Juan Perez" }
+  ]
+}
+```
+
+En el template de Meta, las variables se definen con doble llave y nombre:
+```
+Hola {{customer_name}}, tu pedido {{order_id}} tiene un retraso.
+```
+
+Meta empareja `parameter_name: "customer_name"` con `{{customer_name}}` y `parameter_name: "order_id"` con `{{order_id}}`, sin importar el orden en que se envien.
+
+#### Parametros Posicionales (Legacy)
+
+Sin `parameter_name`, Meta asigna los parametros en orden secuencial: el primer parametro va a `{{1}}`, el segundo a `{{2}}`, etc. Este formato es legacy y mas fragil:
+
+```json
+{
+  "type": "body",
+  "parameters": [
+    { "type": "text", "text": "Juan Perez" },
+    { "type": "text", "text": "ORD-2024-001" }
+  ]
+}
+```
+
+Template correspondiente: `Hola {{1}}, tu pedido {{2}} tiene un retraso.`
+
+> **Nuestro sistema usa parametros nombrados siempre que se proveen `templateParameters` con `name`.** El fallback por comas (seccion 3) genera parametros posicionales sin `parameter_name`.
+
+### Estructura de Componentes del Template
+
+Un template de Meta puede tener multiples secciones, cada una con sus propios parametros:
+
+| Componente | Descripcion | Tipos de Parametro Soportados |
+|---|---|---|
+| **header** | Encabezado del mensaje (texto, imagen, video, documento) | `text`, `image`, `video`, `document` |
+| **body** | Cuerpo principal del mensaje | `text` |
+| **button** | Botones interactivos (URL dinamica, respuesta rapida) | `text` (para URL dinamica con sufijo variable) |
+
+Ejemplo de payload con header y body:
+
+```json
+{
+  "template": {
+    "name": "shipment_with_image",
+    "language": { "code": "es_MX" },
+    "components": [
+      {
+        "type": "header",
+        "parameters": [
+          { "type": "image", "image": { "link": "https://example.com/foto.jpg" } }
+        ]
+      },
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "parameter_name": "customer_name", "text": "Maria" },
+          { "type": "text", "parameter_name": "tracking_id", "text": "GT-12345" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+> **Alcance actual:** Nuestro adapter de WhatsApp actualmente solo soporta parametros de tipo `text` en el componente `body`. Soporte para `header` con media y `button` con URL dinamica puede agregarse en fases futuras.
+
+### Payload Completo de Referencia
+
+```json
+POST https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages
+
+{
+  "messaging_product": "whatsapp",
+  "to": "50212345678",
+  "type": "template",
+  "template": {
+    "name": "order_delay_notification",
+    "language": {
+      "code": "es_MX"
+    },
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          {
+            "type": "text",
+            "parameter_name": "customer_name",
+            "text": "Juan Perez"
+          },
+          {
+            "type": "text",
+            "parameter_name": "order_id",
+            "text": "ORD-2024-001"
+          },
+          {
+            "type": "text",
+            "parameter_name": "delay_days",
+            "text": "3"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 12. Mapeo de EventType a Template de Meta
+
+### Vision General
+
+Nuestro sistema **no requiere cambios de codigo** para conectar un nuevo tipo de evento con un template de Meta. Todo se configura en base de datos a traves de tres entidades: **regla de notificacion**, **template interno**, y **metadata de canal WhatsApp**.
+
+### Cadena Completa del Mapeo
+
+```
+eventType (ej: "order.delay")
+       |
+       v
+notification_rules.event_type = "order.delay"
+  → actions[].templateId = "order-delay"
+  → actions[].channels = ["whatsapp"]
+       |
+       v
+template_service: templates.id = "order-delay"
+  → template_versions (version activa)
+  → template_channels (channel = "whatsapp")
+       |
+       v
+template_channels.metadata (JSONB):
+  {
+    "metaTemplateName": "order_delay_notification",
+    "metaTemplateLanguage": "es_MX",
+    "metaTemplateParameters": [
+      { "name": "customer_name", "field": "customerName" },
+      { "name": "order_id", "field": "orderId" },
+      { "name": "delay_days", "field": "estimatedDelay" }
+    ]
+  }
+       |
+       v
+Notification Engine resuelve los valores del payload del evento:
+  templateParameters = metaTemplateParameters.map(param => ({
+    name: param.name,
+    value: normalizedPayload[param.field]
+  }))
+       |
+       v
+SendRequest al WhatsApp Adapter con:
+  metadata.templateName = "order_delay_notification"
+  metadata.templateLanguage = "es_MX"
+  metadata.templateParameters = [
+    { name: "customer_name", value: "Juan Perez" },
+    { name: "order_id", value: "ORD-2024-001" },
+    { name: "delay_days", value: "3" }
+  ]
+```
+
+### Tablas Involucradas
+
+| Tabla | Schema | Rol en el Mapeo |
+|---|---|---|
+| `notification_rules` | `notification_engine_service` | Conecta `eventType` con `templateId` y canales via columna JSONB `actions` |
+| `templates` | `template_service` | Registro maestro del template interno |
+| `template_versions` | `template_service` | Versiones inmutables del template |
+| `template_channels` | `template_service` | Contenido por canal. Para WhatsApp, la columna `metadata` (JSONB) contiene el nombre del template de Meta, idioma, y mapeo de parametros |
+
+### Detalle del Campo `metadata` en `template_channels`
+
+Este campo JSONB es el **punto central del mapeo** entre nuestro sistema y Meta:
+
+```json
+{
+  "metaTemplateName": "order_delay_notification",
+  "metaTemplateLanguage": "es_MX",
+  "metaTemplateParameters": [
+    { "name": "customer_name", "field": "customerName" },
+    { "name": "order_id", "field": "orderId" },
+    { "name": "delay_days", "field": "estimatedDelay" }
+  ]
+}
+```
+
+| Propiedad | Descripcion |
+|---|---|
+| `metaTemplateName` | Nombre exacto del template aprobado en Meta Business Manager |
+| `metaTemplateLanguage` | Codigo de idioma para Meta (ej: `es_MX`, `en_US`) |
+| `metaTemplateParameters` | Array de mapeos. Cada elemento tiene: |
+| `metaTemplateParameters[].name` | Nombre del parametro en el template de Meta (corresponde a `{{nombre}}` en el template) |
+| `metaTemplateParameters[].field` | Nombre del campo en el `normalizedPayload` del evento de donde se toma el valor |
+
+### Ejemplo Completo: Desde el Evento hasta Meta
+
+**1. Evento llega al Event Ingestion Service:**
+```json
+{
+  "eventType": "order.delay",
+  "source": "ecommerce-erp",
+  "payload": {
+    "customer_name": "Juan Perez",
+    "order_number": "ORD-2024-001",
+    "estimated_delay": "3"
+  }
+}
+```
+
+**2. Event Ingestion normaliza los campos** (via mapeos de campo en runtime):
+```json
+{
+  "eventType": "order.delay",
+  "normalizedPayload": {
+    "customerName": "Juan Perez",
+    "orderId": "ORD-2024-001",
+    "estimatedDelay": "3",
+    "customerPhone": "+50212345678"
+  }
+}
+```
+
+**3. Notification Engine encuentra la regla** donde `event_type = 'order.delay'`:
+```json
+{
+  "actions": [
+    {
+      "templateId": "order-delay",
+      "channels": ["whatsapp"],
+      "recipientField": "customerPhone"
+    }
+  ]
+}
+```
+
+**4. Template Service renderiza y retorna el channelMetadata** para el canal `whatsapp` del template `order-delay`:
+```json
+{
+  "channelMetadata": {
+    "metaTemplateName": "order_delay_notification",
+    "metaTemplateLanguage": "es_MX",
+    "metaTemplateParameters": [
+      { "name": "customer_name", "field": "customerName" },
+      { "name": "order_id", "field": "orderId" },
+      { "name": "delay_days", "field": "estimatedDelay" }
+    ]
+  }
+}
+```
+
+**5. Notification Engine resuelve los valores** del `normalizedPayload`:
+```json
+{
+  "templateParameters": [
+    { "name": "customer_name", "value": "Juan Perez" },
+    { "name": "order_id", "value": "ORD-2024-001" },
+    { "name": "delay_days", "value": "3" }
+  ]
+}
+```
+
+**6. WhatsApp Adapter construye el payload de Meta:**
+```json
+{
+  "messaging_product": "whatsapp",
+  "to": "50212345678",
+  "type": "template",
+  "template": {
+    "name": "order_delay_notification",
+    "language": { "code": "es_MX" },
+    "components": [
+      {
+        "type": "body",
+        "parameters": [
+          { "type": "text", "parameter_name": "customer_name", "text": "Juan Perez" },
+          { "type": "text", "parameter_name": "order_id", "text": "ORD-2024-001" },
+          { "type": "text", "parameter_name": "delay_days", "text": "3" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Archivos Clave del Codigo
+
+| Componente | Archivo |
+|---|---|
+| Entidad de regla (actions JSONB) | `notification-engine-service/src/rules/entities/notification-rule.entity.ts` |
+| Pipeline de procesamiento (resolucion de parametros) | `notification-engine-service/src/consumers/event-processing-pipeline.service.ts` |
+| Interfaz DeliverMessage (templateName, templateParameters) | `notification-engine-service/src/rabbitmq/interfaces/deliver-message.interface.ts` |
+| Entidad template_channels (metadata JSONB) | `template-service/src/templates/entities/template-channel.entity.ts` |
+| Servicio de renderizado (retorna channelMetadata) | `template-service/src/rendering/services/rendering.service.ts` |
+| Transformacion a SendRequest | `channel-router-service/src/adapter-client/adapter-client.service.ts` |
+| Construccion del payload Meta | `provider-adapters/apps/adapter-whatsapp/src/send/send.service.ts` |
+| Seed SQL de ejemplo | `template-service/dbscripts/seed-order-delay-template.sql` |
+
+### Para Agregar un Nuevo EventType → Template de Meta
+
+1. **Crear el template en Meta Business Manager** y esperar aprobacion
+2. **Crear el template interno** en `template_service` (tabla `templates` + `template_versions`)
+3. **Configurar el canal WhatsApp** en `template_channels` con el `metadata` JSONB que contenga `metaTemplateName`, `metaTemplateLanguage`, y `metaTemplateParameters`
+4. **Crear la regla** en `notification_engine_service` (tabla `notification_rules`) con `event_type` y `actions[].templateId` apuntando al template interno
+5. **Configurar los mapeos de campo** en `event_ingestion_service` para que el payload del sistema origen se normalice con los nombres de campo que el `metaTemplateParameters[].field` espera
+
+> **Sin cambios de codigo:** Todo el mapeo se configura en base de datos. Agregar un nuevo tipo de evento con un nuevo template de Meta es puramente configuracion.
 
 ---
 

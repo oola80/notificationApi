@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import {
   Table,
@@ -23,6 +24,7 @@ import { Pagination, SearchInput, DateRangePicker, PageHeader } from "@/componen
 import type { DateRange } from "@/components/shared";
 import { AuditDetailRow } from "./audit-detail-row";
 import { CsvExportButton } from "./csv-export";
+import { XlsxExportButton } from "./xlsx-export";
 import { useAuditLogs, useAuditSearch } from "@/hooks/use-audit";
 import { formatDate, truncate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
@@ -150,6 +152,7 @@ function AuditLogViewer() {
             </Button>
           )}
           <CsvExportButton params={csvParams} />
+          <XlsxExportButton params={csvParams} />
           <Button
             variant="outline"
             size="sm"
@@ -227,9 +230,17 @@ function AuditLogViewer() {
                         </TableCell>
                         <TableCell className="text-sm">{event.actor}</TableCell>
                         <TableCell className="font-mono text-xs">
-                          {event.notificationId
-                            ? truncate(event.notificationId, 12)
-                            : <span className="text-muted-foreground">-</span>}
+                          {event.notificationId ? (
+                            <Link
+                              href={`/logs/${event.notificationId}`}
+                              className="hover:underline text-primary"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {truncate(event.notificationId, 12)}
+                            </Link>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {event.correlationId

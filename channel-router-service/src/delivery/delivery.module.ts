@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeliveryAttempt } from './entities/delivery-attempt.entity.js';
+import { DeliveryAttemptsController } from './delivery-attempts.controller.js';
 import { DeliveryAttemptsRepository } from './delivery-attempts.repository.js';
 import { DeliveryPipelineService } from './delivery-pipeline.service.js';
 import { ProvidersModule } from '../providers/providers.module.js';
@@ -26,6 +27,7 @@ import { AppRabbitMQModule } from '../rabbitmq/rabbitmq.module.js';
     FallbackModule,
     forwardRef(() => AppRabbitMQModule),
   ],
+  controllers: [DeliveryAttemptsController],
   providers: [DeliveryAttemptsRepository, DeliveryPipelineService],
   exports: [DeliveryAttemptsRepository, DeliveryPipelineService],
 })

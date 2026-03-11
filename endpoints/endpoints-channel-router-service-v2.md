@@ -27,6 +27,12 @@ Provider webhook endpoints have moved to individual adapter services. The Notifi
 | GET | `/providers` | List all registered provider adapter services with status, supported channels, adapter URL, circuit breaker state, and rate limit config | Done |
 | PUT | `/providers/:id/config` | Update provider adapter service configuration (adapter URL, routing weight, rate limits). Note: provider credentials are managed by each adapter service independently, not by the core. | Done |
 
+## Delivery Attempts
+
+| Method | Path | Description | Status |
+|--------|------|-------------|--------|
+| GET | `/api/v1/delivery-attempts/:notificationId` | Get all delivery attempt rows for a notification, including `providerResponse` JSONB, ordered by attempt number ascending | Done |
+
 ## Health
 
 | Method | Path | Description | Status |

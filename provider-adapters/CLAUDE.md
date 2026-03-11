@@ -26,13 +26,15 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 
 ## Implementation Status
 
-**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). **adapter-braze Phase 4 complete** — Full multi-channel adapter: send pipeline (email, SMS, WhatsApp, push), profile sync with LRU cache, email hashing, webhook processing (transactional postbacks + Currents batches, 16 event type mappings, shared secret verification with timing-safe comparison, fire-and-forget RabbitMQ publishing). All endpoints Done. **adapter-whatsapp Phase 1 complete** — Send pipeline + health (POST /send, GET /health, GET /capabilities, GET /metrics). **libs/common MetadataDto** extended with `templateName`, `templateLanguage`, `templateParameters` (`TemplateParameterDto[]` — named parameter objects with `name`/`value` fields) for WhatsApp Meta template dispatch. Named parameters emitted to Meta API as `{ type: 'text', parameter_name, text }`. **libs/common WebhookEventType** extended with `SENT`, `READ`, `RECEIVED`, `TEMP_FAIL`, `SPAM_COMPLAINT` for Braze multi-channel webhook support. All other adapters not started.
+**adapter-mailgun Phase 3 complete** — Webhook verification, normalization, and RabbitMQ publishing (POST /webhooks/inbound). **adapter-braze Phase 4 complete** — Full multi-channel adapter: send pipeline (email, SMS, WhatsApp, push), profile sync with LRU cache, email hashing, webhook processing (transactional postbacks + Currents batches, 16 event type mappings, shared secret verification with timing-safe comparison, fire-and-forget RabbitMQ publishing). All endpoints Done. **adapter-whatsapp Phase 1 complete** — Send pipeline + health (POST /send, GET /health, GET /capabilities, GET /metrics). **adapter-aws-ses Phase 3 complete** — Dual-mode email adapter (SMTP via Nodemailer + API via `@aws-sdk/client-sesv2`). Send pipeline with channel validation, attachment processing (40 MB SMTP / 10 MB API), HTML detection, custom headers (`X-Notification-Id`, `X-Correlation-Id`). Factory pattern (`SesClientFactoryService`) selects client based on `SES_MODE` (smtp/api). Webhook processing: SNS notification handling with subscription confirmation, certificate-based signature verification, 11 SES event type mappings (Delivery/Bounce/Complaint/Reject/Open/Click/Send/DeliveryDelay/RenderingFailure/Subscription), fire-and-forget RabbitMQ publishing. Health check: SMTP verify or API GetAccount with quota details. All endpoints Done. ~170 unit tests / 13 suites, 3 E2E files. **libs/common MetadataDto** extended with `templateName`, `templateLanguage`, `templateParameters` (`TemplateParameterDto[]` — named parameter objects with `name`/`value` fields) for WhatsApp Meta template dispatch. Named parameters emitted to Meta API as `{ type: 'text', parameter_name, text }`. **libs/common WebhookEventType** extended with `SENT`, `READ`, `RECEIVED`, `TEMP_FAIL`, `SPAM_COMPLAINT` for Braze multi-channel webhook support.
 
 - **Phase 3:** Webhook processing pipeline (`WebhooksModule`: `WebhookVerificationService` with HMAC-SHA256 + timing-safe comparison + 5-min replay protection, `WebhookNormalizerService` with 7 event type mappings + field extraction + metadata, `WebhooksService` pipeline orchestrator with fire-and-forget pattern, `WebhooksController` POST /webhooks/inbound with 200/401 responses). Interfaces: `MailgunWebhookPayload`, `MailgunWebhookSignature`, `MailgunWebhookEventData`. 204 unit tests across 28 suites, 17 E2E tests across 3 files.
 
 - **Phase 2:** Mailgun HTTP client module (`MailgunClientService`: sendMessage, getDomainInfo, buildFormData, EU region support). Send pipeline (`SendService`: channel validation, attachment processing with Base64/URL support and graceful degradation, Mailgun form data mapping with custom variables `v:notificationId`/`v:correlationId`/`v:cycleId` and headers `h:X-Notification-Id`, "Name \<email\>" recipient formatting, HTML detection, fromAddress override, Reply-To). Error classifier (`ErrorClassifierService`: HTTP status→retryable/errorCode mapping for all Mailgun responses). Send controller (`POST /send` with `@HttpCode(200)` — always returns 200 with success/failure in body). Refactored `MailgunHealthService` to use shared `MailgunClientService`. 149 unit tests across 24 suites, 10 E2E tests across 2 files.
 
 - **adapter-whatsapp Phase 1:** WhatsApp (Meta Cloud API) send pipeline + health. `WhatsAppClientService` (sendMessage, getPhoneNumberInfo via Graph API v22.0 with Bearer token; debug logging of Meta API request payload). `SendService` (channel validation, phone formatting strip `+`, message type detection — Priority 1: `metadata.templateName` explicit field; Priority 2: `content.subject` prefix `template:`; template/text/media messages, `buildTemplateFromMetadata()` uses metadata fields with named parameters `{ type: 'text', parameter_name: param.name, text: param.value }`, fallback to comma-separated body parsing). `ErrorClassifierService` (two-level: Meta error codes 130429/131026/131047/132000/132012/135000/368 + HTTP status fallback). `HealthController` (GET /health, GET /capabilities with providerId `meta-whatsapp`). `WhatsAppHealthService` extends `BaseHealthService`. 10 WA-prefixed error codes. 5 test files (3 E2E spec files).
+
+- **adapter-aws-ses Phase 3:** Dual-mode email adapter (SMTP + API). `SesClientFactoryService` factory reads `SES_MODE`, provides `SES_CLIENT` injection token (interface-based). SMTP mode: Nodemailer transport to `email-smtp.{region}.amazonaws.com` with SES SMTP credentials. API mode: `@aws-sdk/client-sesv2` `SendEmailCommand` (simple) / raw MIME (attachments). `SendService` with channel validation, attachment processing (40 MB SMTP / 10 MB API), HTML detection, custom headers. `ErrorClassifierService` with AWS SDK error types (ThrottlingException, MessageRejected, AccountSendingPausedException, etc.) + SMTP error codes. Webhook processing: SNS notification handling (`WebhooksController` with SubscriptionConfirmation auto-confirm + Notification processing), certificate-based signature verification (`WebhookVerificationService` with certificate caching, SigningCertURL validation), 11 SES event type mappings in `WebhookNormalizerService`, fire-and-forget RabbitMQ publishing. Health: `SesHealthService` delegates to `SES_CLIENT.checkConnectivity()` (SMTP verifyConnection / API GetAccount with quota). 10 SES-prefixed error codes. ~170 unit tests / 13 suites, 3 E2E files.
 
 - **Phase 1:** NestJS monorepo restructuring (nest-cli.json, tsconfig paths, package.json with all dependencies). libs/common/ shared library (DTOs: SendRequest/SendResult/WebhookEvent/Health/Capabilities, errors: PA-prefixed base codes + HttpExceptionFilter, pipes: DtoValidationPipe, interceptors: LoggingInterceptor, metrics: 7 prom-client metrics + GET /metrics, RabbitMQ: optional connection + fire-and-forget publisher, health: abstract BaseHealthService). apps/adapter-mailgun/ application (bootstrap with Pino/validation/filter/interceptor/CORS, config with registerAs + env validation, MG-prefixed error codes, MailgunHealthService with domains API connectivity check, HealthController with GET /health + GET /capabilities). 93 unit tests across 20 suites, 3 E2E tests. Mailgun domain: distelsa.info, region: us.
 
@@ -47,6 +49,8 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 | `@nestjs/axios` | ^4.0.0 | HTTP client module for provider API calls |
 | `@nestjs/mapped-types` | ^2.1.0 | DTO utilities (PartialType, OmitType) |
 | `@nestjs/terminus` | ^11.1.1 | Health checks |
+| `@aws-sdk/client-sesv2` | ^3.1006.0 | AWS SES v2 API client (API mode) |
+| `nodemailer` | ^8.0.2 | SMTP email transport (SES SMTP mode) |
 | `@golevelup/nestjs-rabbitmq` | ^7.1.2 | NestJS-idiomatic RabbitMQ integration |
 | `prom-client` | ^15.1.3 | Prometheus metrics (Registry, Counter, Histogram, Gauge) |
 | `class-validator` | ^0.14.3 | DTO validation decorators |
@@ -69,14 +73,18 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 | `build` | `nest build` | Build default app (adapter-mailgun) |
 | `build:mailgun` | `nest build adapter-mailgun` | Build Mailgun adapter |
 | `build:whatsapp` | `nest build adapter-whatsapp` | Build WhatsApp adapter |
+| `build:aws-ses` | `nest build adapter-aws-ses` | Build AWS SES adapter |
 | `start` | `nest start` | Run default app |
 | `start:dev` | `nest start --watch` | Dev mode (default app) |
 | `start:dev:mailgun` | `nest start adapter-mailgun --watch` | Dev mode (Mailgun) |
 | `start:dev:whatsapp` | `nest start adapter-whatsapp --watch` | Dev mode (WhatsApp) |
+| `start:dev:aws-ses` | `nest start adapter-aws-ses --watch` | Dev mode (AWS SES) |
 | `start:debug:mailgun` | `nest start adapter-mailgun --debug --watch` | Debug mode (Mailgun) |
 | `start:debug:whatsapp` | `nest start adapter-whatsapp --debug --watch` | Debug mode (WhatsApp) |
+| `start:debug:aws-ses` | `nest start adapter-aws-ses --debug --watch` | Debug mode (AWS SES) |
 | `start:prod:mailgun` | `node dist/apps/adapter-mailgun/main` | Production (Mailgun) |
 | `start:prod:whatsapp` | `node dist/apps/adapter-whatsapp/main` | Production (WhatsApp) |
+| `start:prod:aws-ses` | `node dist/apps/adapter-aws-ses/main` | Production (AWS SES) |
 | `lint` | `eslint "{apps,libs,test}/**/*.ts" --fix` | Lint and auto-fix |
 | `format` | `prettier --write "apps/**/*.ts" "libs/**/*.ts" "test/**/*.ts"` | Format code |
 | `test` | `jest` | Run all unit tests |
@@ -84,6 +92,7 @@ NestJS monorepo containing 4 provider adapter microservices. Each adapter is a s
 | `test:cov` | `jest --coverage` | Tests with coverage |
 | `test:e2e:mailgun` | `jest --config ./apps/adapter-mailgun/test/jest-e2e.json` | E2E tests (Mailgun) |
 | `test:e2e:whatsapp` | `jest --config ./apps/adapter-whatsapp/test/jest-e2e.json` | E2E tests (WhatsApp) |
+| `test:e2e:aws-ses` | `jest --config ./apps/adapter-aws-ses/test/jest-e2e.json` | E2E tests (AWS SES) |
 
 ## RabbitMQ
 
@@ -117,6 +126,18 @@ Configured via `.env` file in the monorepo root (git-ignored). Required for loca
 | `META_DEFAULT_TEMPLATE_LANGUAGE` | Default template language | `en` |
 | `WHATSAPP_TEST_MODE` | Enable test mode (static hello_world payload) | `true` |
 | `WHATSAPP_TLS_REJECT_UNAUTHORIZED` | TLS certificate verification (`'false'` to skip for corporate proxy) | `false` |
+| `SES_PORT` | AWS SES adapter HTTP port | `3174` |
+| `SES_MODE` | Delivery mode (`smtp` or `api`) | `smtp` |
+| `SES_REGION` | AWS region | `us-east-1` |
+| `SES_FROM_ADDRESS` | Default from address | *(see .env)* |
+| `SES_CONFIGURATION_SET` | SES Configuration Set name (for SNS events) | *(see .env)* |
+| `SES_SMTP_HOST` | SMTP endpoint | `email-smtp.us-east-1.amazonaws.com` |
+| `SES_SMTP_PORT` | SMTP port | `587` |
+| `SES_SMTP_USERNAME` | SES SMTP credentials (not IAM keys) | *(see .env)* |
+| `SES_SMTP_PASSWORD` | SES SMTP credentials (not IAM keys) | *(see .env)* |
+| `SES_ACCESS_KEY_ID` | IAM access key (API mode only) | *(see .env)* |
+| `SES_SECRET_ACCESS_KEY` | IAM secret key (API mode only) | *(see .env)* |
+| `SES_TIMEOUT` | Request timeout (ms) | `10000` |
 | `RABBITMQ_HOST` | RabbitMQ host | `localhost` |
 | `RABBITMQ_PORT` | RabbitMQ AMQP port | `5672` |
 | `RABBITMQ_VHOST` | RabbitMQ virtual host | `vhnotificationapi` |
@@ -177,7 +198,7 @@ provider-adapters/
   .prettierrc                    # { singleQuote: true, trailingComma: "all" }
   eslint.config.mjs              # ESLint flat config (typescript-eslint + prettier)
   jest.setup.ts                  # Jest setup (reflect-metadata)
-  nest-cli.json                  # NestJS monorepo config (adapter-mailgun + adapter-whatsapp + common)
+  nest-cli.json                  # NestJS monorepo config (adapter-mailgun + adapter-braze + adapter-whatsapp + adapter-aws-ses + common)
   package.json                   # Dependencies and npm scripts (monorepo)
   package-lock.json
   tsconfig.json                  # ES2023 target, nodenext modules, @app/common paths
@@ -242,6 +263,62 @@ provider-adapters/
         app.e2e-spec.ts            # E2E: health, capabilities, metrics
         send.e2e-spec.ts           # E2E: POST /send (all channels, validation, errors)
         webhooks.e2e-spec.ts       # E2E: POST /webhooks/inbound (postbacks, Currents, verification)
+        jest-e2e.json              # Jest E2E config
+    adapter-aws-ses/
+      .env.example                 # Environment variables template
+      tsconfig.app.json            # App-specific TS config extending root
+      src/
+        main.ts                    # Bootstrap: Pino logger, global pipes/filters/interceptors, CORS, port 3174
+        app.module.ts              # Root module: SesConfigModule, LoggerModule, MetricsModule, HealthModule, SendModule, WebhooksModule
+        config/
+          config.module.ts         # ConfigModule.forRoot (isGlobal, env validation, ses + rabbitmq configs)
+          ses.config.ts            # registerAs 'ses': port, nodeEnv, mode (smtp/api), region, fromAddress, configurationSet, SMTP/API credentials, timeout
+          rabbitmq.config.ts       # registerAs 'rabbitmq': host, port, vhost, user, password
+          env.validation.ts        # class-validator EnvironmentVariables + validate()
+        errors/
+          ses-errors.ts            # SES_ERROR_CODES (10 SES-prefixed + inherited PA- base)
+          ses-errors.spec.ts
+        ses-client/
+          ses-client.module.ts     # Provides SES_CLIENT token via SesClientFactoryService (SMTP or API based on SES_MODE)
+          ses-client-factory.service.ts    # Factory: reads SES_MODE config, returns SMTP or API client
+          ses-client-factory.service.spec.ts
+          ses-api-client.service.ts        # AWS SES v2 API client (SendEmailCommand, GetAccountCommand, raw MIME for attachments)
+          ses-api-client.service.spec.ts
+          ses-smtp-client.service.ts       # Nodemailer SMTP transport (email-smtp.{region}.amazonaws.com)
+          ses-smtp-client.service.spec.ts
+          interfaces/
+            ses.interfaces.ts      # SesClientInterface, SesApiResponse, SesAccountInfo, SesSendResult, SES_CLIENT token
+        send/
+          send.module.ts           # Imports SesClientModule, provides SendService, ErrorClassifierService, SendController
+          send.service.ts          # Send pipeline: validate channel, process attachments (40MB SMTP/10MB API), build email, send via SES_CLIENT
+          send.controller.ts       # POST /send (@HttpCode(200))
+          error-classifier.service.ts   # AWS SDK error types + SMTP error codes → retryable/errorCode
+          send.service.spec.ts
+          send.controller.spec.ts
+          error-classifier.service.spec.ts
+        health/
+          health.module.ts         # Imports SesClientModule, provides SesHealthService + HealthController
+          health.controller.ts     # GET /health, GET /capabilities (dynamic maxAttachmentSizeMb based on SES_MODE)
+          health.controller.spec.ts
+          ses-health.service.ts    # Extends BaseHealthService, delegates to SES_CLIENT.checkConnectivity()
+          ses-health.service.spec.ts
+        webhooks/
+          webhooks.module.ts       # Imports AppRabbitMQModule, provides verification/normalizer/service/controller
+          webhooks.controller.ts   # POST /webhooks/inbound (SNS subscription confirmation + notification handling)
+          webhooks.controller.spec.ts
+          webhooks.service.ts      # Pipeline: verify → normalize → publish → metrics
+          webhooks.service.spec.ts
+          webhook-verification.service.ts    # SNS certificate-based signature verification
+          webhook-verification.service.spec.ts
+          webhook-normalizer.service.ts      # 11 SES event types → WebhookEventDto normalization
+          webhook-normalizer.service.spec.ts
+          interfaces/
+            ses-webhook.interfaces.ts  # SnsNotification, SesEvent, SesBounce, SesComplaint, etc.
+      test/
+        test-utils.ts              # E2E test helper (createMockSesClient, createMockNodemailerTransporter, createMockSESv2Client)
+        app.e2e-spec.ts            # E2E: health, capabilities, metrics
+        send.e2e-spec.ts           # E2E: POST /send (valid email, validation, attachments, ThrottlingException, MessageRejected)
+        webhooks.e2e-spec.ts       # E2E: POST /webhooks/inbound (SNS confirmation, delivery events, verification)
         jest-e2e.json              # Jest E2E config
     adapter-whatsapp/
       tsconfig.app.json          # App-specific TS config extending root

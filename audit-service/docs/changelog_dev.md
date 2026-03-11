@@ -5,6 +5,25 @@
 
 ## [Unreleased]
 
+### Added: XLSX export endpoint for audit logs (2026-03-11)
+
+- `GET /audit/logs/export` — New endpoint that generates a styled XLSX file with audit log data joined with delivery receipts. Accepts same filters as `GET /audit/logs` but requires `from`/`to` date range. Returns binary XLSX as `StreamableFile` download.
+- `AuditExportService` — New service that builds an ExcelJS workbook with: styled header row (bold white text, blue background), color-coded data rows by delivery status (green for delivered/sent, red for failed, orange for bounced/suppressed), truncation warning row when results exceed configurable `EXPORT_MAX_ROWS` (default 50,000).
+- `ExportAuditLogsQueryDto` — New DTO with required `from`/`to` and optional filter fields (no pagination).
+- `AuditEventsRepository.findForExport()` — New method that LEFT JOINs `delivery_receipts` on `notification_id` to include channel, provider, and delivery status in export rows.
+- `AUD-011` error code — Export date range required (400).
+- `AUD-012` error code — Export row limit exceeded (400, informational).
+- `app.config.ts` — Added `exportMaxRows` configuration (env: `EXPORT_MAX_ROWS`, default: 50,000).
+- `exceljs` dependency added.
+- Unit tests: `audit-export.service.spec.ts` — 12 tests covering workbook generation, color coding, truncation, date range validation, empty results.
+
+### Added: Manual analytics aggregation trigger endpoint (2026-03-11)
+
+- `POST /audit/analytics/aggregate` — New endpoint to manually trigger analytics aggregation on demand. Accepts optional `{ period: "hourly" | "daily" }` body (defaults to both). Hourly aggregates 24 one-hour windows back from current hour; daily aggregates today (midnight to now). Returns `{ hourly: boolean, daily: boolean }` indicating which aggregations ran.
+- `TriggerAggregationDto` — New DTO with optional `period` field validated to `"hourly" | "daily"`.
+- `AggregationService.runManualAggregation()` — New method orchestrating manual aggregation for specified or all periods.
+- `AUD-010` error code — Aggregation failure (500).
+
 ### Added: Technical implementation reference documentation (2026-03-01)
 
 - `tech-audit-service-v1.md` — Technical implementation reference documentation

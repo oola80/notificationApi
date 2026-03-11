@@ -15,6 +15,7 @@
 | Method | Path | Description | Status |
 |--------|------|-------------|--------|
 | GET | `/audit/logs` | Returns paginated audit event log entries with filtering and full-text search | Done |
+| GET | `/audit/logs/export` | Generates and downloads a styled XLSX file with audit logs joined with delivery receipts | Done |
 | GET | `/audit/search` | Full-text search across audit events using tsvector/tsquery | Done |
 
 ## Receipt Endpoints
@@ -29,6 +30,7 @@
 |--------|------|-------------|--------|
 | GET | `/audit/analytics` | Returns pre-aggregated analytics data (hourly/daily) with channel and event type filters | Done |
 | GET | `/audit/analytics/summary` | Returns high-level summary for dashboard consumption (today, last 7 days, channel breakdown) | Done |
+| POST | `/audit/analytics/aggregate` | Manually triggers analytics aggregation (hourly, daily, or both) | Done |
 
 ## DLQ Endpoints
 

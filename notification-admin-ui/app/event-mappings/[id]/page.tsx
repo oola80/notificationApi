@@ -30,7 +30,6 @@ export default function MappingDetailPage({
       name: data.name,
       description: data.description || undefined,
       priority: data.priority,
-      isActive: data.isActive,
       fieldMappings: fieldMappingsToApi(data.fieldMappings),
       timestampField: data.timestampField || undefined,
       timestampFormat: data.timestampFormat || undefined,

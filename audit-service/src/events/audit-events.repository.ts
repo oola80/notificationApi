@@ -4,6 +4,24 @@ import { Repository } from 'typeorm';
 import { PgBaseRepository, PaginatedResult } from '../common/base/pg-base.repository.js';
 import { AuditEvent } from './entities/audit-event.entity.js';
 
+export interface ExportRow {
+  createdAt: string;
+  notificationId: string | null;
+  correlationId: string | null;
+  cycleId: string | null;
+  eventType: string;
+  actor: string;
+  metadata: Record<string, unknown> | null;
+  channel: string | null;
+  provider: string | null;
+  deliveryStatus: string | null;
+}
+
+export interface ExportResult {
+  rows: ExportRow[];
+  totalCount: number;
+}
+
 export interface AuditLogFilters {
   notificationId?: string;
   correlationId?: string;
@@ -178,5 +196,87 @@ export class AuditEventsRepository extends PgBaseRepository<AuditEvent> {
       .getRawMany();
 
     return rows.map((r: { notificationId: string }) => r.notificationId);
+  }
+
+  async findForExport(
+    filters: Omit<AuditLogFilters, 'page' | 'limit'>,
+    maxRows: number,
+  ): Promise<ExportResult> {
+    const paramValues: unknown[] = [];
+    const whereClauses: string[] = [];
+    let paramIndex = 0;
+
+    const addFilter = (clause: string, value: unknown) => {
+      paramIndex++;
+      whereClauses.push(clause.replace('?', `$${paramIndex}`));
+      paramValues.push(value);
+    };
+
+    if (filters.notificationId) {
+      addFilter('ae.notification_id = ?', filters.notificationId);
+    }
+    if (filters.correlationId) {
+      addFilter('ae.correlation_id = ?', filters.correlationId);
+    }
+    if (filters.cycleId) {
+      addFilter('ae.cycle_id = ?', filters.cycleId);
+    }
+    if (filters.eventType) {
+      addFilter('ae.event_type = ?', filters.eventType);
+    }
+    if (filters.actor) {
+      addFilter('ae.actor = ?', filters.actor);
+    }
+    if (filters.from) {
+      addFilter('ae.created_at >= ?', filters.from);
+    }
+    if (filters.to) {
+      addFilter('ae.created_at <= ?', filters.to);
+    }
+    if (filters.q) {
+      addFilter('ae.search_vector @@ plainto_tsquery(?)', filters.q);
+    }
+
+    const whereSQL = whereClauses.length > 0
+      ? 'WHERE ' + whereClauses.join(' AND ')
+      : '';
+
+    // Count query (schema-qualified: repository.query() does not use TypeORM search_path)
+    const countSQL = `
+      SELECT COUNT(*) AS "count"
+      FROM audit_service.audit_events ae
+      LEFT JOIN audit_service.delivery_receipts dr ON dr.notification_id = ae.notification_id
+      ${whereSQL}
+    `;
+    const countResult = await this.repository.query(countSQL, paramValues);
+    const totalCount = parseInt(countResult?.[0]?.count ?? '0', 10);
+
+    // Data query
+    paramIndex++;
+    const limitParam = `$${paramIndex}`;
+    const dataSQL = `
+      SELECT
+        ae.created_at AS "createdAt",
+        ae.notification_id AS "notificationId",
+        ae.correlation_id AS "correlationId",
+        ae.cycle_id AS "cycleId",
+        ae.event_type AS "eventType",
+        ae.actor AS "actor",
+        ae.metadata AS "metadata",
+        dr.channel AS "channel",
+        dr.provider AS "provider",
+        dr.status AS "deliveryStatus"
+      FROM audit_service.audit_events ae
+      LEFT JOIN audit_service.delivery_receipts dr ON dr.notification_id = ae.notification_id
+      ${whereSQL}
+      ORDER BY ae.created_at DESC
+      LIMIT ${limitParam}
+    `;
+    const rows: ExportRow[] = await this.repository.query(
+      dataSQL,
+      [...paramValues, maxRows + 1],
+    );
+
+    return { rows: rows.slice(0, maxRows), totalCount };
   }
 }

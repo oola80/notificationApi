@@ -74,7 +74,7 @@ export class NotificationAnalyticsRepository extends PgBaseRepository<Notificati
     row: AggregationRow,
   ): Promise<void> {
     await this.dataSource.query(
-      `INSERT INTO notification_analytics
+      `INSERT INTO audit_service.notification_analytics
         (period, period_start, channel, event_type,
          total_sent, total_delivered, total_failed,
          total_opened, total_clicked, total_bounced,
@@ -121,7 +121,7 @@ export class NotificationAnalyticsRepository extends PgBaseRepository<Notificati
          COUNT(*) FILTER (WHERE status = 'opened')::int as total_opened,
          COUNT(*) FILTER (WHERE status = 'clicked')::int as total_clicked,
          COUNT(*) FILTER (WHERE status = 'bounced')::int as total_bounced
-       FROM delivery_receipts
+       FROM audit_service.delivery_receipts
        WHERE received_at >= $1 AND received_at < $2
        GROUP BY channel`,
       [periodStart, periodEnd],
@@ -149,7 +149,7 @@ export class NotificationAnalyticsRepository extends PgBaseRepository<Notificati
       `SELECT
          COALESCE(metadata->>'channel', '_unknown') as channel,
          COUNT(*)::int as count
-       FROM audit_events
+       FROM audit_service.audit_events
        WHERE created_at >= $1 AND created_at < $2
          AND event_type LIKE '%SUPPRESS%'
        GROUP BY COALESCE(metadata->>'channel', '_unknown')`,

@@ -203,6 +203,7 @@ export class DeliveryPipelineService {
         'SENT',
         sendDurationMs,
         sendResult,
+        sendRequest,
       );
 
       this.metricsService.incrementDelivery(
@@ -260,6 +261,7 @@ export class DeliveryPipelineService {
           'RETRYING',
           sendDurationMs,
           sendResult,
+          sendRequest,
         );
 
         this.metricsService.incrementRetry(
@@ -353,6 +355,7 @@ export class DeliveryPipelineService {
       'FAILED',
       sendDurationMs,
       sendResult,
+      sendRequest,
     );
 
     this.metricsService.incrementDelivery(
@@ -653,6 +656,7 @@ export class DeliveryPipelineService {
     status: string,
     durationMs: number,
     sendResult: any,
+    sentPayload?: SendRequest,
   ): void {
     this.deliveryAttemptsRepository
       .create({
@@ -666,6 +670,7 @@ export class DeliveryPipelineService {
         providerMessageId: sendResult?.providerMessageId ?? null,
         providerResponse: sendResult?.providerResponse ?? null,
         errorMessage: sendResult?.errorMessage ?? null,
+        metadata: sentPayload ? { sentPayload } : null,
       })
       .catch((err) => {
         this.logger.error(

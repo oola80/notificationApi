@@ -6,6 +6,60 @@
 
 ## [Unreleased]
 
+### Feature: Include Meta API payload in adapter-whatsapp providerResponse (2026-03-10)
+
+- `apps/adapter-whatsapp/src/send/send.service.ts` — `providerResponse` now returns `{ sentPayload: WhatsAppMessage, apiResponse: MetaApiResponse }` on success, and `{ sentPayload: WhatsAppMessage }` on error (if the message was built before the error). Exposes the actual Meta Cloud API request payload (template name, parameters, phone number, message type) for debugging in the admin UI.
+
+### Feature: adapter-aws-ses Phase 3 — API Mode Send, Dual-Mode Support, Final Integration (2026-03-10)
+
+#### apps/adapter-aws-ses/ — Phase 3 API Mode & Dual-Mode
+
+##### ses-client/ — Dual-Mode Client Architecture
+- **SesApiClientService** (`ses-api-client.service.ts`): New API mode client using `@aws-sdk/client-sesv2` `SESv2Client`:
+  - `sendEmail()`: Simple email via `SendEmailCommand` (HTML/text, subject, replyTo, EmailTags from X-headers, ConfigurationSetName)
+  - Raw MIME email with attachments via `Content.Raw` (multipart/mixed boundary construction, Base64-encoded attachment parts, custom headers)
+  - `getAccountInfo()`: Calls `GetAccountCommand` returning sending quota (MaxSendRate, Max24HourSend, SentLast24Hours, SendingEnabled)
+  - `checkConnectivity()`: Health check via GetAccount with quota details in response
+  - Initialized with region, IAM credentials (optional — supports instance roles), timeout config
+- **SesClientInterface** (`interfaces/ses.interfaces.ts`): Abstract interface (`sendEmail`, `checkConnectivity`) implemented by both SMTP and API clients
+  - New types: `SesApiResponse`, `SesAccountInfo`, `SesSendResult`, `SES_CLIENT` injection token
+- **SesSmtpClientService**: Updated to implement `SesClientInterface` with new `checkConnectivity()` method
+- **SesClientFactoryService** (`ses-client-factory.service.ts`): Factory reads `SES_MODE` config, returns SMTP or API client. Throws on invalid mode.
+- **SesClientModule**: Updated to provide `SES_CLIENT` token via factory pattern, exports both client services
+
+##### send/ — Dual-Mode Send Pipeline
+- **SendService**: Refactored to inject `SES_CLIENT` token (interface-based) instead of direct `SesSmtpClientService` reference
+  - Dynamic attachment size limit: 40 MB (SMTP) / 10 MB (API) based on `SES_MODE`
+- **ErrorClassifierService**: Added AWS SDK error type classification (checked before message-based patterns):
+  - `ThrottlingException` / `TooManyRequestsException` → retryable SES-006 (429)
+  - `MessageRejected` → non-retryable SES-007 (400)
+  - `AccountSendingPausedException` → non-retryable SES-008 (403)
+  - `MailFromDomainNotVerifiedException` → non-retryable SES-005 (400)
+  - `NotFoundException` / `BadRequestException` → non-retryable SES-007 (400)
+  - Generic `$metadata.httpStatusCode >= 500` → retryable SES-002 (503)
+
+##### health/ — Dual-Mode Health Check
+- **SesHealthService**: Refactored to inject `SES_CLIENT` token; delegates to `checkConnectivity()` (SMTP: verifyConnection, API: GetAccount with quota details)
+- **HealthController**: `GET /capabilities` now returns dynamic `maxAttachmentSizeMb` (10 for API, 40 for SMTP) based on `SES_MODE`
+
+##### Dependencies
+- Added `@aws-sdk/client-sesv2` to `package.json`
+
+##### Tests
+- **New unit tests** (2 new suites):
+  - `ses-api-client.service.spec.ts`: 18 tests — simple send, raw MIME attachments, configuration set, EmailTags, getAccountInfo, checkConnectivity, error propagation
+  - `ses-client-factory.service.spec.ts`: 4 tests — SMTP/API client selection, invalid mode, default mode
+- **Updated unit tests** (3 suites):
+  - `send.service.spec.ts`: Updated mock to use `SesClientInterface` shape
+  - `error-classifier.service.spec.ts`: Added 9 tests for AWS SDK error types (ThrottlingException, TooManyRequestsException, MessageRejected, AccountSendingPausedException, MailFromDomainNotVerifiedException, NotFoundException, BadRequestException, 5xx server errors)
+  - `ses-health.service.spec.ts`: Rewritten with `checkConnectivity` mock — SMTP mode, API mode with quota details, error handling
+  - `health.controller.spec.ts`: Added API mode `maxAttachmentSizeMb=10` test
+- **Updated E2E tests**:
+  - `test-utils.ts`: Refactored with `createMockSesClient()`, `createMockNodemailerTransporter()`, `createMockSESv2Client()` shared factories; `SES_CLIENT` override
+  - `send.e2e-spec.ts`: Added ThrottlingException and MessageRejected E2E scenarios
+  - `app.e2e-spec.ts`: Updated to use new test-utils pattern
+- **Total: 170 unit tests / 13 suites, 20 E2E tests / 3 suites**
+
 ### Feature: adapter-braze Phase 4 — Webhooks (Postbacks + Currents), Final Polish & Full E2E (2026-03-09)
 
 #### libs/common/

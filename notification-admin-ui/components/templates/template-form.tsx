@@ -35,6 +35,11 @@ import {
   FormControl,
   FormDescription,
   FormMessage,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui";
 import { PageHeader, ChannelIcon } from "@/components/shared";
 import { TipTapEditor } from "./tiptap-editor";
@@ -46,11 +51,13 @@ import {
   extractVariables,
   CHANNEL_OPTIONS,
   CHANNEL_LABELS,
+  WHATSAPP_LANGUAGE_OPTIONS,
   SMS_MAX_CHARS,
   PUSH_MAX_CHARS,
   type CreateTemplateFormData,
   type UpdateTemplateFormData,
   type ChannelOption,
+  type MetaTemplateParameter,
 } from "@/lib/validators/template-schemas";
 import type { Template, ChannelType } from "@/types";
 
@@ -80,12 +87,25 @@ function TemplateForm({
   // Use the appropriate schema
   const schema = isEditing ? updateTemplateSchema : createTemplateSchema;
 
-  const defaultChannels = initialData?.versions?.[0]?.channels?.map((c) => ({
-    channel: c.channel as ChannelOption,
-    subject: c.subject ?? "",
-    body: c.body,
-    metadata: c.metadata,
-  })) ?? [
+  const defaultChannels = initialData?.versions?.[0]?.channels?.map((c) => {
+    const base = {
+      channel: c.channel as ChannelOption,
+      subject: c.subject ?? "",
+      body: c.body,
+      metadata: c.metadata,
+      metaTemplateName: undefined as string | undefined,
+      metaTemplateLanguage: undefined as string | undefined,
+      metaTemplateParameters: undefined as MetaTemplateParameter[] | undefined,
+    };
+    // Extract WhatsApp metadata fields to top-level form fields
+    if (c.channel === "whatsapp" && c.metadata) {
+      const meta = c.metadata as Record<string, unknown>;
+      if (meta.metaTemplateName) base.metaTemplateName = meta.metaTemplateName as string;
+      if (meta.metaTemplateLanguage) base.metaTemplateLanguage = meta.metaTemplateLanguage as string;
+      if (Array.isArray(meta.metaTemplateParameters)) base.metaTemplateParameters = meta.metaTemplateParameters as MetaTemplateParameter[];
+    }
+    return base;
+  }) ?? [
     { channel: "email" as const, subject: "", body: "", metadata: undefined },
   ];
 
@@ -143,6 +163,21 @@ function TemplateForm({
   );
 
   const handleFormSubmit = async (data: Record<string, unknown>) => {
+    // Move WhatsApp-specific fields into metadata before submitting
+    const channels = (data.channels as Record<string, unknown>[]) ?? [];
+    for (const ch of channels) {
+      if (ch.channel === "whatsapp") {
+        const metadata = (ch.metadata as Record<string, unknown>) ?? {};
+        if (ch.metaTemplateName) metadata.metaTemplateName = ch.metaTemplateName;
+        if (ch.metaTemplateLanguage) metadata.metaTemplateLanguage = ch.metaTemplateLanguage;
+        if (ch.metaTemplateParameters) metadata.metaTemplateParameters = ch.metaTemplateParameters;
+        ch.metadata = metadata;
+      }
+      // Remove top-level WhatsApp fields so the API receives clean data
+      delete ch.metaTemplateName;
+      delete ch.metaTemplateLanguage;
+      delete ch.metaTemplateParameters;
+    }
     await onSubmit(data as CreateTemplateFormData | UpdateTemplateFormData);
   };
 
@@ -334,6 +369,9 @@ function TemplateForm({
                                 subject: (ch === "email" || ch === "push") ? "" : undefined,
                                 body: "",
                                 metadata: undefined,
+                                metaTemplateName: ch === "whatsapp" ? "" : undefined,
+                                metaTemplateLanguage: ch === "whatsapp" ? "" : undefined,
+                                metaTemplateParameters: ch === "whatsapp" ? [] : undefined,
                               });
                               setActiveTab(ch);
                             }}
@@ -392,6 +430,11 @@ function TemplateForm({
                                 </FormItem>
                               )}
                             />
+                          )}
+
+                          {/* WhatsApp-specific fields */}
+                          {field.channel === "whatsapp" && (
+                            <WhatsAppFields form={form} index={index} />
                           )}
 
                           {/* Body */}
@@ -520,6 +563,128 @@ function TemplateForm({
             <TemplatePreview template={initialData} />
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// --- WhatsApp-specific fields ---
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function WhatsAppFields({ form, index }: { form: any; index: number }) {
+  const parameters: MetaTemplateParameter[] =
+    form.watch(`channels.${index}.metaTemplateParameters`) ?? [];
+
+  const addParameter = () => {
+    const current = form.getValues(`channels.${index}.metaTemplateParameters`) ?? [];
+    form.setValue(`channels.${index}.metaTemplateParameters`, [...current, { name: "", field: "" }], {
+      shouldDirty: true,
+    });
+  };
+
+  const removeParameter = (paramIndex: number) => {
+    const current: MetaTemplateParameter[] =
+      form.getValues(`channels.${index}.metaTemplateParameters`) ?? [];
+    form.setValue(
+      `channels.${index}.metaTemplateParameters`,
+      current.filter((_, i) => i !== paramIndex),
+      { shouldDirty: true },
+    );
+  };
+
+  const updateParameter = (paramIndex: number, key: "name" | "field", value: string) => {
+    const current: MetaTemplateParameter[] =
+      form.getValues(`channels.${index}.metaTemplateParameters`) ?? [];
+    const updated = current.map((p, i) => (i === paramIndex ? { ...p, [key]: value } : p));
+    form.setValue(`channels.${index}.metaTemplateParameters`, updated, { shouldDirty: true });
+  };
+
+  return (
+    <div className="space-y-4 rounded-md border border-border p-4">
+      <p className="text-sm font-medium">WhatsApp Meta Template Configuration</p>
+
+      {/* Meta Template Name */}
+      <FormField
+        control={form.control}
+        name={`channels.${index}.metaTemplateName`}
+        render={({ field: f }) => (
+          <FormItem>
+            <FormLabel>Meta Template Name</FormLabel>
+            <FormControl>
+              <Input placeholder="e.g., order_confirmation" {...f} />
+            </FormControl>
+            <FormDescription>
+              The template name registered in Meta Business Manager
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {/* Meta Template Language */}
+      <FormField
+        control={form.control}
+        name={`channels.${index}.metaTemplateLanguage`}
+        render={({ field: f }) => (
+          <FormItem>
+            <FormLabel>Template Language</FormLabel>
+            <Select onValueChange={f.onChange} value={f.value ?? ""}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {WHATSAPP_LANGUAGE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormDescription>
+              Language code matching the Meta template
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {/* Template Parameters */}
+      <div className="space-y-2">
+        <FormLabel>Template Parameters</FormLabel>
+        <FormDescription>
+          Map Meta template placeholders to event payload fields
+        </FormDescription>
+        {parameters.map((param, paramIndex) => (
+          <div key={paramIndex} className="flex items-center gap-2">
+            <Input
+              placeholder="Parameter name"
+              value={param.name}
+              onChange={(e) => updateParameter(paramIndex, "name", e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              placeholder="Event field"
+              value={param.field}
+              onChange={(e) => updateParameter(paramIndex, "field", e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0 text-destructive hover:text-destructive"
+              onClick={() => removeParameter(paramIndex)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={addParameter}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Add Parameter
+        </Button>
       </div>
     </div>
   );

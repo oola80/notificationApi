@@ -25,4 +25,5 @@ export default registerAs('app', () => ({
   analyticsDailyCron: process.env.ANALYTICS_DAILY_CRON ?? '15 0 * * *',
   searchMaxResults: parseInt(process.env.SEARCH_MAX_RESULTS ?? '200', 10),
   logLevel: process.env.LOG_LEVEL ?? 'info',
+  exportMaxRows: parseInt(process.env.EXPORT_MAX_ROWS ?? '50000', 10),
 }));
